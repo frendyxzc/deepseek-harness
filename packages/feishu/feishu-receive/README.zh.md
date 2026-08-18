@@ -2,19 +2,25 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness 的飞书消息接收消费方。把收到的飞书 webhook 事件路由进活跃 agent 会话。
+DeepSeek Harness 的飞书长连接接收消费方。把每个飞书聊天路由进各自的 agent 会话。
 
 ## 用途
 
-启动 `ctx.feishu` 接收通道，并把每条收到的消息作为用户 follow-up 注入到第一个 root agent，使 agent 能接收并回复发给飞书 bot 的消息。
+启动 `ctx.feishu` 接收通道，并在某个聊天首次发来消息时，为该聊天创建一个专属 root agent，然后把该聊天的每条消息作为用户 follow-up 注入到那个 agent。每个聊天的会话 id 都是全新的 `feishu-<uuid>`，聊天 → 会话的对应关系存放在内存映射里，因此同一个聊天在进程内复用同一个会话，重启后则重新开始（不做跨重启恢复）。该 agent 运行活跃会话的同一 preset —— 包括 `dsh-tool-feishu`，从而能在自己的聊天里回复 —— 并继承活跃会话的模型路由与工作目录。工作目录是必需的：接收通道必须在活跃 root 会话拥有 cwd 之后才能启动，否则任意聊天的首条消息会被拒绝（记入日志，不抛出），直到出现携带 cwd 的活跃 root。每个按聊天划分的 agent 会获得一个系统提示词上下文（`feishu:chat-context`，order 130），告知模型其飞书 chat id，并说明文本回复对用户不可见，除非通过 `feishu_send_message` 以 `receiveIdType: "chat_id"` 发送。
+
+### 配置
+
+| 字段 | 类型 | 默认值 | 说明 |
+| ---- | ---- | ------ | ---- |
+| `cwd` | `string` | — | 当活跃 root agent 不存在或其 cwd 不可用时，按聊天划分 agent 的回退工作目录。未设置时，任意聊天的首条消息会被拒绝，直到出现携带 cwd 的活跃 root。在 `cordis.patch.yml` 中将其设为项目目录，接收通道即可在启动后立即可用。 |
 
 ## 依赖
 
-要求组合中存在 `ctx.feishu`（飞书 seam）、`ctx.agents`（agent 注册表）与 `ctx.webServer`（provider 注册 webhook 路由所用的 Web 服务器）。对 Web 服务器的依赖同时也约束了启动顺序：只有在 Web 服务器就绪后接收通道才会启动；缺少 Web 服务器的组合会在激活阶段失败，而不是静默地不接收消息。
+要求组合中存在 `ctx.feishu`（飞书 seam）、`ctx.agents`（用于创建每个按聊天划分 agent 的 agent 注册表）、`ctx.agentPresets`（用于按活跃会话的 preset 组装每个 agent 的 roster）与 `ctx.systemPrompt`（用于注册按聊天划分的回复指导）。
 
 ## 模型体验
 
-间接地，通过它注入到会话日志的用户消息体现。该消费方自身不注册任何提示或 schema 内容。
+间接地，通过它注入到每个按聊天划分的会话日志的用户消息体现。该消费方自身不注册任何提示或 schema 内容。
 
 #### KV Cache 影响
 
@@ -22,5 +28,5 @@ DeepSeek Harness 的飞书消息接收消费方。把收到的飞书 webhook 事
 
 ## 已知局限与推迟工作
 
-- **单 agent 路由** —— 只有第一个 root agent 通过 `followup` 接收消息（投递会唤醒空闲 agent）。按聊天或发送者路由到特定 agent 被推迟。
-- **无消息过滤** —— 所有收到的文本消息都会被注入；按 chat_id 或发送者过滤被推迟。
+- **进程本地路由映射** —— 聊天 → 会话的对应关系在内存中、每次启动重建，且每个会话 id 都是全新 UUID，因此重启后每个聊天都会以新的会话开始（不保留跨重启历史）。
+- **无发送者归属** —— 注入的消息只携带文本内容，不携带是哪位成员发送的；群聊中按发送者归属被推迟。

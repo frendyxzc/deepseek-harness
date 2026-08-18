@@ -18,13 +18,22 @@
       "path": "../../core/agent"
     },
     {
+      "path": "../../core/session"
+    },
+    {
       "path": "../../llm/llm"
+    },
+    {
+      "path": "../../preset/agent-presets"
     },
     {
       "path": "../feishu"
     },
     {
-      "path": "../../host/webserver"
+      "path": "../../core/system-prompt"
+    },
+    {
+      "path": "../../../vendor/schemastery"
     },
     {
       "path": "../../runtime-diagnostics/invariants"

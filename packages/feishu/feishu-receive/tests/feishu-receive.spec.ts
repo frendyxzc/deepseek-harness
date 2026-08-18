@@ -1,7 +1,8 @@
 /**
- * Consumer tests: incoming Feishu events route to the first root agent through
- * followup, a root-less composition drops the event without raising, and the
- * namespace exports survive the real Loader unwrap path.
+ * Consumer tests: incoming Feishu events create a dedicated agent per chat (keyed
+ * by a fresh `feishu-<uuid>` session id, running the live session's preset),
+ * deliver each message to that agent via followup, reuse the agent for the same
+ * chat within one process, and survive the real Loader unwrap path.
  */
 
 import { describe, expect, it, vi } from 'vitest'
@@ -10,7 +11,59 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import FeishuRuntime, { type FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
 import * as FeishuReceive from '@deepseek-ai/dsh-feishu-receive'
 
-function mountReceive(onRoots: () => unknown[]): Promise<{ ctx: Context; handler: (event: FeishuReceiveEvent) => void; fiber: Awaited<ReturnType<Context['plugin']>> }> {
+interface CreatedAgent {
+  id: string
+  followup: ReturnType<typeof vi.fn>
+  dispose: ReturnType<typeof vi.fn>
+}
+
+interface CreatedOptions {
+  sessionId: string
+  meta?: { agentPreset?: string; cwd?: string }
+  agentOptions?: { provider?: string; model?: string; maxTokens?: number }
+  setup?: (agentCtx: Context) => Promise<void>
+}
+
+interface MountOptions {
+  onRoots?: () => unknown[]
+  presetOfRoot?: string
+  defaultId?: string
+  config?: { cwd?: string }
+}
+
+function root(): unknown {
+  return {
+    ctx: {},
+    options: { provider: 'p1', model: 'm1' },
+    session: { header: { cwd: '/work' } },
+  }
+}
+
+/**
+ * A mock systemPrompt service that records context registrations. Each call
+ * returns a no-op disposer so the setup callback completes normally.
+ */
+function mockSystemPrompt() {
+  const contextCalls: { name: string; order: number; text: string }[] = []
+  return {
+    context: vi.fn((entry: { name: string; order: number; text: string }) => {
+      contextCalls.push(entry)
+      return () => {}
+    }),
+    section: vi.fn(() => () => {}),
+    assemble: vi.fn(async () => ({ sections: [], contexts: [], variables: new Map() })),
+    contextCalls,
+  }
+}
+
+function mountReceive(options: MountOptions = {}): Promise<{
+  ctx: Context
+  handler: (event: FeishuReceiveEvent) => void
+  fiber: Awaited<ReturnType<Context['plugin']>>
+  create: ReturnType<typeof vi.fn>
+  agents: CreatedAgent[]
+  systemPrompt: ReturnType<typeof mockSystemPrompt>
+}> {
   return (async () => {
     const ctx = new Context()
     await ctx.plugin(FeishuRuntime, {})
@@ -23,14 +76,39 @@ function mountReceive(onRoots: () => unknown[]): Promise<{ ctx: Context; handler
       startReceiving: (h) => { handler = h; return () => {} },
     })
 
-    ctx.provide('agents', { roots: onRoots } as never)
-    const fiber = await ctx.plugin(FeishuReceive)
-    return { ctx, handler: handler!, fiber }
+    const systemPrompt = mockSystemPrompt()
+    ctx.provide('systemPrompt', systemPrompt as never)
+
+    const agents: CreatedAgent[] = []
+    const create = vi.fn(async (opts: CreatedOptions) => {
+      const agent: CreatedAgent = { id: opts.sessionId, followup: vi.fn(), dispose: vi.fn(async () => {}) }
+      agents.push(agent)
+      // Call the setup callback so per-chat system-prompt context registration
+      // runs, matching the real agents.create contract.
+      if (opts.setup !== undefined) {
+        const agentCtx = ctx.extend({ agent })
+        await opts.setup(agentCtx)
+      }
+      return { agent, dispose: agent.dispose }
+    })
+
+    ctx.provide('agents', {
+      roots: options.onRoots ?? (() => []),
+      create,
+    } as never)
+    ctx.provide('agentPresets', {
+      defaultId: options.defaultId ?? 'preset-default',
+      composedPreset: () => options.presetOfRoot,
+      mount: vi.fn(async () => {}),
+    } as never)
+
+    const fiber = await ctx.plugin(FeishuReceive, options.config ?? {})
+    return { ctx, handler: handler!, fiber, create, agents, systemPrompt }
   })()
 }
 
-function event(text: string): FeishuReceiveEvent {
-  return { eventType: 'im.message.receive_v1', senderId: 'ou_1', senderIdType: 'open_id', chatId: 'oc_1', content: text, raw: {} }
+function event(text: string, chatId = 'oc_1'): FeishuReceiveEvent {
+  return { eventType: 'im.message.receive_v1', senderId: 'ou_1', senderIdType: 'open_id', chatId, content: text, raw: {} }
 }
 
 describe('feishu-receive', () => {
@@ -40,30 +118,153 @@ describe('feishu-receive', () => {
     const unwrapped = loader.unwrapExports(FeishuReceive) as Record<string, unknown>
     expect(unwrapped).toBe(FeishuReceive)
     expect(unwrapped.name).toBe('feishu-receive')
-    expect(unwrapped.inject).toEqual(['feishu', 'agents'])
+    expect(unwrapped.inject).toEqual(['feishu', 'agents', 'agentPresets', 'systemPrompt'])
     expect(typeof unwrapped.apply).toBe('function')
   })
 
-  it('delivers a received message to the first root agent via followup', async () => {
-    const followup = vi.fn()
-    const root = { id: 'agent-1', followup }
-    const { ctx, handler, fiber } = await mountReceive(() => [root])
+  it('creates a per-chat agent running the live preset and delivers via followup', async () => {
+    const { ctx, handler, fiber, create, agents } = await mountReceive({
+      onRoots: () => [root()],
+      presetOfRoot: 'preset-web',
+    })
 
     handler(event('hello'))
 
-    expect(followup).toHaveBeenCalledTimes(1)
-    const first = followup.mock.calls[0]
-    expect(first).toBeDefined()
-    const message = first![0] as { content: unknown[]; source: { kind: string } }
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+    const options = create.mock.calls[0]![0] as CreatedOptions
+    expect(options.sessionId).toMatch(/^feishu-/)
+    expect(options.meta?.agentPreset).toBe('preset-web')
+    expect(options.meta?.cwd).toBe('/work')
+    expect(options.agentOptions).toEqual({ provider: 'p1', model: 'm1' })
+
+    await vi.waitFor(() => expect(agents[0]!.followup).toHaveBeenCalledTimes(1))
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[]; source: { kind: string } }
     expect(message.content).toEqual([{ type: 'text', text: 'hello' }])
     expect(message.source.kind).toBe('user')
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
 
-  it('drops the event without raising when no root agent exists', async () => {
-    const { ctx, handler } = await mountReceive(() => [])
+  it('reuses the created agent for a second message from the same chat', async () => {
+    const { ctx, handler, fiber, create, agents } = await mountReceive({ onRoots: () => [root()] })
+
+    handler(event('first'))
+    handler(event('second'))
+
+    await vi.waitFor(() => expect(agents[0]!.followup).toHaveBeenCalledTimes(2))
+    expect(create).toHaveBeenCalledTimes(1)
+    expect(create.mock.calls[0]![0].sessionId).toMatch(/^feishu-/)
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('creates a separate agent per chat with a distinct session id', async () => {
+    const { ctx, handler, fiber, create, agents } = await mountReceive({ onRoots: () => [root()] })
+
+    handler(event('a', 'oc_1'))
+    handler(event('b', 'oc_2'))
+
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(2))
+    expect(create.mock.calls[0]![0].sessionId).toMatch(/^feishu-/)
+    expect(create.mock.calls[1]![0].sessionId).toMatch(/^feishu-/)
+    expect(create.mock.calls[0]![0].sessionId).not.toBe(create.mock.calls[1]![0].sessionId)
+    await vi.waitFor(() => expect(agents[1]!.followup).toHaveBeenCalledTimes(1))
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('falls back to the configured cwd when no live root agent exists', async () => {
+    const { ctx, handler, fiber, create } = await mountReceive({
+      onRoots: () => [],
+      config: { cwd: '/configured-work' },
+    })
+
+    handler(event('hello'))
+
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+    const options = create.mock.calls[0]![0] as CreatedOptions
+    expect(options.meta?.cwd).toBe('/configured-work')
+    expect(options.meta?.agentPreset).toBe('preset-default')
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('rejects the first message when neither root cwd nor config.cwd is available without raising', async () => {
+    const { ctx, handler, fiber, create } = await mountReceive({ onRoots: () => [] })
+
+    // No live root and no config.cwd; resolveTemplate throws synchronously,
+    // the rejection reaches the error logger, and create is never called.
+    // The handler itself does not throw.
     expect(() => { handler(event('hello')) }).not.toThrow()
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(0))
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('registers a per-chat system-prompt context with the chat id and reply instructions', async () => {
+    const { ctx, handler, fiber, systemPrompt } = await mountReceive({
+      onRoots: () => [root()],
+      presetOfRoot: 'preset-web',
+    })
+
+    handler(event('hello', 'oc_42'))
+
+    await vi.waitFor(() => expect(systemPrompt.context).toHaveBeenCalledTimes(1))
+    const entry = systemPrompt.contextCalls[0]!
+    expect(entry.name).toBe('feishu:chat-context')
+    expect(entry.order).toBe(130)
+    expect(entry.text).toContain('oc_42')
+    expect(entry.text).toContain('chat_id')
+    expect(entry.text).toContain('feishu_send_message')
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('drops events without a chat id without raising or creating', async () => {
+    const { ctx, handler, fiber, create } = await mountReceive({ onRoots: () => [root()] })
+
+    expect(() => { handler(event('hello', '')) }).not.toThrow()
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(0))
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('survives a creation failure without raising', async () => {
+    const create = vi.fn(async (): Promise<never> => { throw new Error('preset broken') })
+    const ctx = new Context()
+    await ctx.plugin(FeishuRuntime, {})
+    let handler: ((event: FeishuReceiveEvent) => void) | undefined
+    ctx.feishu.registerProvider({
+      id: 'scripted',
+      available: () => true,
+      sendMessage: async () => ({ messageId: 'm' }),
+      startReceiving: (h) => { handler = h; return () => {} },
+    })
+    ctx.provide('systemPrompt', mockSystemPrompt() as never)
+    // The live root carries a cwd so resolveTemplate succeeds; the failure
+    // happens inside agents.create, not during template resolution.
+    ctx.provide('agents', { roots: () => [root()], create } as never)
+    ctx.provide('agentPresets', {
+      defaultId: 'preset-default',
+      composedPreset: () => undefined,
+      mount: vi.fn(async () => {}),
+    } as never)
+    const fiber = await ctx.plugin(FeishuReceive)
+
+    expect(() => { handler!(event('hello')) }).not.toThrow()
+    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('disposes every created agent when its fiber disposes', async () => {
+    const { ctx, handler, fiber, agents } = await mountReceive({ onRoots: () => [root()] })
+
+    handler(event('hello'))
+    await vi.waitFor(() => expect(agents[0]!.followup).toHaveBeenCalledTimes(1))
+
+    await fiber.dispose()
+    await vi.waitFor(() => expect(agents[0]!.dispose).toHaveBeenCalledTimes(1))
     await ctx.fiber.dispose()
   })
 })

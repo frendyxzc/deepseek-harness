@@ -2,7 +2,7 @@
 
 English | [中文](feishu.zh.md)
 
-The Feishu (飞书/Lark) chat capability seam — a [capability seam](../../.agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md) that spans **send and receive** on one `ctx.feishu` service, split across packages: Service Definition ([dsh-feishu](../../packages/feishu/feishu), `ctx.feishu` + the provider registry), Service Provider ([dsh-feishu-bot](../../packages/feishu/feishu-bot), the Feishu Open API Bot provider), and Consumers ([dsh-tool-feishu](../../packages/feishu/tool-feishu), the `feishu_send_message` tool; [dsh-feishu-receive](../../packages/feishu/feishu-receive), the receive-to-agent bridge). Feishu is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A provider swap does not change how the model asks to send a message.
+The Feishu (飞书/Lark) chat capability seam — a [capability seam](../../.agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md) that spans **send and receive** on one `ctx.feishu` service, split across packages: Service Definition ([dsh-feishu](../../packages/feishu/feishu), `ctx.feishu` + the provider registry), Service Provider ([dsh-feishu-bot](../../packages/feishu/feishu-bot), the Feishu Open API Bot provider), and Consumers ([dsh-tool-feishu](../../packages/feishu/tool-feishu), the `feishu_send_message` tool; [dsh-feishu-receive](../../packages/feishu/feishu-receive), the per-chat receive router). Feishu is **one optional capability**, not part of the agent-loop spine — so its vocabulary lives here, not in [core.md](core.md). A provider swap does not change how the model asks to send a message.
 
 Source: [`packages/feishu/feishu/src/types.ts`](../../packages/feishu/feishu/src/types.ts)
 
