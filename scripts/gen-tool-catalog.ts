@@ -60,6 +60,8 @@ import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
+import FeishuRuntime from '@deepseek-ai/dsh-feishu'
+import * as ToolFeishu from '@deepseek-ai/dsh-tool-feishu'
 import VmWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
@@ -550,6 +552,26 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-feishu',
+    dir: 'tool-feishu',
+    source: 'packages/feishu/tool-feishu/src/index.ts',
+    requires: ['ctx.tools', 'ctx.feishu', 'ctx.systemPrompt'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Register a scripted provider so the tool registers; its schema does not
+      // depend on provider identity or availability.
+      await ctx.plugin(FeishuRuntime)
+      ctx.feishu.registerProvider({
+        id: 'catalog',
+        available: () => true,
+        sendMessage: async () => ({ messageId: 'catalog' }),
+      })
+      await ctx.plugin(ToolFeishu)
+    },
+    note:
+      'feishu_send_message keeps provider selection behind ctx.feishu so the model-visible schema stays stable across backend swaps.',
   },
 ]
 

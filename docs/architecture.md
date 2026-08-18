@@ -113,6 +113,7 @@ New behavior attaches to a documented extension point. Changing the loop itself 
 | Add shell execution | register a `ctx.shell` backend; the local one spawns through `ctx.subprocess` |
 | Add persistent terminal execution | register a `ctx.terminals` backend plus `dsh-tool-terminal` |
 | Add a human command | register on `ctx.commands`; it dispatches without a model turn |
+| Add Feishu (飞书/Lark) integration | register a `ctx.feishu` provider; the model-facing tool consumes it |
 | Add background work | register on `ctx.jobs`; `job_*` tools collect or stop it |
 | Add filesystem access or policy | register a `ctx.fs` provider or listen to `fs/*` events |
 | Confine spawned processes | use a `ctx.sandbox` backend; consumers wrap argv before spawning |

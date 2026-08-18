@@ -569,6 +569,37 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'feishu',
+    summary: 'The Feishu chat service.',
+    description: 'The Feishu chat service. Registered as `ctx.feishu` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `FEISHU_PROVIDER_CONFIGURED_MISSING`.\n- A configured id registered but unavailable → `FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `FEISHU_PROVIDER_AMBIGUOUS`.\n- No id configured, no usable provider → `FEISHU_PROVIDER_UNAVAILABLE`.',
+    methods: [
+      {
+        signature: 'registerProvider(provider: FeishuProvider): () => void',
+        description: 'Register a Feishu provider. Throws FeishuError `FEISHU_DUPLICATE_PROVIDER` if its id is already registered. Returns a disposer; disposed with the calling fiber.',
+        parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'async sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>',
+        description: 'Send one message through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError when the capability cannot run.',
+        parameters: [{ name: 'request', description: 'the target recipient and content.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the provider\'s send result.',
+      },
+      {
+        signature: 'startReceiving(handler: FeishuReceiveHandler): () => void',
+        description: 'Start receiving messages through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no `startReceiving`, or the provider\'s own failure when it cannot set up its receive channel (e.g. unmatched credentials).',
+        parameters: [{ name: 'handler', description: 'the callback for each received {@link FeishuReceiveEvent}.' }],
+        returns: 'a disposer that stops the receive channel.',
+      },
+      {
+        signature: 'async describeStatus(): Promise<FeishuRuntimeStatus>',
+        description: 'Project the effective connection state of this capability for status surfaces. Applies the same selection rules as sendMessage without throwing; selection failures surface as `state: \'error\'` with FeishuRuntimeStatus.selectionError. Providers without a `status` method project from `available()`.',
+        parameters: [],
+        returns: 'the effective status view.',
+      },
+    ],
+  },
+  {
     key: 'fs',
     summary: 'Abstract filesystem provider.',
     description: 'Abstract filesystem provider. Targets must preserve identity across aliases; reads expose regular UTF-8 text or typed errors, listings are stable and content-free, and mutations are atomic. Optional guards add stale protection without changing the unguarded provider contract.',
@@ -3034,6 +3065,46 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
+  },
+  {
+    name: 'FeishuConnectionState',
+    declaration: 'export type FeishuConnectionState = (typeof FEISHU_CONNECTION_STATES)[number];',
+  },
+  {
+    name: 'FeishuMsgType',
+    declaration: 'export type FeishuMsgType = (typeof FEISHU_MSG_TYPES)[number];',
+  },
+  {
+    name: 'FeishuProvider',
+    declaration: 'export interface FeishuProvider {\n    readonly id: string;\n    available(): boolean;\n    sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>;\n    startReceiving?(handler: FeishuReceiveHandler): () => void;\n    status?(): Promise<FeishuProviderStatus>;\n}',
+  },
+  {
+    name: 'FeishuProviderStatus',
+    declaration: 'export interface FeishuProviderStatus {\n    readonly state: FeishuConnectionState;\n    readonly appIdMasked?: string;\n    readonly appSecretConfigured: boolean;\n    readonly baseURL?: string;\n    readonly receiveActive: boolean;\n    readonly lastError?: string;\n}',
+  },
+  {
+    name: 'FeishuReceiveEvent',
+    declaration: 'export interface FeishuReceiveEvent {\n    readonly eventType: string;\n    readonly senderId: string;\n    readonly senderIdType: FeishuReceiveIdType;\n    readonly chatId: string;\n    readonly content: string;\n    readonly raw: unknown;\n}',
+  },
+  {
+    name: 'FeishuReceiveHandler',
+    declaration: 'export type FeishuReceiveHandler = (event: FeishuReceiveEvent) => void;',
+  },
+  {
+    name: 'FeishuReceiveIdType',
+    declaration: 'export type FeishuReceiveIdType = (typeof FEISHU_RECEIVE_ID_TYPES)[number];',
+  },
+  {
+    name: 'FeishuRuntimeStatus',
+    declaration: 'export interface FeishuRuntimeStatus {\n    readonly state: FeishuConnectionState;\n    readonly providerId?: string;\n    readonly providerStatus?: FeishuProviderStatus;\n    readonly selectionError?: string;\n}',
+  },
+  {
+    name: 'FeishuSendRequest',
+    declaration: 'export interface FeishuSendRequest {\n    readonly receiveId: string;\n    readonly receiveIdType?: FeishuReceiveIdType;\n    readonly content: string;\n    readonly msgType?: FeishuMsgType;\n}',
+  },
+  {
+    name: 'FeishuSendResult',
+    declaration: 'export interface FeishuSendResult {\n    readonly messageId: string;\n}',
   },
   {
     name: 'FileDiff',

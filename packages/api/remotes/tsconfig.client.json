@@ -37,6 +37,9 @@
       "path": "../../host/plugin-inventory"
     },
     {
+      "path": "../../feishu/feishu-status"
+    },
+    {
       "path": "../../interaction/commands"
     },
     {

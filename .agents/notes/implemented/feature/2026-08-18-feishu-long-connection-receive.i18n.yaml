@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-feishu-long-connection-receive.md
+2026-08-18-feishu-long-connection-receive.md: c382eb5350a97c44f836bd1de864ed65a86956c1
+2026-08-18-feishu-long-connection-receive.zh.md: 23fa468fb2e00bdd49c87e8803974f76fc8b7e0e

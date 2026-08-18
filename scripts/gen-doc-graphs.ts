@@ -488,6 +488,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Search and fetch providers register into one ctx.web seam; tool-web owns the stable model-facing names.',
   },
   {
+    key: 'feishu',
+    pkg: 'feishu',
+    title: 'Feishu chat provider registry',
+    mode: 'seam',
+    implementations: ['feishu-bot'],
+    consumers: ['tool-feishu', 'feishu-receive'],
+    note: 'The Feishu Bot API provider registers into one ctx.feishu seam; tool-feishu owns the stable model-facing send name, and feishu-receive bridges inbound webhook events into the agent session.',
+  },
+  {
     key: 'spillStore',
     pkg: 'spill',
     title: 'Spill storage seam',

@@ -587,6 +587,47 @@ export interface Config {
 
 来源：[`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
+<a id="deepseek-aidsh-feishu"></a>
+
+## `@deepseek-ai/dsh-feishu`
+
+```ts config-catalog
+/**
+ * Config for the Feishu seam. `provider` pins which provider wins; omitted
+ * auto-selects when exactly one usable provider is registered.
+ */
+export interface FeishuRuntimeConfig {
+  /** Explicit provider id. Omitted = auto-select when exactly one usable. */
+  readonly provider?: string
+}
+```
+
+来源：[`packages/feishu/feishu/src/index.ts:52`](../packages/feishu/feishu/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-bot"></a>
+
+## `@deepseek-ai/dsh-feishu-bot`
+
+需要：`feishu`
+
+```ts config-catalog
+/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
+export interface Config {
+  /** Literal Feishu App ID; prefer {@link appIdEnv} so no secret enters configuration files. */
+  appId?: string
+  /** Literal Feishu App Secret; prefer {@link appSecretEnv} so no secret enters configuration files. */
+  appSecret?: string
+  /** Credential reference resolved for each operation; defaults to `FEISHU_APP_ID`. */
+  appIdEnv?: string
+  /** Credential reference resolved for each operation; defaults to `FEISHU_APP_SECRET`. */
+  appSecretEnv?: string
+  /** Feishu Open API base URL. */
+  baseURL?: string
+}
+```
+
+来源：[`packages/feishu/feishu-bot/src/index.ts:37`](../packages/feishu/feishu-bot/src/index.ts)
+
 <a id="deepseek-aidsh-fs-local"></a>
 
 ## `@deepseek-ai/dsh-fs-local`
@@ -2374,6 +2415,24 @@ export interface Config {
 
 来源：[`packages/shell/tool-bash-persistent/src/index.ts:400`](../packages/shell/tool-bash-persistent/src/index.ts)
 
+<a id="deepseek-aidsh-tool-feishu"></a>
+
+## `@deepseek-ai/dsh-tool-feishu`
+
+需要：`tools` · `feishu` · `systemPrompt`
+
+```ts config-catalog
+/** Plugin config: whether to register the tool and its timeout budget. */
+export interface Config {
+  /** Register `feishu_send_message`. Defaults to true. */
+  send?: boolean
+  /** Cooperative timeout budget (ms) for `feishu_send_message`. Defaults to 30000. */
+  timeoutMs?: number
+}
+```
+
+来源：[`packages/feishu/tool-feishu/src/index.ts:24`](../packages/feishu/tool-feishu/src/index.ts)
+
 <a id="deepseek-aidsh-tool-fs"></a>
 
 ## `@deepseek-ai/dsh-tool-fs`
@@ -3067,6 +3126,7 @@ export interface Config {
 - `@deepseek-ai/dsh-command-goal` — 需要 `commands` · `goals`（[`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts)）
 - `@deepseek-ai/dsh-commands`（[`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts)）
 - `@deepseek-ai/dsh-cordis-client-runner`（[`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts)）
+- `@deepseek-ai/dsh-feishu-receive` — 需要 `feishu` · `agents`（[`packages/feishu/feishu-receive/src/index.ts`](../packages/feishu/feishu-receive/src/index.ts)）
 - `@deepseek-ai/dsh-fs-e2b` — 需要 `e2b`（[`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts)）
 - `@deepseek-ai/dsh-fs-observation-policy`（[`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts)）
 - `@deepseek-ai/dsh-goal-round-driver` — 需要 `agents` · `goals` · `sessions`（[`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts)）

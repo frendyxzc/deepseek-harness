@@ -1929,6 +1929,21 @@
       "doc": "docs/subsystems/feedback.md",
       "symbol": "MessageFeedbackDeleteResult",
       "source": "packages/feedback/message-feedback/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feishu.md",
+      "symbol": "FeishuSendRequest",
+      "source": "packages/feishu/feishu/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feishu.md",
+      "symbol": "FeishuSendResult",
+      "source": "packages/feishu/feishu/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feishu.md",
+      "symbol": "FeishuReceiveEvent",
+      "source": "packages/feishu/feishu/src/types.ts"
     }
   ]
 }
