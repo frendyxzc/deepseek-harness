@@ -1944,6 +1944,11 @@
       "doc": "docs/subsystems/feishu.md",
       "symbol": "FeishuReceiveEvent",
       "source": "packages/feishu/feishu/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/feishu.md",
+      "symbol": "FeishuCardActionEvent",
+      "source": "packages/feishu/feishu/src/types.ts"
     }
   ]
 }

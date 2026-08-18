@@ -10,5 +10,6 @@ This family provides provider-neutral Feishu (飞书/Lark) chat operations plus 
 | [`feishu-bot/`](feishu-bot/README.md) | Provides Feishu Bot API message sending and webhook receiving | registers on `ctx.feishu` |
 | [`tool-feishu/`](tool-feishu/README.md) | Exposes `feishu_send_message` to the model | registers on `ctx.tools` |
 | [`feishu-receive/`](feishu-receive/README.md) | Routes incoming Feishu messages to the active agent session | registers on `ctx.feishu` |
+| [`feishu-approval/`](feishu-approval/README.md) | Answers Feishu chat agents' approval requests with interactive Allow/Deny cards | listens on `ctx.feishu` · `ctx.approval` |
 
 The subsystem reference — send-message request/result vocabulary, availability, `FeishuError` — is [docs/subsystems/feishu.md](../../docs/subsystems/feishu.md).

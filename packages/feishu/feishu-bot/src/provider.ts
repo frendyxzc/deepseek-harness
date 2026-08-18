@@ -1,8 +1,9 @@
 /**
  * Feishu Bot API provider for `ctx.feishu`: authenticates with App ID and App Secret
- * to obtain a tenant access token, sends messages through the Feishu Open API, and
- * receives `im.message.receive_v1` events through the official long-connection SDK.
- * Token caching and expiry are handled internally.
+ * to obtain a tenant access token, sends and updates messages through the Feishu
+ * Open API, and receives `im.message.receive_v1` events plus `card.action.trigger`
+ * card callbacks through ONE shared official long-connection client. Token caching
+ * and expiry are handled internally.
  *
  * Credentials are resolved through `ctx.credentials` (the `FEISHU_APP_ID` and
  * `FEISHU_APP_SECRET` environment variables), or supplied as literal config values.
@@ -11,6 +12,8 @@
 
 import { FEISHU_RECEIVE_ID_TYPES, FeishuError } from '@deepseek-ai/dsh-feishu'
 import type {
+  FeishuCardActionEvent,
+  FeishuCardActionHandler,
   FeishuProvider,
   FeishuProviderStatus,
   FeishuReceiveEvent,
@@ -45,6 +48,24 @@ interface SendMessageResponse {
   data?: {
     message_id?: string
   }
+}
+
+/** Response shape from the update message endpoint. */
+interface UpdateMessageResponse {
+  code: number
+  msg?: string
+}
+
+/**
+ * The shared long-connection receive channel: one WS client fanned out to
+ * every message and card-action subscriber. `controller` aborts the in-flight
+ * setup when the last subscriber disposes before setup completes.
+ */
+interface ReceiveState {
+  readonly controller: AbortController
+  readonly messageHandlers: Set<FeishuReceiveHandler>
+  readonly cardActionHandlers: Set<FeishuCardActionHandler>
+  wsClient: FeishuWsClient | undefined
 }
 
 /** Minimal logger surface the provider uses for async receive-channel diagnostics. */
@@ -100,6 +121,8 @@ export class FeishuBotProvider implements FeishuProvider {
   private lastResolvedAppId: string | undefined
   /** Whether a receive channel is currently open. */
   private receiveActive = false
+  /** The live shared receive channel, when at least one subscriber is attached. */
+  private receive: ReceiveState | undefined
 
   /**
    * @param resolveOptions - the options for the NEXT operation, snapshotted
@@ -236,78 +259,184 @@ export class FeishuBotProvider implements FeishuProvider {
   }
 
   /**
-   * Start the Feishu long-connection receive channel. The official SDK dials
-   * OUT to Feishu, so no public callback URL is required. Setup and connection
-   * are asynchronous: failures surface through `lastError` and the logger, and
-   * the returned disposer closes the connection.
+   * Subscribe to Feishu messages on the shared long-connection receive
+   * channel. The official SDK dials OUT to Feishu, so no public callback URL
+   * is required. The first subscriber opens the connection; the returned
+   * disposer removes this handler and closes the connection when it is the
+   * last one. Setup and connection are asynchronous: failures surface through
+   * `lastError` and the logger.
    */
   startReceiving(handler: FeishuReceiveHandler): () => void {
+    return this.subscribeReceive('message', handler)
+  }
+
+  /**
+   * Subscribe to Feishu card button actions on the SAME shared long
+   * connection as {@link startReceiving} — never a second connection. The
+   * first subscriber opens the connection; the returned disposer removes this
+   * handler and closes the connection when it is the last one.
+   */
+  startReceivingCardActions(handler: FeishuCardActionHandler): () => void {
+    return this.subscribeReceive('cardAction', handler)
+  }
+
+  /**
+   * Replace the content of a message this provider sent earlier — e.g.
+   * settling an interactive approval card after its buttons were consumed.
+   * Uses the Feishu `/im/v1/messages/:message_id` update endpoint.
+   * @param messageId - the message id returned by an earlier send.
+   * @param content - the replacement content (card JSON string for cards).
+   * @param signal - abort signal for the surrounding operation.
+   */
+  async updateMessage(messageId: string, content: string, signal?: AbortSignal): Promise<void> {
     const options = this.resolveOptions()
-    const controller = new AbortController()
-    const logger = options.logger
-    let wsClient: FeishuWsClient | undefined
-    this.receiveActive = true
+    throwIfAborted(signal)
 
-    const begin = async (): Promise<void> => {
-      try {
-        const appId = await this.resolveCredential(
-          options.appId, options.resolveAppId, options.appIdEnv ?? 'FEISHU_APP_ID',
-          'App ID', controller.signal,
-        )
-        const appSecret = await this.resolveCredential(
-          options.appSecret, options.resolveAppSecret, options.appSecretEnv ?? 'FEISHU_APP_SECRET',
-          'App Secret', controller.signal,
-        )
-        if (controller.signal.aborted) return
+    const token = await this.getAccessToken(options, signal)
+    throwIfAborted(signal)
 
-        const sdk = await import('@larksuiteoapi/node-sdk')
-        if (controller.signal.aborted) return
+    const url = `${options.baseURL}/im/v1/messages/${encodeURIComponent(messageId)}`
 
-        const dispatcher = new sdk.EventDispatcher({ loggerLevel: sdk.LoggerLevel.warn })
-        dispatcher.register({
-          'im.message.receive_v1': (data: unknown): void => {
-            const inner = data as { message?: unknown; sender?: unknown } | null | undefined
-            const received = toReceiveEvent(inner?.message, inner?.sender, data)
-            if (received !== undefined) handler(received)
-          },
-        })
-
-        const client = new sdk.WSClient({
-          appId,
-          appSecret,
-          domain: new URL(options.baseURL).origin,
-          autoReconnect: true,
-          loggerLevel: sdk.LoggerLevel.warn,
-          source: 'deepseek-harness',
-          onReady: () => logger?.debug('feishu long connection established'),
-          onReconnecting: () => logger?.warn('feishu long connection reconnecting'),
-          onReconnected: () => logger?.info('feishu long connection reconnected'),
-          onError: (error: Error) => {
-            this.lastError = `Feishu long connection failed: ${String(error)}`
-            logger?.error(`feishu long connection failed: ${String(error)}`)
-          },
-        })
-        wsClient = client
-
-        void client.start({ eventDispatcher: dispatcher }).catch((error: unknown) => {
-          if (controller.signal.aborted) return
-          this.lastError = `Feishu long connection start failed: ${String(error)}`
-          logger?.error(`feishu long connection start failed: ${String(error)}`)
-        })
-      } catch (error: unknown) {
-        if (controller.signal.aborted) return
-        this.receiveActive = false
-        this.lastError = `Feishu long connection setup failed: ${String(error)}`
-        logger?.error(`feishu long connection setup failed: ${String(error)}`)
-      }
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'PATCH',
+        redirect: 'error',
+        headers: {
+          'authorization': `Bearer ${token}`,
+          'content-type': 'application/json; charset=utf-8',
+          'user-agent': USER_AGENT,
+        },
+        body: JSON.stringify({ content }),
+        ...signal !== undefined ? { signal } : {},
+      })
+    } catch (error: unknown) {
+      if (signal?.aborted === true || isAbortError(error)) throw sendAborted(signal, error)
+      throw this.fail(
+        `Feishu update message request failed: ${String(error)}`,
+        'FEISHU_PROVIDER_ERROR',
+        error,
+      )
     }
 
-    void begin()
+    const body = await response.json() as UpdateMessageResponse
+    if (body.code !== 0) {
+      throw this.fail(
+        `Feishu API error (code ${body.code}): ${body.msg ?? 'unknown error'}`,
+        'FEISHU_PROVIDER_ERROR',
+      )
+    }
+    this.lastError = undefined
+  }
 
+  /**
+   * Add one handler to the shared receive channel, opening the long
+   * connection on the first subscriber. The disposer removes the handler and
+   * closes the connection once no subscriber remains; it is idempotent and
+   * never touches a later replacement connection.
+   */
+  private subscribeReceive(kind: 'message', handler: FeishuReceiveHandler): () => void
+  private subscribeReceive(kind: 'cardAction', handler: FeishuCardActionHandler): () => void
+  private subscribeReceive(kind: 'message' | 'cardAction', handler: FeishuReceiveHandler | FeishuCardActionHandler): () => void {
+    let state = this.receive
+    if (state === undefined) {
+      state = {
+        controller: new AbortController(),
+        messageHandlers: new Set(),
+        cardActionHandlers: new Set(),
+        wsClient: undefined,
+      }
+      this.receive = state
+      this.receiveActive = true
+      void this.beginReceiveConnection(state)
+    }
+    if (kind === 'message') state.messageHandlers.add(handler as FeishuReceiveHandler)
+    else state.cardActionHandlers.add(handler as FeishuCardActionHandler)
+
+    const owned = state
+    let disposed = false
     return () => {
-      controller.abort()
-      this.receiveActive = false
-      wsClient?.close({ force: true })
+      if (disposed) return
+      disposed = true
+      // A disposed-and-reopened channel is a NEW state object; never close it
+      // on behalf of this stale subscription.
+      if (this.receive !== owned) return
+      if (kind === 'message') owned.messageHandlers.delete(handler as FeishuReceiveHandler)
+      else owned.cardActionHandlers.delete(handler as FeishuCardActionHandler)
+      if (owned.messageHandlers.size === 0 && owned.cardActionHandlers.size === 0) {
+        owned.controller.abort()
+        this.receive = undefined
+        this.receiveActive = false
+        owned.wsClient?.close({ force: true })
+      }
+    }
+  }
+
+  /**
+   * Open the shared long connection for one receive state: resolve
+   * credentials, build the event dispatcher for both message and card-action
+   * events, and start the WS client. Failures record `lastError` and log;
+   * they never throw out of the subscription path.
+   */
+  private async beginReceiveConnection(state: ReceiveState): Promise<void> {
+    const options = this.resolveOptions()
+    const logger = options.logger
+    try {
+      const appId = await this.resolveCredential(
+        options.appId, options.resolveAppId, options.appIdEnv ?? 'FEISHU_APP_ID',
+        'App ID', state.controller.signal,
+      )
+      const appSecret = await this.resolveCredential(
+        options.appSecret, options.resolveAppSecret, options.appSecretEnv ?? 'FEISHU_APP_SECRET',
+        'App Secret', state.controller.signal,
+      )
+      if (state.controller.signal.aborted) return
+
+      const sdk = await import('@larksuiteoapi/node-sdk')
+      if (state.controller.signal.aborted) return
+
+      const dispatcher = new sdk.EventDispatcher({ loggerLevel: sdk.LoggerLevel.warn })
+      dispatcher.register({
+        'im.message.receive_v1': (data: unknown): void => {
+          const inner = data as { message?: unknown; sender?: unknown } | null | undefined
+          const received = toReceiveEvent(inner?.message, inner?.sender, data)
+          if (received === undefined) return
+          for (const messageHandler of state.messageHandlers) messageHandler(received)
+        },
+        'card.action.trigger': (data: unknown): void => {
+          if (state.cardActionHandlers.size === 0) return
+          const action = toCardActionEvent(data)
+          for (const cardHandler of state.cardActionHandlers) cardHandler(action)
+        },
+      })
+
+      const client = new sdk.WSClient({
+        appId,
+        appSecret,
+        domain: new URL(options.baseURL).origin,
+        autoReconnect: true,
+        loggerLevel: sdk.LoggerLevel.warn,
+        source: 'deepseek-harness',
+        onReady: () => logger?.debug('feishu long connection established'),
+        onReconnecting: () => logger?.warn('feishu long connection reconnecting'),
+        onReconnected: () => logger?.info('feishu long connection reconnected'),
+        onError: (error: Error) => {
+          this.lastError = `Feishu long connection failed: ${String(error)}`
+          logger?.error(`feishu long connection failed: ${String(error)}`)
+        },
+      })
+      state.wsClient = client
+
+      void client.start({ eventDispatcher: dispatcher }).catch((error: unknown) => {
+        if (state.controller.signal.aborted) return
+        this.lastError = `Feishu long connection start failed: ${String(error)}`
+        logger?.error(`feishu long connection start failed: ${String(error)}`)
+      })
+    } catch (error: unknown) {
+      if (state.controller.signal.aborted) return
+      if (this.receive === state) this.receiveActive = false
+      this.lastError = `Feishu long connection setup failed: ${String(error)}`
+      logger?.error(`feishu long connection setup failed: ${String(error)}`)
     }
   }
 
@@ -405,10 +534,10 @@ export class FeishuBotProvider implements FeishuProvider {
     )
   }
 
-  /** Record and throw a provider operation failure with a stable code. */
-  private fail(message: string, code: string, cause?: unknown): never {
+  /** Record one provider operation failure and return its stable-code error for the caller to throw. */
+  private fail(message: string, code: string, cause?: unknown): FeishuError {
     this.lastError = message
-    throw new FeishuError(message, code, cause === undefined ? {} : { cause })
+    return new FeishuError(message, code, cause === undefined ? {} : { cause })
   }
 }
 
@@ -510,6 +639,42 @@ function toReceiveEvent(message: unknown, sender: unknown, raw: unknown): Feishu
     senderIdType,
     chatId,
     content,
+    raw,
+  }
+}
+
+/** True for a plain object (not null, not an array) used as a record view. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** Read the first string among candidates, in priority order. */
+function firstString(...candidates: unknown[]): string {
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string') return candidate
+  }
+  return ''
+}
+
+/**
+ * Convert one `card.action.trigger` payload into a {@link FeishuCardActionEvent}.
+ * The current event shape nests the message/chat ids under `context`; older
+ * or alternate surfaces may deliver them at the top level, so both are read.
+ * The `value` payload is passed through UNVALIDATED — it is attacker-controllable
+ * card data, and consumers validate it against their own trusted state.
+ * @param raw - the raw card-action payload delivered by the long-connection client.
+ * @returns the normalized card-action event.
+ */
+function toCardActionEvent(raw: unknown): FeishuCardActionEvent {
+  const event = isRecord(raw) ? raw : undefined
+  const context = isRecord(event?.context) ? event.context : undefined
+  const operator = isRecord(event?.operator) ? event.operator : undefined
+  const action = isRecord(event?.action) ? event.action : undefined
+  return {
+    operatorId: firstString(operator?.open_id),
+    chatId: firstString(context?.open_chat_id, event?.open_chat_id),
+    messageId: firstString(context?.open_message_id, event?.open_message_id),
+    value: action?.value,
     raw,
   }
 }

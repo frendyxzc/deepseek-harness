@@ -59,6 +59,30 @@ export interface FeishuReceiveEvent {
 /** Callback invoked when a message is received from Feishu. */
 export type FeishuReceiveHandler = (event: FeishuReceiveEvent) => void
 
+/**
+ * One card button action received from Feishu — an operator tapped a button on
+ * an interactive card message delivered over the same channel as messages.
+ */
+export interface FeishuCardActionEvent {
+  /** The open id of the operator who tapped the button. */
+  readonly operatorId: string
+  /** The chat the card message lives in. */
+  readonly chatId: string
+  /** The message id of the tapped card message. */
+  readonly messageId: string
+  /**
+   * The tapped button's value payload. Attacker-controllable card data:
+   * consumers must validate it against trusted state (e.g. a nonce they
+   * minted when the card was built) before acting on it.
+   */
+  readonly value: unknown
+  /** The raw event payload for provider-specific handling. */
+  readonly raw: unknown
+}
+
+/** Callback invoked when a card button action is received from Feishu. */
+export type FeishuCardActionHandler = (event: FeishuCardActionEvent) => void
+
 /** Connection states a Feishu provider or the capability as a whole reports. */
 export const FEISHU_CONNECTION_STATES = ['unavailable', 'unconfigured', 'connected', 'error'] as const
 /** A connection state reported by a Feishu provider or the capability as a whole. */
@@ -117,6 +141,28 @@ export interface FeishuProvider {
    * @returns a disposer that stops the receive channel.
    */
   startReceiving?(handler: FeishuReceiveHandler): () => void
+  /**
+   * Start receiving card button actions from Feishu through the provider's
+   * receive channel — the same long connection a `startReceiving` subscriber
+   * opens, never a second one. The provider calls `handler` for each tapped
+   * card action. Handlers must settle fast (Feishu expects the callback
+   * acknowledged promptly); anything slow belongs behind the handler.
+   * Returns a disposer that stops this subscription; the underlying channel
+   * closes when its last subscriber disposes.
+   * @param handler - the callback for each received card action.
+   * @returns a disposer that stops this card-action subscription.
+   */
+  startReceivingCardActions?(handler: FeishuCardActionHandler): () => void
+  /**
+   * Replace the content of a message sent earlier through this provider —
+   * e.g. settling an interactive card after its buttons were consumed.
+   * `content` carries the same encoding as {@link FeishuSendRequest.content}
+   * for the message's existing type. Honor `signal` for cancellation.
+   * @param messageId - the provider message id returned by an earlier send.
+   * @param content - the replacement content.
+   * @param signal - optional cancellation signal.
+   */
+  updateMessage?(messageId: string, content: string, signal?: AbortSignal): Promise<void>
   /**
    * Project this provider's connection state and display-safe configuration
    * for status surfaces. May resolve credentials; must not throw. Providers

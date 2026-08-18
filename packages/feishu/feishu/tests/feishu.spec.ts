@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import FeishuRuntime, {
   FeishuError,
+  type FeishuCardActionEvent,
   type FeishuProvider,
   type FeishuProviderStatus,
   type FeishuReceiveEvent,
@@ -15,6 +16,8 @@ function makeProvider(
   send: (request: FeishuSendRequest) => Promise<FeishuSendResult>,
   startReceiving?: (handler: (event: FeishuReceiveEvent) => void) => () => void,
   status?: () => Promise<FeishuProviderStatus>,
+  startReceivingCardActions?: (handler: (event: FeishuCardActionEvent) => void) => () => void,
+  updateMessage?: (messageId: string, content: string) => Promise<void>,
 ): FeishuProvider {
   return {
     id,
@@ -22,6 +25,8 @@ function makeProvider(
     sendMessage: request => send(request),
     ...(startReceiving !== undefined ? { startReceiving } : {}),
     ...(status !== undefined ? { status } : {}),
+    ...(startReceivingCardActions !== undefined ? { startReceivingCardActions } : {}),
+    ...(updateMessage !== undefined ? { updateMessage } : {}),
   }
 }
 
@@ -180,6 +185,52 @@ describe('FeishuRuntime receive', () => {
   it('throws FEISHU_PROVIDER_UNAVAILABLE for receive when nothing is registered', async () => {
     const { feishu } = await mountFeishu()
     expect(() => feishu.startReceiving(() => {})).toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
+  })
+})
+
+describe('FeishuRuntime card-action receive', () => {
+  it('delegates startReceivingCardActions to the selected provider and returns its disposer', async () => {
+    const { feishu } = await mountFeishu()
+    let handler: ((event: FeishuCardActionEvent) => void) | undefined
+    const dispose = () => {}
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1')), undefined, undefined, (h) => { handler = h; return dispose }))
+    const returned = feishu.startReceivingCardActions(() => {})
+    expect(returned).toBe(dispose)
+    expect(handler).toBeTypeOf('function')
+  })
+
+  it('throws FEISHU_RECEIVE_UNSUPPORTED when the provider has no startReceivingCardActions', async () => {
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1'))))
+    expect(() => feishu.startReceivingCardActions(() => {})).toThrow(expect.objectContaining({ code: 'FEISHU_RECEIVE_UNSUPPORTED' }))
+  })
+
+  it('throws FEISHU_PROVIDER_UNAVAILABLE for card-action receive when nothing is registered', async () => {
+    const { feishu } = await mountFeishu()
+    expect(() => feishu.startReceivingCardActions(() => {})).toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
+  })
+})
+
+describe('FeishuRuntime updateMessage', () => {
+  it('delegates updateMessage to the selected provider', async () => {
+    const { feishu } = await mountFeishu()
+    const updates: Array<{ messageId: string; content: string }> = []
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1')), undefined, undefined, undefined, async (messageId, content) => {
+      updates.push({ messageId, content })
+    }))
+    await feishu.updateMessage('m1', '{"settled":true}')
+    expect(updates).toEqual([{ messageId: 'm1', content: '{"settled":true}' }])
+  })
+
+  it('throws FEISHU_UPDATE_UNSUPPORTED when the provider has no updateMessage', async () => {
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1'))))
+    await expect(feishu.updateMessage('m1', '{}')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_UPDATE_UNSUPPORTED' }))
+  })
+
+  it('throws FEISHU_PROVIDER_UNAVAILABLE for update when nothing is registered', async () => {
+    const { feishu } = await mountFeishu()
+    await expect(feishu.updateMessage('m1', '{}')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
   })
 })
 

@@ -4235,6 +4235,34 @@ importers:
         specifier: workspace:^
         version: link:../../llm/llm
 
+  packages/feishu/feishu-approval:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:^
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-feishu':
+        specifier: workspace:^
+        version: link:../feishu
+      '@deepseek-ai/dsh-feishu-receive':
+        specifier: workspace:^
+        version: link:../feishu-receive
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:^
+        version: link:../../core/session
+      '@deepseek-ai/dsh-user-approval':
+        specifier: workspace:^
+        version: link:../../interaction/user-approval
+
   packages/feishu/feishu-bot:
     dependencies:
       '@deepseek-ai/schemastery':

@@ -235,6 +235,7 @@
     { "path": "./packages/feishu/feishu-bot" },
     { "path": "./packages/feishu/tool-feishu" },
     { "path": "./packages/feishu/feishu-receive" },
+    { "path": "./packages/feishu/feishu-approval" },
     { "path": "./packages/feishu/feishu-status" },
     { "path": "./packages/spill/spill" },
     { "path": "./packages/spill/spill-local" },

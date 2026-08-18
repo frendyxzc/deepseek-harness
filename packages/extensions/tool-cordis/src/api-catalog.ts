@@ -592,6 +592,17 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a disposer that stops the receive channel.',
       },
       {
+        signature: 'startReceivingCardActions(handler: FeishuCardActionHandler): () => void',
+        description: 'Start receiving card button actions through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no `startReceivingCardActions`. Card actions share the provider\'s receive channel with startReceiving subscribers.',
+        parameters: [{ name: 'handler', description: 'the callback for each received {@link FeishuCardActionEvent}.' }],
+        returns: 'a disposer that stops this card-action subscription.',
+      },
+      {
+        signature: 'async updateMessage(messageId: string, content: string, signal?: AbortSignal): Promise<void>',
+        description: 'Replace the content of a message sent earlier through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_UPDATE_UNSUPPORTED` when the provider has no `updateMessage`, or the provider\'s own failure when the update does not succeed.',
+        parameters: [{ name: 'messageId', description: 'the provider message id returned by an earlier send.' }, { name: 'content', description: 'the replacement content.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+      },
+      {
         signature: 'async describeStatus(): Promise<FeishuRuntimeStatus>',
         description: 'Project the effective connection state of this capability for status surfaces. Applies the same selection rules as sendMessage without throwing; selection failures surface as `state: \'error\'` with FeishuRuntimeStatus.selectionError. Providers without a `status` method project from `available()`.',
         parameters: [],
@@ -2387,6 +2398,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'change', description: 'domain, table (`\'\'` for global), key (`\'\'` for global), operation discriminant, and on `put` the new snapshot.' }],
   },
   {
+    name: 'feishu/chat-agent',
+    mode: 'emit',
+    signature: '\'feishu/chat-agent\'(payload: { agent: Agent; chatId: string }): void',
+    summary: 'A per-chat agent was published for one Feishu chat: the routing pin is live and every message from that chat now reaches this agent.',
+    description: 'A per-chat agent was published for one Feishu chat: the routing pin is live and every message from that chat now reaches this agent. Emitted once per chat per process, after `agent/created`, by `@deepseek-ai/dsh-feishu-receive`; consumers that need the chat ↔ agent binding (approval cards, per-chat surfaces) subscribe here instead of re-deriving the routing.',
+    parameters: [{ name: 'payload', description: '.chatId - the Feishu chat whose messages this agent serves.' }],
+  },
+  {
     name: 'fs/edit-intent',
     mode: 'waterfall',
     signature: '\'fs/edit-intent\'(target: FsTarget, actor: object | undefined, next: () => { version: FsVersion } | undefined | Promise<{ version: FsVersion } | undefined>): Promise<{ version: FsVersion } | undefined>',
@@ -3067,6 +3086,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
   },
   {
+    name: 'FeishuCardActionEvent',
+    declaration: 'export interface FeishuCardActionEvent {\n    readonly operatorId: string;\n    readonly chatId: string;\n    readonly messageId: string;\n    readonly value: unknown;\n    readonly raw: unknown;\n}',
+  },
+  {
+    name: 'FeishuCardActionHandler',
+    declaration: 'export type FeishuCardActionHandler = (event: FeishuCardActionEvent) => void;',
+  },
+  {
     name: 'FeishuConnectionState',
     declaration: 'export type FeishuConnectionState = (typeof FEISHU_CONNECTION_STATES)[number];',
   },
@@ -3076,7 +3103,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'FeishuProvider',
-    declaration: 'export interface FeishuProvider {\n    readonly id: string;\n    available(): boolean;\n    sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>;\n    startReceiving?(handler: FeishuReceiveHandler): () => void;\n    status?(): Promise<FeishuProviderStatus>;\n}',
+    declaration: 'export interface FeishuProvider {\n    readonly id: string;\n    available(): boolean;\n    sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>;\n    startReceiving?(handler: FeishuReceiveHandler): () => void;\n    startReceivingCardActions?(handler: FeishuCardActionHandler): () => void;\n    updateMessage?(messageId: string, content: string, signal?: AbortSignal): Promise<void>;\n    status?(): Promise<FeishuProviderStatus>;\n}',
   },
   {
     name: 'FeishuProviderStatus',

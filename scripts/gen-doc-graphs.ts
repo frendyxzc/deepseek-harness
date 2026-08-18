@@ -420,9 +420,9 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'approval',
     title: 'Approval seam',
     mode: 'seam',
-    implementations: ['acp'],
+    implementations: ['acp', 'feishu-approval'],
     consumers: ['tools', 'tool-bash'],
-    note: 'One-shot permission decisions dispatched over the `approval/request` waterfall; answerers are listeners (the ACP bridge for its own agents), absence fails closed to `unavailable`.',
+    note: 'One-shot permission decisions dispatched over the `approval/request` waterfall; answerers are listeners (the ACP bridge for its own agents, feishu-approval for Feishu chat agents), absence fails closed to `unavailable`.',
   },
   {
     key: 'permissionPresets',
@@ -493,8 +493,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Feishu chat provider registry',
     mode: 'seam',
     implementations: ['feishu-bot'],
-    consumers: ['tool-feishu', 'feishu-receive'],
-    note: 'The Feishu Bot API provider registers into one ctx.feishu seam; tool-feishu owns the stable model-facing send name, and feishu-receive bridges inbound webhook events into the agent session.',
+    consumers: ['tool-feishu', 'feishu-receive', 'feishu-approval'],
+    note: 'The Feishu Bot API provider registers into one ctx.feishu seam; tool-feishu owns the stable model-facing send name, feishu-receive bridges inbound messages into per-chat agent sessions, and feishu-approval answers those sessions\' tool-approval requests with interactive Allow/Deny cards.',
   },
   {
     key: 'spillStore',

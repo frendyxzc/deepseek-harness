@@ -28,6 +28,8 @@ Registers the `FeishuRuntime` service as `ctx.feishu` — one instance per Cordi
 - `ctx.feishu.registerProvider(provider)` — register a `FeishuProvider` implementation. Returns a disposer.
 - `ctx.feishu.sendMessage(request, signal?)` — send one message through the selected provider.
 - `ctx.feishu.startReceiving(handler)` — start the selected provider's receive channel; the provider calls `handler` with each `FeishuReceiveEvent`. Returns a disposer, and throws `FEISHU_RECEIVE_UNSUPPORTED` for a send-only provider.
+- `ctx.feishu.startReceivingCardActions(handler)` — subscribe to card button actions (`FeishuCardActionEvent`) through the selected provider's receive channel — the same channel `startReceiving` opens, never a second one. Returns a disposer, and throws `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no card-action support. Handlers must settle fast; anything slow belongs behind the handler.
+- `ctx.feishu.updateMessage(messageId, content, signal?)` — replace the content of a message sent earlier through the selected provider (e.g. settling an interactive card after its buttons were consumed); throws `FEISHU_UPDATE_UNSUPPORTED` when the provider has no update support.
 - `ctx.feishu.describeStatus()` — project the effective connection state (`FeishuRuntimeStatus`) for status surfaces, applying the same selection rules without throwing; selection failures surface as `state: 'error'` with `selectionError`. Providers may implement an async `status(): FeishuProviderStatus` projection (masked App ID, secret booleans, receive activity, last failure); without one, `available()` decides `connected`/`unavailable`.
 
 ## Model Experience

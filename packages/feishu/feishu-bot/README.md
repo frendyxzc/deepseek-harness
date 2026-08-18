@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-Feishu Bot API provider for `ctx.feishu`. Sends messages through the Feishu Open API and receives messages through Feishu's official long-connection client.
+Feishu Bot API provider for `ctx.feishu`. Sends and updates messages through the Feishu Open API and receives messages and card button actions through ONE shared official long-connection client.
 
 ## Purpose
 
-Registers the `FeishuBotProvider` with `ctx.feishu` under the id `feishu-bot`. Authenticates with the Feishu `/auth/v3/tenant_access_token/internal` endpoint, sends messages through `/im/v1/messages`, and receives `im.message.receive_v1` events through `@larksuiteoapi/node-sdk`.
+Registers the `FeishuBotProvider` with `ctx.feishu` under the id `feishu-bot`. Authenticates with the Feishu `/auth/v3/tenant_access_token/internal` endpoint, sends messages through `/im/v1/messages`, updates a sent message through `PATCH /im/v1/messages/:message_id`, and receives `im.message.receive_v1` events plus `card.action.trigger` card callbacks through `@larksuiteoapi/node-sdk`.
 
 ## Config
 
@@ -28,7 +28,11 @@ The tenant access token is cached and refreshed on expiry, with a 60-second safe
 
 ## Receiving
 
-`startReceiving(handler)` starts Feishu's long-connection client (`@larksuiteoapi/node-sdk`), which dials OUT to Feishu and needs no public callback URL, then dispatches each `im.message.receive_v1` event to the handler. The provider extracts only text messages whose content decoded to non-empty; other message kinds and empty content are ignored. Setup is asynchronous: connection or credential failures surface through the provider `status()` error state and the plugin logger, and the returned disposer closes the connection.
+`startReceiving(handler)` and `startReceivingCardActions(handler)` share ONE long-connection client (`@larksuiteoapi/node-sdk`), which dials OUT to Feishu and needs no public callback URL. The first subscriber — message or card-action — opens the connection; the last disposer closes it, so a message subscriber and a card-action subscriber never open two connections. `startReceiving` dispatches each `im.message.receive_v1` event, extracting only text messages whose content decoded to non-empty and ignoring other kinds and empty content. `startReceivingCardActions` dispatches each `card.action.trigger` callback as a `FeishuCardActionEvent` (operator open id, chat id, message id, and the tapped button's `value` payload passed through UNVALIDATED — consumers validate it against their own trusted state). Setup is asynchronous: connection or credential failures surface through the provider `status()` error state and the plugin logger.
+
+## Updating a sent message
+
+`updateMessage(messageId, content, signal?)` replaces the content of a message this provider sent earlier — e.g. settling an interactive approval card after its buttons were consumed — through `PATCH /im/v1/messages/:message_id`. `content` carries the same encoding as the original send (a card JSON string for cards).
 
 ## Model Experience
 

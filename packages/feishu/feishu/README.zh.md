@@ -28,6 +28,8 @@ DeepSeek Harness 的飞书（Feishu/Lark）聊天能力 seam（`ctx.feishu`）�
 - `ctx.feishu.registerProvider(provider)` —— 注册一个 `FeishuProvider` 实现。返回 disposer。
 - `ctx.feishu.sendMessage(request, signal?)` —— 通过选定提供方发送一条消息。
 - `ctx.feishu.startReceiving(handler)` —— 启动选定提供方的接收通道；提供方会以每条 `FeishuReceiveEvent` 调用 `handler`。返回 disposer，对仅发送的提供方抛 `FEISHU_RECEIVE_UNSUPPORTED`。
+- `ctx.feishu.startReceivingCardActions(handler)` —— 通过选定提供方的接收通道订阅卡片按钮动作（`FeishuCardActionEvent`）—— 与 `startReceiving` 打开的是同一条通道，绝不另开第二条。返回 disposer，对不支持卡片动作的提供方抛 `FEISHU_RECEIVE_UNSUPPORTED`。handler 必须快速完成处理；任何耗时操作都应放到 handler 之后。
+- `ctx.feishu.updateMessage(messageId, content, signal?)` —— 替换早先通过选定提供方发送的某条消息的内容（例如在按钮被消费后结算一张交互卡片）；对不支持更新的提供方抛 `FEISHU_UPDATE_UNSUPPORTED`。
 - `ctx.feishu.describeStatus()` —— 为状态界面投影有效的连接状态（`FeishuRuntimeStatus`），套用相同的选择规则但不抛错；选择失败以 `state: 'error'` 与 `selectionError` 呈现。提供方可实现异步的 `status(): FeishuProviderStatus` 投影（脱敏 App ID、密钥布尔值、接收活跃度、最近失败）；未实现时由 `available()` 决定 `connected`/`unavailable`。
 
 ## 模型体验

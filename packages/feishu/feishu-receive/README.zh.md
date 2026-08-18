@@ -6,7 +6,7 @@ DeepSeek Harness 的飞书长连接接收消费方。把每个飞书聊天路由
 
 ## 用途
 
-启动 `ctx.feishu` 接收通道，并在某个聊天首次发来消息时，为该聊天创建一个专属 root agent，然后把该聊天的每条消息作为用户 follow-up 注入到那个 agent。每个聊天的会话 id 都是全新的 `feishu-<uuid>`，聊天 → 会话的对应关系存放在内存映射里，因此同一个聊天在进程内复用同一个会话，重启后则重新开始（不做跨重启恢复）。该 agent 运行活跃会话的同一 preset —— 包括 `dsh-tool-feishu`，从而能在自己的聊天里回复 —— 并继承活跃会话的模型路由与工作目录。工作目录是必需的：接收通道必须在活跃 root 会话拥有 cwd 之后才能启动，否则任意聊天的首条消息会被拒绝（记入日志，不抛出），直到出现携带 cwd 的活跃 root。每个按聊天划分的 agent 会获得一个系统提示词上下文（`feishu:chat-context`，order 130），告知模型其飞书 chat id，并说明文本回复对用户不可见，除非通过 `feishu_send_message` 以 `receiveIdType: "chat_id"` 发送。
+启动 `ctx.feishu` 接收通道，并在某个聊天首次发来消息时，为该聊天创建一个专属 root agent，然后把该聊天的每条消息作为用户 follow-up 注入到那个 agent。每个聊天的会话 id 都是全新的 `feishu-<uuid>`，聊天 → 会话的对应关系存放在内存映射里，因此同一个聊天在进程内复用同一个会话，重启后则重新开始（不做跨重启恢复）。该 agent 运行活跃会话的同一 preset —— 包括 `dsh-tool-feishu`，从而能在自己的聊天里回复 —— 并继承活跃会话的模型路由与工作目录。工作目录是必需的：接收通道必须在活跃 root 会话拥有 cwd 之后才能启动，否则任意聊天的首条消息会被拒绝（记入日志，不抛出），直到出现携带 cwd 的活跃 root。每个按聊天划分的 agent 会获得一个系统提示词上下文（`feishu:chat-context`，order 130），告知模型其飞书 chat id，并说明文本回复对用户不可见，除非通过 `feishu_send_message` 以 `receiveIdType: "chat_id"` 发送。每当一个按聊天划分的 agent 发布后，该消费方会发出 `feishu/chat-agent` 事件（`{ agent, chatId }`），以便其他飞书消费方——例如审批卡片应答器（`@deepseek-ai/dsh-feishu-approval`）——能绑定到存活的聊天 ↔ agent 路由，而无须自行重新推导。
 
 ### 配置
 

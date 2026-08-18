@@ -600,7 +600,26 @@ export interface FeishuRuntimeConfig {
 }
 ```
 
-Source: [`packages/feishu/feishu/src/index.ts:57`](../packages/feishu/feishu/src/index.ts)
+Source: [`packages/feishu/feishu/src/index.ts:60`](../packages/feishu/feishu/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-approval"></a>
+
+## `@deepseek-ai/dsh-feishu-approval`
+
+Requires: `feishu` · `approval`
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /**
+   * How long (ms) one approval card waits for a tap before it is denied
+   * automatically. Defaults to 60000; must be a positive finite number.
+   */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/feishu/feishu-approval/src/index.ts:42`](../packages/feishu/feishu-approval/src/index.ts)
 
 <a id="deepseek-aidsh-feishu-bot"></a>
 
@@ -625,6 +644,26 @@ export interface Config {
 ```
 
 Source: [`packages/feishu/feishu-bot/src/index.ts:37`](../packages/feishu/feishu-bot/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-receive"></a>
+
+## `@deepseek-ai/dsh-feishu-receive`
+
+Requires: `feishu` · `agents` · `agentPresets` · `systemPrompt`
+
+```ts config-catalog
+/** Plugin config: the working directory used when no live root agent is available to inherit one from. */
+export interface Config {
+  /**
+   * Fallback working directory for per-chat agents when the live root session
+   * has no cwd (or no root agent exists yet). Without this, the first
+   * message from any chat is rejected until a live root with a cwd appears.
+   */
+  cwd?: string
+}
+```
+
+Source: [`packages/feishu/feishu-receive/src/index.ts:56`](../packages/feishu/feishu-receive/src/index.ts)
 
 <a id="deepseek-aidsh-fs-local"></a>
 
@@ -3107,6 +3146,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-plan` ([`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-im` ([`packages/client/ui-settings-im/src/index.ts`](../packages/client/ui-settings-im/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
@@ -3124,7 +3164,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-command-goal` — requires `commands` · `goals` ([`packages/goal/command-goal/src/index.ts`](../packages/goal/command-goal/src/index.ts))
 - `@deepseek-ai/dsh-commands` ([`packages/interaction/commands/src/index.ts`](../packages/interaction/commands/src/index.ts))
 - `@deepseek-ai/dsh-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
-- `@deepseek-ai/dsh-feishu-receive` — requires `feishu` · `agents` ([`packages/feishu/feishu-receive/src/index.ts`](../packages/feishu/feishu-receive/src/index.ts))
+- `@deepseek-ai/dsh-feishu-status` — requires `feishu` ([`packages/feishu/feishu-status/src/index.ts`](../packages/feishu/feishu-status/src/index.ts))
 - `@deepseek-ai/dsh-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
 - `@deepseek-ai/dsh-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@deepseek-ai/dsh-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))

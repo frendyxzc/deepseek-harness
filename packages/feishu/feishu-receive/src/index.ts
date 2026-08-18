@@ -6,14 +6,16 @@
  * that chat to that agent. The chat → session pin is cached in memory for the
  * plugin's lifetime, so the same chat reuses one conversation; each session id
  * is a fresh UUID, so a restart never collides with a persisted log and simply
- * starts each chat anew.
+ * starts each chat anew. Each published per-chat agent is announced with the
+ * `feishu/chat-agent` event so other Feishu consumers (e.g. the approval-card
+ * answerer) can bind to it without re-deriving the routing.
  *
  * @module @deepseek-ai/dsh-feishu-receive
  */
 
 import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
-import type { AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import type {} from '@deepseek-ai/dsh-feishu'
@@ -21,6 +23,23 @@ import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import z from '@deepseek-ai/schemastery'
+
+declare module '@deepseek-ai/cordis' {
+  interface Events {
+    /**
+     * A per-chat agent was published for one Feishu chat: the routing pin is
+     * live and every message from that chat now reaches this agent. Emitted
+     * once per chat per process, after `agent/created`, by
+     * `@deepseek-ai/dsh-feishu-receive`; consumers that need the chat ↔ agent
+     * binding (approval cards, per-chat surfaces) subscribe here instead of
+     * re-deriving the routing.
+     * @param payload.agent - the published per-chat agent.
+     * @param payload.chatId - the Feishu chat whose messages this agent serves.
+     * @mode emit
+     */
+    'feishu/chat-agent'(payload: { agent: Agent; chatId: string }): void
+  }
+}
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'feishu-receive'
@@ -140,6 +159,11 @@ export function apply(ctx: Context, config: Config = {}): void {
       },
       ...(options === undefined ? {} : { agentOptions: options }),
       setup,
+    }).then((handle) => {
+      // Announce the live binding once the agent is published; approval and
+      // other per-chat consumers subscribe here instead of re-deriving it.
+      ctx.emit('feishu/chat-agent', { agent: handle.agent, chatId })
+      return handle
     })
 
     // Cache the in-flight creation so messages from the same chat arriving before

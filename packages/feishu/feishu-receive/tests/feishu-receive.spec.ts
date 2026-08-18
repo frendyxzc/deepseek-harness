@@ -130,17 +130,30 @@ describe('feishu-receive', () => {
 
     handler(event('hello'))
 
-    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(1) })
     const options = create.mock.calls[0]![0] as CreatedOptions
     expect(options.sessionId).toMatch(/^feishu-/)
     expect(options.meta?.agentPreset).toBe('preset-web')
     expect(options.meta?.cwd).toBe('/work')
     expect(options.agentOptions).toEqual({ provider: 'p1', model: 'm1' })
 
-    await vi.waitFor(() => expect(agents[0]!.followup).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
     const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[]; source: { kind: string } }
     expect(message.content).toEqual([{ type: 'text', text: 'hello' }])
     expect(message.source.kind).toBe('user')
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('announces each published per-chat agent with the feishu/chat-agent event', async () => {
+    const { ctx, handler, fiber, agents } = await mountReceive({ onRoots: () => [root()] })
+    const announcements: Array<{ agent: unknown; chatId: string }> = []
+    ctx.on('feishu/chat-agent', payload => announcements.push(payload))
+
+    handler(event('hello', 'oc_7'))
+
+    await vi.waitFor(() => { expect(announcements).toHaveLength(1) })
+    expect(announcements[0]).toEqual({ agent: agents[0], chatId: 'oc_7' })
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
@@ -151,7 +164,7 @@ describe('feishu-receive', () => {
     handler(event('first'))
     handler(event('second'))
 
-    await vi.waitFor(() => expect(agents[0]!.followup).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(2) })
     expect(create).toHaveBeenCalledTimes(1)
     expect(create.mock.calls[0]![0].sessionId).toMatch(/^feishu-/)
     await ctx.fiber.dispose()
@@ -164,11 +177,11 @@ describe('feishu-receive', () => {
     handler(event('a', 'oc_1'))
     handler(event('b', 'oc_2'))
 
-    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(2) })
     expect(create.mock.calls[0]![0].sessionId).toMatch(/^feishu-/)
     expect(create.mock.calls[1]![0].sessionId).toMatch(/^feishu-/)
     expect(create.mock.calls[0]![0].sessionId).not.toBe(create.mock.calls[1]![0].sessionId)
-    await vi.waitFor(() => expect(agents[1]!.followup).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(agents[1]!.followup).toHaveBeenCalledTimes(1) })
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
@@ -181,7 +194,7 @@ describe('feishu-receive', () => {
 
     handler(event('hello'))
 
-    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(1) })
     const options = create.mock.calls[0]![0] as CreatedOptions
     expect(options.meta?.cwd).toBe('/configured-work')
     expect(options.meta?.agentPreset).toBe('preset-default')
@@ -196,7 +209,7 @@ describe('feishu-receive', () => {
     // the rejection reaches the error logger, and create is never called.
     // The handler itself does not throw.
     expect(() => { handler(event('hello')) }).not.toThrow()
-    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(0))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(0) })
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
@@ -209,7 +222,7 @@ describe('feishu-receive', () => {
 
     handler(event('hello', 'oc_42'))
 
-    await vi.waitFor(() => expect(systemPrompt.context).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(systemPrompt.context).toHaveBeenCalledTimes(1) })
     const entry = systemPrompt.contextCalls[0]!
     expect(entry.name).toBe('feishu:chat-context')
     expect(entry.order).toBe(130)
@@ -224,7 +237,7 @@ describe('feishu-receive', () => {
     const { ctx, handler, fiber, create } = await mountReceive({ onRoots: () => [root()] })
 
     expect(() => { handler(event('hello', '')) }).not.toThrow()
-    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(0))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(0) })
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
@@ -252,7 +265,7 @@ describe('feishu-receive', () => {
     const fiber = await ctx.plugin(FeishuReceive)
 
     expect(() => { handler!(event('hello')) }).not.toThrow()
-    await vi.waitFor(() => expect(create).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(1) })
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
@@ -261,10 +274,10 @@ describe('feishu-receive', () => {
     const { ctx, handler, fiber, agents } = await mountReceive({ onRoots: () => [root()] })
 
     handler(event('hello'))
-    await vi.waitFor(() => expect(agents[0]!.followup).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
 
     await fiber.dispose()
-    await vi.waitFor(() => expect(agents[0]!.dispose).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => { expect(agents[0]!.dispose).toHaveBeenCalledTimes(1) })
     await ctx.fiber.dispose()
   })
 })

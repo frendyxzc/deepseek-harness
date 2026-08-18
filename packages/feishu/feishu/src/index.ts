@@ -9,6 +9,7 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
+  FeishuCardActionHandler,
   FeishuProvider,
   FeishuReceiveHandler,
   FeishuRuntimeStatus,
@@ -24,6 +25,8 @@ export {
   FeishuError,
 } from './types.ts'
 export type {
+  FeishuCardActionEvent,
+  FeishuCardActionHandler,
   FeishuConnectionState,
   FeishuMsgType,
   FeishuProvider,
@@ -143,6 +146,47 @@ export class FeishuRuntime extends Service {
       )
     }
     return provider.startReceiving(handler)
+  }
+
+  /**
+   * Start receiving card button actions through the selected provider.
+   * Resolves the provider at call time with the selection rules above;
+   * throws {@link FeishuError} `FEISHU_RECEIVE_UNSUPPORTED` when the
+   * provider has no `startReceivingCardActions`. Card actions share the
+   * provider's receive channel with {@link startReceiving} subscribers.
+   * @param handler - the callback for each received {@link FeishuCardActionEvent}.
+   * @returns a disposer that stops this card-action subscription.
+   */
+  startReceivingCardActions(handler: FeishuCardActionHandler): () => void {
+    const provider = this.resolveProvider()
+    if (provider.startReceivingCardActions === undefined) {
+      throw new FeishuError(
+        `Feishu provider "${provider.id}" does not support receiving card actions`,
+        'FEISHU_RECEIVE_UNSUPPORTED',
+      )
+    }
+    return provider.startReceivingCardActions(handler)
+  }
+
+  /**
+   * Replace the content of a message sent earlier through the selected
+   * provider. Resolves the provider at call time with the selection rules
+   * above; throws {@link FeishuError} `FEISHU_UPDATE_UNSUPPORTED` when the
+   * provider has no `updateMessage`, or the provider's own failure when the
+   * update does not succeed.
+   * @param messageId - the provider message id returned by an earlier send.
+   * @param content - the replacement content.
+   * @param signal - optional cancellation signal forwarded to the provider.
+   */
+  async updateMessage(messageId: string, content: string, signal?: AbortSignal): Promise<void> {
+    const provider = this.resolveProvider()
+    if (provider.updateMessage === undefined) {
+      throw new FeishuError(
+        `Feishu provider "${provider.id}" does not support updating messages`,
+        'FEISHU_UPDATE_UNSUPPORTED',
+      )
+    }
+    return provider.updateMessage(messageId, content, signal)
   }
 
   /**
