@@ -173,13 +173,24 @@ function reasoningInfo(
   }
 }
 
-/** Merge deployment headers while removing case-insensitive attribution collisions. */
-function requestHeaders(headers: Readonly<Record<string, string>> | undefined): Record<string, string> {
+/** Merge deployment headers with harness attribution and session-identity headers. */
+function requestHeaders(
+  headers: Readonly<Record<string, string>> | undefined,
+  options: GenerateOptions,
+): Record<string, string> {
   const attribution = attributionHeaders()
   const reserved = new Set(Object.keys(attribution).map(name => name.toLowerCase()))
   return {
     ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
     ...attribution,
+    // Harness session identity must ride this OAI-compatible transport so a
+    // dsh-aware proxy (e.g. the TDAI MemoryProxy) can bind the session exactly
+    // as it binds the llm-deepseek adapter's direct-fetch requests. Spread after
+    // the deployment headers so the Harness-owned names win collisions.
+    ...options.sessionId === undefined
+      ? {}
+      : { 'x-deepseek-harness-session-id': String(options.sessionId) },
+    ...options.purpose === 'compaction' ? { 'x-deepseek-harness-compact': '1' } : {},
   }
 }
 
@@ -324,9 +335,9 @@ export class PiAiAdapter extends LlmAdapter {
         ...options.maxTokens === undefined ? {} : { maxTokens: options.maxTokens },
         ...options.sessionId === undefined ? {} : { sessionId: String(options.sessionId) },
         signal: watchdog.signal,
-        // Profile headers are deployment-owned; attribution names are
-        // Harness-owned and therefore win collisions.
-        headers: requestHeaders(profile.headers),
+        // Profile headers are deployment-owned; attribution and session-identity
+        // names are Harness-owned and therefore win collisions.
+        headers: requestHeaders(profile.headers, options),
       })
       const iterator = toStreamChunks(events, model.contextWindow)[Symbol.asyncIterator]()
       let exhausted = false
