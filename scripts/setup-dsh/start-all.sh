@@ -2,7 +2,7 @@
 # Start the full local dsh + memory stack in dependency order, fully automated.
 #
 #   1. MemoryCore     :8420   (kernel gateway — needs .env.local from setup.sh)
-#   2. MemoryProxy    :8096   (dsh's LLM baseURL — needs config.yaml)
+#   2. MemoryProxy    :8096   (dsh's LLM baseURL — needs proxy-config.yaml)
 #   3. MemoryKnowledge :8421  (Wiki / Code-Graph)
 #   4. MemoryPanel    :8123   (stateless control panel, binds all interfaces)
 #   5. dsh Web UI     :3080   (binds all interfaces)
@@ -37,16 +37,26 @@ WORKSPACE="$(cd "$WORKSPACE" 2>/dev/null && pwd || true)"
 [[ -n "$WORKSPACE" && -d "$WORKSPACE" ]] || die "workspace $WORKSPACE is not a directory"
 
 # Pre-flight: the memory stack must already be cloned (hard requirement), and
-# each service's config must exist (soft — only needed when that service has to
-# start here; an already-running service is skipped without touching its config).
+# each service's config must exist when that service would have to start here
+# (an already-running service is skipped without touching its config).
 require() { [[ -e "$1" ]] || die "missing $1 — run ./scripts/setup-dsh/setup.sh first"; }
 require "$MEMORY_ROOT/MemoryCore/src/gateway/server.ts"
 require "$MEMORY_ROOT/MemoryProxy/package.json"
 require "$MEMORY_ROOT/MemoryKnowledge/package.json"
 require "$MEMORY_ROOT/MemoryPanel/package.json"
-[[ -f "$MEMORY_ROOT/MemoryCore/.env.local" ]] || warn "core .env.local missing — core will fail if it needs to start here (run setup.sh)"
-[[ -f "$MEMORY_ROOT/MemoryProxy/config.yaml" ]] || warn "proxy config.yaml missing — proxy will fail if it needs to start here (run setup.sh)"
-[[ -f "$MEMORY_ROOT/MemoryPanel/.env" ]] || warn "panel .env missing — panel will fail if it needs to start here (run setup.sh)"
+
+# require_config <name> <port> <path> — the service needs its config only when
+# it is the one that starts here; a service already listening is left alone.
+require_config() {
+  local name="$1" port="$2" path="$3"
+  if ! is_listening "$port" && [[ ! -f "$path" ]]; then
+    die "$name would start without $path — run ./scripts/setup-dsh/setup.sh first"
+  fi
+}
+require_config core 8420 "$MEMORY_ROOT/MemoryCore/.env.local"
+require_config proxy 8096 "$DSH_HOME/tdai-stack/config/proxy-config.yaml"
+require_config knowledge 8421 "$MEMORY_ROOT/MemoryKnowledge/.env"
+require_config panel 8123 "$MEMORY_ROOT/MemoryPanel/.env"
 [[ -d "$WORKSPACE/node_modules" ]] || warn "$WORKSPACE/node_modules missing — run \`pnpm install\` in the workspace first"
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
@@ -74,9 +84,11 @@ start_service() {
 start_service core 8420 "http://127.0.0.1:8420/health" 40 \
   "cd '$MEMORY_ROOT/MemoryCore' && set -a && . ./.env.local && set +a && node --import tsx src/gateway/server.ts"
 
-# 2. MemoryProxy :8096
+# 2. MemoryProxy :8096 — config is passed explicitly: the generated one lives
+#    at $DSH_HOME/tdai-stack/config/proxy-config.yaml (the upstream repo's own
+#    MemoryProxy/config.yaml is not consulted).
 start_service proxy 8096 "http://127.0.0.1:8096/health" 30 \
-  "cd '$MEMORY_ROOT/MemoryProxy' && npm start"
+  "cd '$MEMORY_ROOT/MemoryProxy' && node --import tsx/esm src/index.ts --config '$DSH_HOME/tdai-stack/config/proxy-config.yaml'"
 
 # 3. MemoryKnowledge :8421
 start_service knowledge 8421 "http://127.0.0.1:8421/health" 40 \

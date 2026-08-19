@@ -24,10 +24,11 @@ are prompted interactively unless supplied via the `DSH_*` env vars (see
 | `~/.dsh/profiles/web/*` | `templates/profile-web/*` | no (`cwd`/`fallbackChatId` filled from flags) |
 | `<repo>/.env` | prompted `DEEPSEEK_API_KEY`, `FEISHU_*` | yes (gitignored) |
 | `~/.dsh/tdai-stack/TencentDB-Agent-Memory` | git clone `feat/server_team` | — |
-| `…/MemoryProxy/config.yaml` | generated from prompted upstream URL/key | yes (0600) |
+| `~/.dsh/tdai-stack/config/proxy-config.yaml` | `templates/tdai-stack/proxy-config.yaml` + prompted upstream URL/key | yes (0600) |
+| `~/.dsh/tdai-stack/config/tdai-gateway.yaml` | `templates/tdai-stack/tdai-gateway.yaml` + prompted `TDAI_LLM_*` | yes (0600) |
 | `…/MemoryPanel/.env` + `config/metadata-instances.json` | `.env.example` / prompted gateway bearer | partially |
 | `…/MemoryKnowledge/.env` | `.env.example` | no |
-| `…/MemoryCore/.env.local` | prompted `TDAI_LLM_*` | yes (0600) |
+| `…/MemoryCore/.env.local` | prompted `TDAI_LLM_*` (points `TDAI_GATEWAY_CONFIG` at `tdai-stack/config/tdai-gateway.yaml`) | yes (0600) |
 
 Templates under `templates/` are the source of truth for the non-secret DSH
 config. Edit them and re-run with `--force` to redeploy.
