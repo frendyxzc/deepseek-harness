@@ -43,6 +43,23 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     feishu: FeishuRuntime
   }
+
+  interface Events {
+    /**
+     * A Feishu provider was registered with `ctx.feishu.registerProvider`.
+     * Load-time consumers (receive channels) subscribe here so they open on
+     * the registered provider regardless of parallel entry load order.
+     * @param provider - the registered provider.
+     * @mode emit
+     */
+    'feishu/provider-added'(provider: FeishuProvider): void
+    /**
+     * A Feishu provider left the registry (its registering fiber unloaded).
+     * @param id - the provider id that no longer resolves.
+     * @mode emit
+     */
+    'feishu/provider-removed'(id: string): void
+  }
 }
 
 /** Selection inputs for execution-time provider resolution. */
@@ -95,6 +112,8 @@ export class FeishuRuntime extends Service {
   /**
    * Register a Feishu provider. Throws {@link FeishuError} `FEISHU_DUPLICATE_PROVIDER`
    * if its id is already registered. Returns a disposer; disposed with the calling fiber.
+   * Emits `feishu/provider-added` once the registration commits (a throwing
+   * listener rolls it back) and `feishu/provider-removed` when it is disposed.
    * @param provider - the provider; its `id` is the registry key.
    * @returns the disposer that unregisters the provider.
    */
@@ -106,9 +125,16 @@ export class FeishuRuntime extends Service {
       )
     }
     const store = this.providers
-    const dispose = this.ctx.effect(function* () {
+    const ctx = this.ctx
+    const dispose = ctx.effect(function* () {
       store.set(provider.id, provider)
-      yield () => store.delete(provider.id)
+      yield () => {
+        store.delete(provider.id)
+        ctx.emit('feishu/provider-removed', provider.id)
+      }
+      // A throwing added-listener unwinds the yielded rollback, matching the
+      // repository's fail-loud registration semantics.
+      ctx.emit('feishu/provider-added', provider)
     }, 'feishu.registerProvider()')
     // ctx.effect's disposer returns Promise<void>; our disposer API is
     // synchronous fire-and-forget — discard the (always-resolved) promise.

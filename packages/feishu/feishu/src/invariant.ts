@@ -15,8 +15,11 @@ export const name = 'feishu-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant: the provider map is private and selection is enforced on each
- * call; the seam publishes no independent registry or request/result observation stream.
+ * No runtime invariant: the provider map is private, and the published
+ * `feishu/provider-added` / `feishu/provider-removed` pair is emitted at the
+ * single set/delete sites inside the registration effect generator, so the
+ * pairing is mechanically guaranteed and no independent relationship remains
+ * for the invariant to assert.
  */
 const install: InvariantInstaller = () => {}
 

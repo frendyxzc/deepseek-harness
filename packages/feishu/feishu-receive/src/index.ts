@@ -18,6 +18,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
+import { FeishuError } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -175,25 +176,78 @@ export function apply(ctx: Context, config: Config = {}): void {
   }
 
   ctx.effect(() => {
-    const disposeReceive = ctx.feishu.startReceiving((event) => {
-      const chatId = event.chatId
-      if (chatId.length === 0) {
-        ctx.logger.warn('feishu-receive: event without a chat id; dropped')
-        return
+    // Sibling entry fibers load in parallel, so a provider plugin may still
+    // be activating when this effect runs; the seam's registration events
+    // open the channel then instead of failing the boot over load order.
+    let disposeReceive: (() => void) | undefined
+    /** Whether the channel waits for a usable provider to register. */
+    let waitingForProvider = false
+
+    /** Open the receive channel; false when no usable provider is registered yet. */
+    const openReceiveChannel = (): boolean => {
+      try {
+        disposeReceive = ctx.feishu.startReceiving((event) => {
+          const chatId = event.chatId
+          if (chatId.length === 0) {
+            ctx.logger.warn('feishu-receive: event without a chat id; dropped')
+            return
+          }
+          void getOrCreate(chatId).then((handle) => {
+            created.add(handle)
+            handle.agent.followup(createUserMessage({
+              content: [{ type: 'text', text: event.content }],
+              source: { kind: 'user' },
+            }))
+            ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)
+          }, (error: unknown) => {
+            ctx.logger.error('feishu-receive: failed to create the per-chat agent for chat %s: %s', chatId, String(error))
+          })
+        })
+        return true
+      } catch (error: unknown) {
+        // Not registered (yet) — a provider fiber may still be loading.
+        if (error instanceof FeishuError
+          && (error.code === 'FEISHU_PROVIDER_UNAVAILABLE' || error.code === 'FEISHU_PROVIDER_CONFIGURED_MISSING')) {
+          return false
+        }
+        throw error
       }
-      void getOrCreate(chatId).then((handle) => {
-        created.add(handle)
-        handle.agent.followup(createUserMessage({
-          content: [{ type: 'text', text: event.content }],
-          source: { kind: 'user' },
-        }))
-        ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)
-      }, (error: unknown) => {
-        ctx.logger.error('feishu-receive: failed to create the per-chat agent for chat %s: %s', chatId, String(error))
-      })
+    }
+    const closeReceiveChannel = (): void => {
+      disposeReceive?.()
+      disposeReceive = undefined
+    }
+
+    waitingForProvider = !openReceiveChannel()
+    if (waitingForProvider) {
+      ctx.logger.warn('feishu-receive: no usable Feishu provider is registered yet; the receive channel opens when one registers')
+    }
+
+    const offProviderAdded = ctx.on('feishu/provider-added', () => {
+      if (!waitingForProvider) return
+      // A registered provider that cannot receive is a real misconfiguration:
+      // the throw unwinds the provider's registration and fails its fiber
+      // loudly.
+      waitingForProvider = !openReceiveChannel()
     })
+    const offProviderRemoved = ctx.on('feishu/provider-removed', () => {
+      if (waitingForProvider) return
+      // The channel's provider is gone: re-open on a remaining provider, or
+      // wait for the next registration. This path never throws — a teardown
+      // reaction must not fail the unloading fiber.
+      closeReceiveChannel()
+      try {
+        waitingForProvider = !openReceiveChannel()
+      } catch (error: unknown) {
+        waitingForProvider = true
+        ctx.logger.warn('feishu-receive: receive channel closed and cannot reopen: %s', String(error))
+      }
+    })
+
     return () => {
-      disposeReceive()
+      closeReceiveChannel()
+      offProviderAdded()
+      offProviderRemoved()
       for (const handle of created) void handle.dispose()
     }
   }, 'feishu-receive.startReceiving()')

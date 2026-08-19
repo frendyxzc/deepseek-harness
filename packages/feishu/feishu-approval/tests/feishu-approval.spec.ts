@@ -90,6 +90,57 @@ async function mountApproval(config: FeishuApproval.Config = {}): Promise<Mounte
   return { ctx, fiber, sent, updates, tap, controls }
 }
 
+/**
+ * Mount SessionStore + ApprovalService + the Feishu seam + the approval
+ * answerer with NO provider registered yet, and a factory for registering
+ * scripted providers later — the parallel-entry-load situation where the
+ * provider plugin activates after the answerer.
+ */
+async function mountDeferred(
+  config: FeishuApproval.Config = {},
+  seamConfig: ConstructorParameters<typeof FeishuRuntime>[1] = {},
+): Promise<{
+  ctx: Context
+  fiber: Awaited<ReturnType<Context['plugin']>>
+  sent: SentMessage[]
+  cardHandlers: Array<(event: FeishuCardActionEvent) => void>
+  register: (id: string, opts?: { available?: () => boolean; cardActions?: boolean }) => () => void
+}> {
+  const ctx = new Context()
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(ApprovalService)
+  await ctx.plugin(FeishuRuntime, seamConfig)
+
+  const sent: SentMessage[] = []
+  const cardHandlers: Array<(event: FeishuCardActionEvent) => void> = []
+  const register = (
+    id: string,
+    opts: { available?: () => boolean; cardActions?: boolean } = {},
+  ): (() => void) => ctx.feishu.registerProvider({
+    id,
+    available: opts.available ?? (() => true),
+    sendMessage: async (request) => {
+      sent.push({
+        receiveId: request.receiveId,
+        ...(request.receiveIdType !== undefined ? { receiveIdType: request.receiveIdType } : {}),
+        ...(request.msgType !== undefined ? { msgType: request.msgType } : {}),
+        content: request.content,
+      })
+      return { messageId: 'om_1' }
+    },
+    ...(opts.cardActions === false ? {} : {
+      startReceivingCardActions: (handler) => {
+        cardHandlers.push(handler)
+        return () => {}
+      },
+    }),
+    updateMessage: async () => {},
+  })
+
+  const fiber = await ctx.plugin(FeishuApproval, config)
+  return { ctx, fiber, sent, cardHandlers, register }
+}
+
 /** A live chat agent: a real session inside an open turn, faked Agent shape. */
 function chatAgent(ctx: Context, id = 'feishu-chat-1'): Agent {
   const session = ctx.sessions.create(SessionId(id))
@@ -331,6 +382,95 @@ describe('feishu-approval', () => {
     await expect(ctx.plugin(FeishuApproval, {})).rejects.toThrow(
       expect.objectContaining({ code: 'FEISHU_RECEIVE_UNSUPPORTED' }),
     )
+    await ctx.fiber.dispose()
+  })
+
+  it('loads without a registered provider and opens the tap channel when one registers', async () => {
+    const { ctx, fiber, sent, cardHandlers, register } = await mountDeferred()
+    expect(cardHandlers).toHaveLength(0)
+
+    register('scripted')
+    expect(cardHandlers).toHaveLength(1)
+
+    // The deferred channel serves real approvals: one bound chat agent's ask
+    // sends a card, and its Allow tap settles the waterfall.
+    const agent = chatAgent(ctx)
+    bindChat(ctx, agent, 'oc_1')
+    const pending = ctx.approval.request(requestOf(agent))
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    const card = parseCard(sent[0]!)
+    cardHandlers[0]!(({
+      operatorId: 'ou_1',
+      chatId: 'oc_1',
+      messageId: 'om_1',
+      raw: {},
+      value: { action: 'allow', session_id: card.sessionId, nonce: card.allowNonce },
+    }))
+    await expect(pending).resolves.toBe('allowed-once')
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('fails the registration loudly when a later provider cannot receive card actions', async () => {
+    const { ctx, fiber, register } = await mountDeferred()
+    expect(() => register('send-only', { cardActions: false })).toThrow(
+      expect.objectContaining({ code: 'FEISHU_RECEIVE_UNSUPPORTED' }),
+    )
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps waiting through registrations that cannot host the channel', async () => {
+    const { ctx, fiber, cardHandlers, register } = await mountDeferred()
+    const disposeCold = register('cold', { available: () => false })
+    expect(cardHandlers).toHaveLength(0)
+    disposeCold()
+    expect(cardHandlers).toHaveLength(0)
+
+    register('scripted')
+    expect(cardHandlers).toHaveLength(1)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('reopens the tap channel on the remaining provider when another leaves', async () => {
+    const { ctx, fiber, cardHandlers, register } = await mountDeferred()
+    const disposeA = register('bot-a')
+    expect(cardHandlers).toHaveLength(1)
+    const disposeB = register('bot-b')
+    expect(cardHandlers).toHaveLength(1)
+
+    disposeB()
+    expect(cardHandlers).toHaveLength(2)
+    disposeA()
+    expect(cardHandlers).toHaveLength(2)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('falls back to waiting when the remaining provider cannot host the channel', async () => {
+    const { ctx, fiber, cardHandlers, register } = await mountDeferred()
+    const disposeGood = register('good')
+    expect(cardHandlers).toHaveLength(1)
+    const disposeSendOnly = register('send-only', { cardActions: false })
+    expect(cardHandlers).toHaveLength(1)
+
+    disposeGood()
+    expect(cardHandlers).toHaveLength(1)
+    disposeSendOnly()
+    register('good-2')
+    expect(cardHandlers).toHaveLength(2)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('waits for the configured provider when it registers after load', async () => {
+    const { ctx, fiber, cardHandlers, register } = await mountDeferred({}, { provider: 'pinned' })
+    expect(cardHandlers).toHaveLength(0)
+
+    register('pinned')
+    expect(cardHandlers).toHaveLength(1)
+    await fiber.dispose()
     await ctx.fiber.dispose()
   })
 

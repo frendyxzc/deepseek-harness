@@ -68,6 +68,32 @@ describe('FeishuRuntime registration', () => {
     await fiber.dispose()
     await expect(feishu.sendMessage({ receiveId: 'u1', content: 'hi' })).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
   })
+
+  it('emits feishu/provider-added when a provider registers', async () => {
+    const { ctx, feishu } = await mountFeishu()
+    const added: FeishuProvider[] = []
+    ctx.on('feishu/provider-added', provider => void added.push(provider))
+    const provider = makeProvider('bot', available, () => Promise.resolve(sendResult('m1')))
+    feishu.registerProvider(provider)
+    expect(added).toEqual([provider])
+  })
+
+  it('emits feishu/provider-removed when a registration is disposed', async () => {
+    const { ctx, feishu } = await mountFeishu()
+    const removed: string[] = []
+    ctx.on('feishu/provider-removed', id => void removed.push(id))
+    const dispose = feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1'))))
+    dispose()
+    expect(removed).toEqual(['bot'])
+  })
+
+  it('rolls registration back when a feishu/provider-added listener throws', async () => {
+    const { ctx, feishu } = await mountFeishu()
+    ctx.on('feishu/provider-added', () => { throw new Error('added boom') })
+    expect(() => feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1')))))
+      .toThrow('added boom')
+    await expect(feishu.sendMessage({ receiveId: 'u1', content: 'hi' })).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
+  })
 })
 
 describe('FeishuRuntime execution resolution', () => {

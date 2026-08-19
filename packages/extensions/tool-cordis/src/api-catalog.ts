@@ -575,7 +575,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'registerProvider(provider: FeishuProvider): () => void',
-        description: 'Register a Feishu provider. Throws FeishuError `FEISHU_DUPLICATE_PROVIDER` if its id is already registered. Returns a disposer; disposed with the calling fiber.',
+        description: 'Register a Feishu provider. Throws FeishuError `FEISHU_DUPLICATE_PROVIDER` if its id is already registered. Returns a disposer; disposed with the calling fiber. Emits `feishu/provider-added` once the registration commits (a throwing listener rolls it back) and `feishu/provider-removed` when it is disposed.',
         parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
         returns: 'the disposer that unregisters the provider.',
       },
@@ -2404,6 +2404,22 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A per-chat agent was published for one Feishu chat: the routing pin is live and every message from that chat now reaches this agent.',
     description: 'A per-chat agent was published for one Feishu chat: the routing pin is live and every message from that chat now reaches this agent. Emitted once per chat per process, after `agent/created`, by `@deepseek-ai/dsh-feishu-receive`; consumers that need the chat ↔ agent binding (approval cards, per-chat surfaces) subscribe here instead of re-deriving the routing.',
     parameters: [{ name: 'payload', description: '.chatId - the Feishu chat whose messages this agent serves.' }],
+  },
+  {
+    name: 'feishu/provider-added',
+    mode: 'emit',
+    signature: '\'feishu/provider-added\'(provider: FeishuProvider): void',
+    summary: 'A Feishu provider was registered with `ctx.feishu.registerProvider`.',
+    description: 'A Feishu provider was registered with `ctx.feishu.registerProvider`. Load-time consumers (receive channels) subscribe here so they open on the registered provider regardless of parallel entry load order.',
+    parameters: [{ name: 'provider', description: 'the registered provider.' }],
+  },
+  {
+    name: 'feishu/provider-removed',
+    mode: 'emit',
+    signature: '\'feishu/provider-removed\'(id: string): void',
+    summary: 'A Feishu provider left the registry (its registering fiber unloaded).',
+    description: 'A Feishu provider left the registry (its registering fiber unloaded).',
+    parameters: [{ name: 'id', description: 'the provider id that no longer resolves.' }],
   },
   {
     name: 'fs/edit-intent',

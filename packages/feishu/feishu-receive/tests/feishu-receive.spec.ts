@@ -107,6 +107,71 @@ function mountReceive(options: MountOptions = {}): Promise<{
   })()
 }
 
+/**
+ * Mount the seam + the receive consumer with NO provider registered yet, and
+ * a factory for registering scripted providers later — the parallel-entry-load
+ * situation where the provider plugin activates after the receive consumer.
+ */
+function mountReceiveDeferred(
+  options: MountOptions = {},
+  seamConfig: ConstructorParameters<typeof FeishuRuntime>[1] = {},
+): Promise<{
+  ctx: Context
+  fiber: Awaited<ReturnType<Context['plugin']>>
+  handlers: Array<(event: FeishuReceiveEvent) => void>
+  create: ReturnType<typeof vi.fn>
+  agents: CreatedAgent[]
+  systemPrompt: ReturnType<typeof mockSystemPrompt>
+  register: (id: string, opts?: { available?: () => boolean; receive?: boolean }) => () => void
+}> {
+  return (async () => {
+    const ctx = new Context()
+    await ctx.plugin(FeishuRuntime, seamConfig)
+
+    const handlers: Array<(event: FeishuReceiveEvent) => void> = []
+    const register = (
+      id: string,
+      opts: { available?: () => boolean; receive?: boolean } = {},
+    ): (() => void) => ctx.feishu.registerProvider({
+      id,
+      available: opts.available ?? (() => true),
+      sendMessage: async () => ({ messageId: 'm' }),
+      ...(opts.receive === false ? {} : {
+        startReceiving: (h) => { handlers.push(h); return () => {} },
+      }),
+    })
+
+    const systemPrompt = mockSystemPrompt()
+    ctx.provide('systemPrompt', systemPrompt as never)
+
+    const agents: CreatedAgent[] = []
+    const create = vi.fn(async (opts: CreatedOptions) => {
+      const agent: CreatedAgent = { id: opts.sessionId, followup: vi.fn(), dispose: vi.fn(async () => {}) }
+      agents.push(agent)
+      // Call the setup callback so per-chat system-prompt context registration
+      // runs, matching the real agents.create contract.
+      if (opts.setup !== undefined) {
+        const agentCtx = ctx.extend({ agent })
+        await opts.setup(agentCtx)
+      }
+      return { agent, dispose: agent.dispose }
+    })
+
+    ctx.provide('agents', {
+      roots: options.onRoots ?? (() => []),
+      create,
+    } as never)
+    ctx.provide('agentPresets', {
+      defaultId: options.defaultId ?? 'preset-default',
+      composedPreset: () => options.presetOfRoot,
+      mount: vi.fn(async () => {}),
+    } as never)
+
+    const fiber = await ctx.plugin(FeishuReceive, options.config ?? {})
+    return { ctx, fiber, handlers, create, agents, systemPrompt, register }
+  })()
+}
+
 function event(text: string, chatId = 'oc_1'): FeishuReceiveEvent {
   return { eventType: 'im.message.receive_v1', senderId: 'ou_1', senderIdType: 'open_id', chatId, content: text, raw: {} }
 }
@@ -278,6 +343,86 @@ describe('feishu-receive', () => {
 
     await fiber.dispose()
     await vi.waitFor(() => { expect(agents[0]!.dispose).toHaveBeenCalledTimes(1) })
+    await ctx.fiber.dispose()
+  })
+
+  it('loads without a registered provider and routes messages when one registers', async () => {
+    const { ctx, fiber, handlers, create, agents, register } = await mountReceiveDeferred({ onRoots: () => [root()] })
+    expect(handlers).toHaveLength(0)
+
+    register('scripted')
+    expect(handlers).toHaveLength(1)
+
+    handlers[0]!(event('hello'))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(1) })
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const createdOptions = create.mock.calls[0]![0] as CreatedOptions
+    expect(createdOptions.sessionId).toMatch(/^feishu-/)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('fails the registration loudly when a later provider cannot receive', async () => {
+    const { ctx, fiber, handlers, register } = await mountReceiveDeferred()
+    expect(() => register('send-only', { receive: false })).toThrow(
+      expect.objectContaining({ code: 'FEISHU_RECEIVE_UNSUPPORTED' }),
+    )
+    expect(handlers).toHaveLength(0)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps waiting through registrations that cannot host the channel', async () => {
+    const { ctx, fiber, handlers, register } = await mountReceiveDeferred()
+    const disposeCold = register('cold', { available: () => false })
+    expect(handlers).toHaveLength(0)
+    disposeCold()
+    expect(handlers).toHaveLength(0)
+
+    register('scripted')
+    expect(handlers).toHaveLength(1)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('reopens the receive channel on the remaining provider when another leaves', async () => {
+    const { ctx, fiber, handlers, register } = await mountReceiveDeferred()
+    const disposeA = register('bot-a')
+    expect(handlers).toHaveLength(1)
+    const disposeB = register('bot-b')
+    expect(handlers).toHaveLength(1)
+
+    disposeB()
+    expect(handlers).toHaveLength(2)
+    disposeA()
+    expect(handlers).toHaveLength(2)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('falls back to waiting when the remaining provider cannot host the channel', async () => {
+    const { ctx, fiber, handlers, register } = await mountReceiveDeferred()
+    const disposeGood = register('good')
+    expect(handlers).toHaveLength(1)
+    const disposeSendOnly = register('send-only', { receive: false })
+    expect(handlers).toHaveLength(1)
+
+    disposeGood()
+    expect(handlers).toHaveLength(1)
+    disposeSendOnly()
+    register('good-2')
+    expect(handlers).toHaveLength(2)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('waits for the configured provider when it registers after load', async () => {
+    const { ctx, fiber, handlers, register } = await mountReceiveDeferred({}, { provider: 'pinned' })
+    expect(handlers).toHaveLength(0)
+
+    register('pinned')
+    expect(handlers).toHaveLength(1)
+    await fiber.dispose()
     await ctx.fiber.dispose()
   })
 })

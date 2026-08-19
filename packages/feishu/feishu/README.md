@@ -26,6 +26,8 @@ Registers the `FeishuRuntime` service as `ctx.feishu` — one instance per Cordi
 ## Extension points
 
 - `ctx.feishu.registerProvider(provider)` — register a `FeishuProvider` implementation. Returns a disposer.
+- `feishu/provider-added` — emitted when a provider commits to the registry; a throwing listener rolls the registration back. Load-time consumers such as the card-action answerer subscribe here because Cordis may load sibling plugins concurrently, so configuration order does not prove registration order.
+- `feishu/provider-removed` — emitted with the provider id when a registration's disposer runs (the registering fiber unloaded).
 - `ctx.feishu.sendMessage(request, signal?)` — send one message through the selected provider.
 - `ctx.feishu.startReceiving(handler)` — start the selected provider's receive channel; the provider calls `handler` with each `FeishuReceiveEvent`. Returns a disposer, and throws `FEISHU_RECEIVE_UNSUPPORTED` for a send-only provider.
 - `ctx.feishu.startReceivingCardActions(handler)` — subscribe to card button actions (`FeishuCardActionEvent`) through the selected provider's receive channel — the same channel `startReceiving` opens, never a second one. Returns a disposer, and throws `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no card-action support. Handlers must settle fast; anything slow belongs behind the handler.

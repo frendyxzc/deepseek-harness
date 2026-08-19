@@ -17,7 +17,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-feishu'
-import type { FeishuCardActionEvent } from '@deepseek-ai/dsh-feishu'
+import { FeishuError, type FeishuCardActionEvent } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu-receive'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
@@ -95,8 +95,11 @@ interface PendingCard {
 
 /**
  * Answer Feishu chat agents' approval requests with interactive cards. The
- * plugin fails loud at load when the selected Feishu provider cannot receive
- * card actions — answering is impossible without the tap channel.
+ * card tap channel opens on a registered Feishu provider; sibling plugins
+ * load concurrently, so the channel waits for `feishu/provider-added` when
+ * no usable provider has registered yet, and a provider that cannot receive
+ * card actions fails its registration loudly — answering is impossible
+ * without the tap channel.
  * @param ctx - Cordis context carrying the injected services.
  * @param config - plugin config; `timeoutMs` defaults to 60000.
  */
@@ -181,7 +184,57 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(() => {
     // The tap channel is the feature's precondition: a provider that cannot
     // receive card actions fails loud here, at load, not at the first ask.
-    const disposeCardReceive = ctx.feishu.startReceivingCardActions(onCardAction)
+    // Entry fibers load in parallel, so a provider plugin may still be
+    // activating when this effect runs; the seam's registration events open
+    // the channel then instead of failing the boot over load order.
+    let disposeCardReceive: (() => void) | undefined
+    /** Whether the channel waits for a usable provider to register. */
+    let waitingForProvider = false
+
+    /** Open the tap channel; false when no usable provider is registered yet. */
+    const openCardChannel = (): boolean => {
+      try {
+        disposeCardReceive = ctx.feishu.startReceivingCardActions(onCardAction)
+        return true
+      } catch (error: unknown) {
+        // Not registered (yet) — a provider fiber may still be loading.
+        if (error instanceof FeishuError
+          && (error.code === 'FEISHU_PROVIDER_UNAVAILABLE' || error.code === 'FEISHU_PROVIDER_CONFIGURED_MISSING')) {
+          return false
+        }
+        throw error
+      }
+    }
+    const closeCardChannel = (): void => {
+      disposeCardReceive?.()
+      disposeCardReceive = undefined
+    }
+
+    waitingForProvider = !openCardChannel()
+    if (waitingForProvider) {
+      ctx.logger.warn('feishu-approval: no usable Feishu provider is registered yet; the card tap channel opens when one registers')
+    }
+
+    const offProviderAdded = ctx.on('feishu/provider-added', () => {
+      if (!waitingForProvider) return
+      // A registered provider that cannot receive card actions is a real
+      // misconfiguration: the throw unwinds the provider's registration and
+      // fails its fiber loudly.
+      waitingForProvider = !openCardChannel()
+    })
+    const offProviderRemoved = ctx.on('feishu/provider-removed', () => {
+      if (waitingForProvider) return
+      // The channel's provider is gone: re-open on a remaining provider, or
+      // wait for the next registration. This path never throws — a teardown
+      // reaction must not fail the unloading fiber.
+      closeCardChannel()
+      try {
+        waitingForProvider = !openCardChannel()
+      } catch (error: unknown) {
+        waitingForProvider = true
+        ctx.logger.warn('feishu-approval: card tap channel closed and cannot reopen: %s', String(error))
+      }
+    })
 
     const offChatAgent = ctx.on('feishu/chat-agent', ({ agent, chatId }) => {
       chatBySession.set(agent.session.id, chatId)
@@ -267,7 +320,9 @@ export function apply(ctx: Context, config: Config): void {
     }, { prepend: true })
 
     return () => {
-      disposeCardReceive()
+      closeCardChannel()
+      offProviderAdded()
+      offProviderRemoved()
       offChatAgent()
       offCreated()
       offDisposed()

@@ -132,6 +132,8 @@ Selection semantics (resolved at execution time, never order-dependent):
 /**
  * Register a Feishu provider. Throws {@link FeishuError} `FEISHU_DUPLICATE_PROVIDER`
  * if its id is already registered. Returns a disposer; disposed with the calling fiber.
+ * Emits `feishu/provider-added` once the registration commits (a throwing
+ * listener rolls it back) and `feishu/provider-removed` when it is disposed.
  * @param provider - the provider; its `id` is the registry key.
  * @returns the disposer that unregisters the provider.
  */
@@ -192,7 +194,7 @@ async updateMessage(messageId: string, content: string, signal?: AbortSignal): P
 async describeStatus(): Promise<FeishuRuntimeStatus>
 ```
 
-Source: [`packages/feishu/feishu/src/index.ts:77`](../../packages/feishu/feishu/src/index.ts)
+Source: [`packages/feishu/feishu/src/index.ts:94`](../../packages/feishu/feishu/src/index.ts)
 
 <a id="feishu-events"></a>
 
@@ -221,5 +223,41 @@ A per-chat agent was published for one Feishu chat: the routing pin is live and 
 
 Types: [Agent](core.md)
 
-Source: [`packages/feishu/feishu-receive/src/index.ts:40`](../../packages/feishu/feishu-receive/src/index.ts)
+Source: [`packages/feishu/feishu-receive/src/index.ts:41`](../../packages/feishu/feishu-receive/src/index.ts)
+
+<a id="feishuprovider-added--emit"></a>
+
+#### `feishu/provider-added` — emit
+
+A Feishu provider was registered with `ctx.feishu.registerProvider`. Load-time consumers (receive channels) subscribe here so they open on the registered provider regardless of parallel entry load order.
+
+```ts cordis-catalog
+/**
+ * A Feishu provider was registered with `ctx.feishu.registerProvider`.
+ * Load-time consumers (receive channels) subscribe here so they open on
+ * the registered provider regardless of parallel entry load order.
+ * @param provider - the registered provider.
+ * @mode emit
+ */
+'feishu/provider-added'(provider: FeishuProvider): void
+```
+
+Source: [`packages/feishu/feishu/src/index.ts:55`](../../packages/feishu/feishu/src/index.ts)
+
+<a id="feishuprovider-removed--emit"></a>
+
+#### `feishu/provider-removed` — emit
+
+A Feishu provider left the registry (its registering fiber unloaded).
+
+```ts cordis-catalog
+/**
+ * A Feishu provider left the registry (its registering fiber unloaded).
+ * @param id - the provider id that no longer resolves.
+ * @mode emit
+ */
+'feishu/provider-removed'(id: string): void
+```
+
+Source: [`packages/feishu/feishu/src/index.ts:61`](../../packages/feishu/feishu/src/index.ts)
 <!-- END GENERATED cordis-surface -->
