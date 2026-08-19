@@ -215,6 +215,20 @@
   overflow-y: auto;
 }
 
+/* Loopback-only notice: the configuration plane is unreachable from a LAN
+   origin, so the shell explains why section content degrades instead of the
+   sections each surfacing a raw 403 transport error. */
+.loopbackNotice {
+  flex: none;
+  margin: 0 24px 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+  font-size: 13px;
+  line-height: 20px;
+}
+
 /* Visually-hidden text seat (close button accessible name from slot content). */
 .hiddenLabel {
   position: absolute;

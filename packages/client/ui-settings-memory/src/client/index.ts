@@ -5,6 +5,7 @@
  * packages/client/AGENTS.md.
  */
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
@@ -31,7 +32,7 @@ const NS = 'settings.memory'
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registration depends on the slot through `slots.inject()`.
  */
-export const inject = ['slots', 'locale']
+export const inject = ['slots', 'locale', 'connection']
 
 /**
  * Register the `settings.memory` dictionaries and the Memory section once the
@@ -42,7 +43,8 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-memory: copy dictionaries')
 
   const t = ctx.locale.bind(NS) as MemorySectionInjected['t']
-  const injected = (): MemorySectionInjected => ({ t })
+  const connection = ctx.get('connection') as ConnectionHandle
+  const injected = (): MemorySectionInjected => ({ t, isLoopback: connection.isLoopback })
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',

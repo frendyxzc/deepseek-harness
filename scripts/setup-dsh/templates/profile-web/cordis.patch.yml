@@ -1,0 +1,38 @@
+# Your patch layer for this dsh profile, applied after every bundle layer:
+# a top-level YAML array of loader patch entries (id-targeted config
+# overrides, disables, and insert lists; `!!js` expressions allowed).
+#
+# Feishu chat capability (send + receive): the seam, the Bot API provider, the
+# model-facing send tool, the long-connection receive router (one agent per
+# chat), and the read-only status gateway the Settings > Plugins > IM tab reads.
+# feishu-approval answers approval/request with interactive cards in the owning
+# chat (or the configured fallback chat for sessions with no Feishu binding,
+# e.g. Web GUI), so remote operators approve protected operations from Feishu.
+# Credentials come from FEISHU_APP_ID / FEISHU_APP_SECRET (root .env), never
+# from this file.
+#
+# `__WORKSPACE__` and `__FALLBACK_CHAT_ID__` are placeholders replaced by
+# scripts/setup-dsh/setup.sh at install time.
+- insert:
+    - id: feishu
+      name: '@deepseek-ai/dsh-feishu'
+
+    - id: feishu-bot
+      name: '@deepseek-ai/dsh-feishu-bot'
+
+    - id: tool-feishu
+      name: '@deepseek-ai/dsh-tool-feishu'
+
+    - id: feishu-receive
+      name: '@deepseek-ai/dsh-feishu-receive'
+      config:
+        cwd: __WORKSPACE__
+
+    - id: feishu-status
+      name: '@deepseek-ai/dsh-feishu-status'
+
+    - id: feishu-approval
+      name: '@deepseek-ai/dsh-feishu-approval'
+      config:
+        timeoutMs: 300000
+        fallbackChatId: __FALLBACK_CHAT_ID__

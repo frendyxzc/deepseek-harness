@@ -21,6 +21,7 @@ const SEAT_CONTENT: Record<string, string> = {
 function mount({
   wide = true,
   onboardingActive = true,
+  isLoopback = true,
   rows = [
     { id: 'general', order: 0, label: 'General' },
     { id: 'models', order: 10, label: 'Models' },
@@ -30,7 +31,7 @@ function mount({
     { id: 'welcome', order: -100 },
     { id: 'credential', order: 0 },
   ],
-}: { wide?: boolean; onboardingActive?: boolean; rows?: Row[]; steps?: Step[] } = {}) {
+}: { wide?: boolean; onboardingActive?: boolean; isLoopback?: boolean; rows?: Row[]; steps?: Step[] } = {}) {
   // Mutable row source standing in for the bound useSections hook; bump()
   // plays a ledger change through the same observable contract.
   let current = rows
@@ -53,6 +54,8 @@ function mount({
     useSessions,
     useWorkspaces: unusedHook,
     wide,
+    isLoopback,
+    t: (key: string) => key,
     useOnboardingSteps: select => select(steps),
     useSections: (select) => {
       const [, force] = useState(0)
@@ -122,6 +125,16 @@ describe('SettingsPanel chrome seats', () => {
     openPanel()
     expect(screen.getByText('Open configuration file')).toBeTruthy()
     expect(renderSlot).toHaveBeenCalledWith('settings.action', {})
+  })
+
+  it('shows the loopback-only notice on a LAN origin and hides it on loopback', () => {
+    mount({ isLoopback: false })
+    openPanel()
+    expect(screen.getByText('loopbackNotice')).toBeTruthy()
+    cleanup()
+    mount()
+    openPanel()
+    expect(screen.queryByText('loopbackNotice')).toBeNull()
   })
 })
 

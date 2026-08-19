@@ -61,7 +61,7 @@ dsh web --dump-config
 dsh web --help
 ```
 
-生产 Web 运行器需要已构建的包和前端产物（`pnpm run build`）。默认服务地址是 `http://127.0.0.1:3080`。CLI 目前有意不支持 `--host 0.0.0.0`，并会以用法错误退出；`--trusted-host` 可添加 `/api` 浏览器信任围栏接受的具名 authority。
+生产 Web 运行器需要已构建的包和前端产物（`pnpm run build`）。默认服务地址是 `http://127.0.0.1:3080`。`dsh web --host 0.0.0.0` 会绑定所有网络接口供局域网使用，并信任机器自动发现的 LAN IP 字面量，从而使未认证的会话表层（其默认 agent preset 会在宿主上运行 `bash`）对同一网络中的任何人可达；`--trusted-host` 可添加 `/api` 浏览器信任围栏接受的具名 authority，这道围栏是 DNS 重绑定防御，而非认证。
 
 进程关闭时，插件树最多有 5 秒完成 dispose。首次收到 `SIGINT` 或 `SIGTERM` 时会开始优雅排空：`SIGTERM` 是监督进程发出的常规停止请求，在所有运行模式下都以 0 退出；`SIGINT` 则报告 130。第二次收到信号时会立即强制退出。如果一次性运行在正常结束时已经卡在 dispose 阶段，第一次按下 `Ctrl+C` 就会直接升级为强制退出，而不会被忽略。
 

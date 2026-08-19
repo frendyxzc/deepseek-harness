@@ -14,12 +14,19 @@ control console that the DSH session's memory proxy (`8096`) binds against.
   section.
 - The section renders a title, a one-line intro, the panel URL, and an
   **Open memory panel** primary button that opens the panel in a new browser tab.
+- The panel URL follows the page's own host: loopback renders the fixed
+  `http://127.0.0.1:8123`, and a LAN origin renders the same host on the panel
+  port (for example `http://192.168.1.5:8123`), so the jump link keeps working
+  when DSH itself is opened across the network.
 - No network requests, no session events, and no settings writes are performed;
   the section is a fixed link and contributes nothing to the model or the
   session log.
 
 ## Known Limitations and Deferred Work
 
-- The panel origin is fixed to `http://127.0.0.1:8123` (the local memory
-  stack's panel port). A deployment that hosts the panel elsewhere needs this
-  value made configurable before the link can follow it.
+- The panel port is fixed to `8123` and the panel is assumed to live on the
+  same machine as DSH; a deployment that hosts the panel on another port or
+  machine needs the origin made configurable before the link can follow it.
+- The panel itself is the standalone TencentDB-Agent-Memory service. Whether a
+  LAN browser can actually load `http://<host>:8123` is that service's own bind
+  policy, outside this repo's control.

@@ -12,6 +12,7 @@ import type { HostObservable, InjectFace, PropsRenderSlots, PropsRuntime } from 
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 // Type-only: pulls the settings slot declarations the shell renders into.
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { SettingsKey } from './locales.ts'
 
 /** One nav row projected from a settings.section registration's options. */
 export interface SettingsSectionRow {
@@ -32,6 +33,10 @@ export interface SettingsOnboardingStep {
  * the shell reads no locale state and subscribes through the bound hook.
  */
 export type SettingsRootInjected = {
+  /** Whether the browser reached the host over loopback (false = a LAN origin). */
+  isLoopback: boolean
+  /** Shell copy translator (the `settings` namespace). */
+  t: (key: SettingsKey) => string
   hooks: {
     /** settings.section ledger projected into ordered nav rows. */
     sections: HostObservable<readonly SettingsSectionRow[]>

@@ -1,0 +1,50 @@
+ui-onboarding:
+  welcomeNoticeVersion: 2026-08-13.1
+agent-presets:
+  default: standard
+llm-pi-ai:
+  providers:
+    dashscope:
+      displayName: DashScope Qwen
+      # Routed through the local TDAI MemoryProxy (team memory injection + L0 capture).
+      # Proxy authenticates with PROXY_USER_KEY (~/.dsh/.credentials.yaml) and forwards
+      # to the MaaS upstream with its own server-side key.
+      apiKeyEnv: PROXY_USER_KEY
+      api: openai-completions
+      # No trailing /v1: the client appends /chat/completions, matching the proxy
+      # route /dsh/<spaceId>/chat/completions.
+      baseURL: http://127.0.0.1:8096/dsh/default
+      models:
+        - id: qwen3.7-plus
+          name: Qwen3.7 Plus
+        - id: qwen3.8-max
+          name: Qwen3.8 Max
+        - id: deepseek-v4-pro
+          name: DeepSeek V4 Pro
+        - id: deepseek-v4-pro-0813
+          name: deepseek-v4-pro-0813
+agent-default-model:
+  # llm-deepseek registers under provider id "deepseek-official"; it is the
+  # adapter that sends x-deepseek-harness-session-id / -user-id headers, which
+  # the MemoryProxy needs to bind the session (picker + injection + L0 capture).
+  provider: deepseek-official
+  model: deepseek-v4-pro-0813
+llm-deepseek:
+  # Same proxy route as llm-pi-ai above (see TencentDB-Agent-Memory INSTALL.md,
+  # "Using Proxy with DeepSeek Harness").
+  apiKeyEnv: PROXY_USER_KEY
+  baseURL: http://127.0.0.1:8096/dsh/default
+  reasoningEffort: high
+  models:
+    - id: deepseek-v4-pro-0813
+      name: DeepSeek V4 Pro 0813
+      contextWindow: 1000000
+      maxTokens: 32768
+    - id: qwen3.8-max
+      name: Qwen3.8 Max
+      contextWindow: 262144
+      maxTokens: 32768
+    - id: deepseek-v4-pro
+      name: DeepSeek V4 Pro
+      contextWindow: 1000000
+      maxTokens: 32768

@@ -33,6 +33,8 @@ type PanelProps = {
   activeId: string | undefined
   onSelect: (id: string) => void
   onClose: () => void
+  isLoopback: boolean
+  t: SettingsRootComponentProps['t']
 }
 
 /**
@@ -40,7 +42,7 @@ type PanelProps = {
  * header button, a mask click, and document-level Escape (mounted only while
  * open, so the listener lifetime is the panel's).
  */
-function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelProps) {
+function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose, isLoopback, t }: PanelProps) {
   // Entries can unmount underneath the requested id, so the render-time
   // projection falls back to the first row when the id is gone.
   const active = rows.find(r => r.id === activeId)?.id ?? rows[0]?.id
@@ -87,6 +89,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
               <span className={css.hiddenLabel}>{renderSlot('settings.close', {})}</span>
             </button>
           </div>
+          {!isLoopback && <p className={css.loopbackNotice}>{t('loopbackNotice')}</p>}
           <div className={css.options}>
             {active !== undefined && renderSlot('settings.section', { close: onClose }, { only: active })}
           </div>
@@ -102,7 +105,7 @@ function SettingsPanel({ rows, renderSlot, activeId, onSelect, onClose }: PanelP
  * @returns the settings shell element tree.
  */
 export function SettingsRoot(props: SettingsRootComponentProps) {
-  const { wide, useSections, useOnboardingSteps, useSessions, renderSlot } = props
+  const { wide, useSections, useOnboardingSteps, useSessions, renderSlot, isLoopback, t } = props
   const [open, setOpen] = useState(false)
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
@@ -157,6 +160,8 @@ export function SettingsRoot(props: SettingsRootComponentProps) {
           activeId={activeId}
           onSelect={setActiveId}
           onClose={close}
+          isLoopback={isLoopback}
+          t={t}
         />
       )}
       {/* Dialog chrome and `#root` inert ownership live inside each step's

@@ -17,6 +17,9 @@ async function bench() {
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
   ctx.provide('locale', locale)
+  // The memory section only reads the loopback classification to resolve the
+  // panel origin; no wire call leaves this face.
+  ctx.provide('connection', { isLoopback: true } as never)
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale }
 }
 
@@ -34,7 +37,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-memory apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale'])
+    expect(inject).toEqual(['slots', 'locale', 'connection'])
   })
 
   it('registers the memory nav entry for declaration before or after apply', async () => {

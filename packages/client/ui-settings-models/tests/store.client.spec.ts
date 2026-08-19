@@ -164,6 +164,18 @@ describe('ModelsSettingsStore', () => {
     await Promise.all([first, second])
     expect(store.store.getSnapshot().status).toBe('ready')
   })
+
+  it('surfaces the loopback-only fact as an error without touching the wire', async () => {
+    const { face, seenRefs } = api()
+    const store = new ModelsSettingsStore(face, true)
+    await store.load()
+    expect(store.store.getSnapshot()).toMatchObject({
+      status: 'error',
+      error: null,
+      loopbackOnly: true,
+    })
+    expect(seenRefs).toEqual([])
+  })
 })
 
 describe('edge joins', () => {

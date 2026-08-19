@@ -236,6 +236,13 @@ function Loaded({ injected }: { injected: ModelsSectionInjected }): ReactNode {
 
   if (state.status === 'idle') void controller.load()
   if (state.status === 'error') {
+    if (state.loopbackOnly) {
+      return (
+        <div className={styles['section']}>
+          <p className={styles['error']}>{t('loopbackOnly')}</p>
+        </div>
+      )
+    }
     /* v8 ignore next -- an error status always carries text; the fallback satisfies the nullable type */
     const errorText = state.error ?? ''
     return (

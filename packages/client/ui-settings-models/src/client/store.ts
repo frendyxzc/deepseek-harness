@@ -46,6 +46,8 @@ export interface ModelsSettingsState {
   rows: readonly ProviderRow[]
   /** Namespace views by ns, for the editor's schema/layers/secrets. */
   namespaces: ReadonlyMap<string, SettingsNamespaceView>
+  /** The configuration plane is loopback-only: a LAN browser cannot read it. */
+  loopbackOnly: boolean
 }
 
 /**
@@ -99,7 +101,7 @@ function apiKeyEnvOf(namespace: SettingsNamespaceView | undefined, path: readonl
 export class ModelsSettingsStore {
   /** The snapshot the section renders from (uSES-safe store). */
   readonly store: SnapshotStore<ModelsSettingsState> = createSnapshotStore<ModelsSettingsState>({
-    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(),
+    status: 'idle', error: null, credentialError: null, writable: false, rows: [], namespaces: new Map(), loopbackOnly: false,
   })
 
   /** Latest load wins; an older response never overwrites a newer one. */
@@ -107,8 +109,12 @@ export class ModelsSettingsStore {
 
   /**
    * @param api - the wire face (settings/credentials/llm domains).
+   * @param loopbackOnly - whether the configuration plane is unreachable from this origin (a LAN client).
    */
-  constructor(private readonly api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>) {}
+  constructor(
+    private readonly api: Pick<IApiClient, 'settings' | 'credentials' | 'llm'>,
+    private readonly loopbackOnly: boolean = false,
+  ) {}
 
   /**
    * Refresh the whole page snapshot: directory and namespaces in parallel,
@@ -117,6 +123,18 @@ export class ModelsSettingsStore {
    * @returns nothing; the snapshot carries the outcome.
    */
   async load(): Promise<void> {
+    // The configuration plane is loopback-only: a LAN browser would 403 on
+    // every settings/credentials read, so surface that fact up front instead
+    // of a transport error.
+    if (this.loopbackOnly) {
+      this.generation += 1
+      this.store.update((s) => {
+        s.status = 'error'
+        s.error = null
+        s.loopbackOnly = true
+      })
+      return
+    }
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'loading'; s.error = null })
     let providers: ConfigurableProviderView[]
