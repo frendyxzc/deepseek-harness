@@ -7,7 +7,11 @@
  * `approval/request` waterfall from the tapped button. One-time nonces
  * guarantee one card settles at most one approval exactly once, and every
  * path that does not produce an explicit Allow — a Deny tap, an unanswered
- * timeout, a withdrawn turn, an undeliverable card — fails closed.
+ * timeout, a withdrawn turn, an undeliverable card — fails closed. A
+ * configured `fallbackChatId` receives the cards of sessions with no Feishu
+ * chat binding — Web GUI, headless, or ACP sessions — so a remote operator
+ * can approve those from Feishu too; without it, such approvals delegate to
+ * the next answerer.
  *
  * @module @deepseek-ai/dsh-feishu-approval
  */
@@ -45,14 +49,24 @@ export interface Config {
    * automatically. Defaults to 60000; must be a positive finite number.
    */
   timeoutMs?: number
+  /**
+   * Feishu chat that receives approval cards for sessions with no Feishu
+   * chat binding — Web GUI, headless, or ACP sessions. Omitted = such
+   * approvals delegate to the next answerer. Must be a non-empty chat id
+   * when provided.
+   */
+  fallbackChatId?: string
 }
 
 export const Config: z<Config> = z.object({
   timeoutMs: z.number().default(DEFAULT_FEISHU_APPROVAL_TIMEOUT_MS),
+  fallbackChatId: z.string(),
 })
 
-/** Complete config after schemastery applies every field default. */
-type ResolvedConfig = Required<Config>
+/** Config after schemastery applies field defaults; only `timeoutMs` gains one. */
+interface ResolvedConfig extends Config {
+  timeoutMs: number
+}
 
 /**
  * Cap on live approval cards. Exceeding it settles the OLDEST card as an
@@ -101,13 +115,18 @@ interface PendingCard {
  * card actions fails its registration loudly — answering is impossible
  * without the tap channel.
  * @param ctx - Cordis context carrying the injected services.
- * @param config - plugin config; `timeoutMs` defaults to 60000.
+ * @param config - plugin config; `timeoutMs` defaults to 60000,
+ * `fallbackChatId` is unset.
  */
 export function apply(ctx: Context, config: Config): void {
   const resolved = config as ResolvedConfig
   const timeoutMs = resolved.timeoutMs
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
     throw new Error(`feishu-approval: timeoutMs must be a positive number, got ${String(timeoutMs)}`)
+  }
+  const fallbackChatId = resolved.fallbackChatId
+  if (fallbackChatId !== undefined && fallbackChatId.length === 0) {
+    throw new Error('feishu-approval: fallbackChatId must be a non-empty chat id when provided')
   }
 
   /**
@@ -123,8 +142,12 @@ export function apply(ctx: Context, config: Config): void {
   /** Live cards in mint order (oldest first) for the eviction cap. */
   const pendingCards = new Set<PendingCard>()
 
-  /** The Feishu chat an approval request belongs to, when one is bound. */
-  const resolveChat = (agent: Agent): string | undefined => chatBySession.get(agent.session.id)
+  /**
+   * The Feishu chat an approval request belongs to: the agent session's
+   * bound chat, else the configured fallback chat, else no chat — the ask
+   * delegates to the next answerer.
+   */
+  const resolveChat = (agent: Agent): string | undefined => chatBySession.get(agent.session.id) ?? fallbackChatId
 
   /** Mint a one-time nonce: enough entropy that guessing is not a channel. */
   const mintNonce = (): string => randomBytes(12).toString('base64url')

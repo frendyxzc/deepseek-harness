@@ -252,6 +252,50 @@ describe('feishu-approval', () => {
     await ctx.fiber.dispose()
   })
 
+  it('routes an unbound session approval to the configured fallback chat', async () => {
+    const { ctx, fiber, sent, updates, tap } = await mountApproval({ fallbackChatId: 'oc_fallback' })
+    const stranger = chatAgent(ctx, 'web-gui-session')
+
+    const pending = ctx.approval.request(requestOf(stranger))
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    expect(sent[0]!.receiveId).toBe('oc_fallback')
+    expect(sent[0]!.content).toContain('Tool approval request')
+    const card = parseCard(sent[0]!)
+    expect(card.sessionId).toBe(stranger.session.id)
+
+    tap({ chatId: 'oc_fallback', value: { action: 'allow', session_id: card.sessionId, nonce: card.allowNonce } })
+    await expect(pending).resolves.toBe('allowed-once')
+    await vi.waitFor(() => { expect(updates).toHaveLength(1) })
+    expect(updates[0]!.content).toContain('Allowed')
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('prefers the owning chat over the fallback for a bound agent', async () => {
+    const { ctx, fiber, sent } = await mountApproval({ fallbackChatId: 'oc_fallback' })
+    const agent = chatAgent(ctx)
+    bindChat(ctx, agent, 'oc_1')
+
+    const pending = ctx.approval.request(requestOf(agent))
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    expect(sent[0]!.receiveId).toBe('oc_1')
+    await fiber.dispose()
+    await expect(pending).resolves.toBe('cancelled')
+    await ctx.fiber.dispose()
+  })
+
+  it('delegates to the next answerer when the fallback card cannot be delivered', async () => {
+    const { ctx, fiber, sent, controls } = await mountApproval({ fallbackChatId: 'oc_fallback' })
+    ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
+    const stranger = chatAgent(ctx, 'web-gui-session')
+    controls.failSend = true
+
+    await expect(ctx.approval.request(requestOf(stranger))).resolves.toBe('allowed-once')
+    expect(sent).toHaveLength(0)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
   it('delegates to the next answerer when card delivery fails', async () => {
     const { ctx, fiber, sent, controls } = await mountApproval()
     ctx.on('approval/request', () => Promise.resolve<ApprovalOutcome>('allowed-once'))
@@ -486,6 +530,21 @@ describe('feishu-approval', () => {
       startReceivingCardActions: () => () => {},
     })
     await expect(ctx.plugin(FeishuApproval, { timeoutMs: 0 })).rejects.toThrow(/positive number/)
+    await ctx.fiber.dispose()
+  })
+
+  it('fails loud for an empty fallbackChatId', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(ApprovalService)
+    await ctx.plugin(FeishuRuntime, {})
+    ctx.feishu.registerProvider({
+      id: 'scripted',
+      available: () => true,
+      sendMessage: async () => ({ messageId: 'm' }),
+      startReceivingCardActions: () => () => {},
+    })
+    await expect(ctx.plugin(FeishuApproval, { fallbackChatId: '' })).rejects.toThrow(/non-empty chat id/)
     await ctx.fiber.dispose()
   })
 })

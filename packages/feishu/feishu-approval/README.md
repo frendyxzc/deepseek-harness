@@ -10,11 +10,14 @@ Answers the `approval/request` waterfall for every agent bound to a Feishu chat 
 
 The card tap channel opens on a registered Feishu provider. Sibling plugins load concurrently, so when no usable provider has registered yet, the plugin waits for `feishu/provider-added` and opens the channel then; a provider that registers but cannot receive card actions fails its registration loudly — answering is impossible without the tap channel.
 
+When `fallbackChatId` is configured, approval requests from sessions with no Feishu chat binding — sessions triggered from the Web GUI, headless, or ACP — are answered with a card in that chat too, so a remote operator can approve work that was not triggered through Feishu. A bound chat always wins over the fallback; the fallback card carries the same one-time nonces and settles only from taps inside the fallback chat. Without `fallbackChatId`, unbound approvals delegate to the next composed answerer.
+
 ### Configuration
 
 | Field | Type | Default | Description |
 | ----- | ---- | ------- | ----------- |
 | `timeoutMs` | `number` | `60000` | How long one approval card waits for a tap before it is denied automatically. Must be a positive finite number. |
+| `fallbackChatId` | `string` | unset | Feishu chat that receives approval cards for sessions with no Feishu chat binding (Web GUI, headless, ACP). Omitted = unbound approvals delegate to the next answerer. Must be a non-empty chat id when provided. |
 
 ## Dependencies
 

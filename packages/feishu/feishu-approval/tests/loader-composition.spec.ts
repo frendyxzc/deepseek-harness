@@ -193,4 +193,34 @@ describe('feishu-approval real composition', () => {
     expect(decided).toHaveLength(1)
     expect(decided[0]!.data).toMatchObject({ outcome: 'rejected' })
   })
+
+  it('routes an unbound session approval to the fallback chat through the real provider', async () => {
+    const { ctx } = await loadComposition(['fallbackChatId: oc_fallback'])
+    const agent = chatAgent(ctx, 'web-gui-real')
+
+    const pending = ctx.approval.request({ agent, toolName: 'bash', reason: 'install a plugin' })
+    await vi.waitFor(() => {
+      expect(apiCalls.some(call => call.method === 'POST' && call.url.startsWith('/im/v1/messages'))).toBe(true)
+    })
+
+    const send = apiCalls.find(call => call.method === 'POST' && call.url.startsWith('/im/v1/messages'))!
+    expect(send.url).toContain('receive_id_type=chat_id')
+    expect(send.body).toMatchObject({ receive_id: 'oc_fallback', msg_type: 'interactive' })
+    const content = send.body.content as string
+    expect(content).toContain('Tool approval request')
+    expect(content).toContain('bash')
+    expect(content).toContain('install a plugin')
+
+    const asked = agent.session.events.filter(event => event.type === 'approval/asked')
+    expect(asked).toHaveLength(1)
+    expect(agent.session.events.filter(event => event.type === 'approval/decided')).toHaveLength(0)
+
+    // Disposal withdraws the pending fallback card and completes the audit pair.
+    await context!.fiber.dispose()
+    context = undefined
+    await expect(pending).resolves.toBe('cancelled')
+    const decided = agent.session.events.filter(event => event.type === 'approval/decided')
+    expect(decided).toHaveLength(1)
+    expect(decided[0]!.data).toMatchObject({ outcome: 'cancelled' })
+  })
 })
