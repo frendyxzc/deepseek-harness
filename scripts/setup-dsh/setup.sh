@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+# One-click local environment bootstrap for DeepSeek Harness.
+#
+# Reproduces every piece of configuration that lives *outside* this checkout —
+# under $DSH_HOME (default ~/.dsh) — plus the TencentDB-Agent-Memory stack
+# that the local dsh Web profile talks to:
+#
+#   ~/.dsh/settings.yaml                LLM providers / models (copied from template)
+#   ~/.dsh/.credentials.yaml            PROXY_USER_KEY (prompted, never committed)
+#   ~/.dsh/profiles/web/{package.json, cordis.yml, cordis.patch.yml, pnpm-workspace.yaml}
+#   ~/.dsh/tdai-stack/TencentDB-Agent-Memory   git clone + per-service config
+#   <repo>/.env                         DEEPSEEK_API_KEY + FEISHU_* (prompted)
+#
+# Idempotent: existing files are kept unless --force is passed. Secrets are
+# prompted interactively (or read from the DSH_* env vars below); pass
+# --non-interactive to fail instead of prompting.
+#
+# Options:
+#   --dsh-home PATH     override the harness home (default $DSH_HOME or ~/.dsh)
+#   --workspace PATH    workspace the profile `cwd` points at (default: this repo)
+#   --branch REF        TencentDB-Agent-Memory branch (default: feat/server_team)
+#   --skip-memory       do not clone/configure the memory stack
+#   --skip-install      do not run pnpm/npm install in the memory services
+#   --force             overwrite existing generated files
+#   --non-interactive   never prompt; fail if a required value is missing
+#   -h, --help          this help
+#
+# Secret env vars (used before prompting):
+#   DSH_PROXY_USER_KEY            -> ~/.dsh/.credentials.yaml PROXY_USER_KEY
+#   DSH_FEISHU_FALLBACK_CHAT_ID   -> profile cordis.patch.yml fallbackChatId
+#   DSH_DEEPSEEK_API_KEY          -> <repo>/.env DEEPSEEK_API_KEY
+#   DSH_FEISHU_APP_ID             -> <repo>/.env FEISHU_APP_ID
+#   DSH_FEISHU_APP_SECRET         -> <repo>/.env FEISHU_APP_SECRET
+#   DSH_PROXY_UPSTREAM_URL        -> memory proxy config.yaml upstream.url
+#   DSH_PROXY_UPSTREAM_API_KEY    -> memory proxy config.yaml upstream.apiKey
+#   DSH_KERNEL_GATEWAY_API_KEY    -> panel metadata-instances.json api_key (default: empty)
+#   DSH_TDAI_LLM_API_KEY          -> memory core TDAI_LLM_API_KEY
+#   DSH_TDAI_LLM_BASE_URL         -> memory core TDAI_LLM_BASE_URL
+#   DSH_TDAI_LLM_MODEL            -> memory core TDAI_LLM_MODEL
+set -euo pipefail
+
+# ── Resolve the checked-out repo root and defaults ───────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TEMPLATES="$SCRIPT_DIR/templates"
+
+MEMORY_REPO_URL="${DSH_MEMORY_REPO_URL:-https://github.com/TencentCloud/TencentDB-Agent-Memory.git}"
+MEMORY_BRANCH="${DSH_MEMORY_BRANCH:-feat/server_team}"
+
+DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
+WORKSPACE="$REPO_ROOT"
+
+SKIP_MEMORY=0
+SKIP_INSTALL=0
+FORCE=0
+NON_INTERACTIVE=0
+
+info()  { printf '\033[1;34m[setup]\033[0m %s\n' "$*"; }
+ok()    { printf '\033[1;32m[setup]\033[0m %s\n' "$*"; }
+warn()  { printf '\033[1;33m[setup]\033[0m %s\n' "$*"; }
+die()   { printf '\033[1;31m[setup]\033[0m %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  awk 'NR>1 { if (/^set -euo pipefail$/) exit; sub(/^# ?/, ""); print }' "$0"
+}
+
+# Parse args
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dsh-home)        DSH_HOME="$2"; shift 2 ;;
+    --workspace)       WORKSPACE="$2"; shift 2 ;;
+    --branch)          MEMORY_BRANCH="$2"; shift 2 ;;
+    --skip-memory)     SKIP_MEMORY=1; shift ;;
+    --skip-install)    SKIP_INSTALL=1; shift ;;
+    --force)           FORCE=1; shift ;;
+    --non-interactive) NON_INTERACTIVE=1; shift ;;
+    -h|--help)         usage; exit 0 ;;
+    *) die "unknown option: $1 (run with --help)" ;;
+  esac
+done
+
+WORKSPACE="$(cd "$WORKSPACE" 2>/dev/null && pwd || true)"
+[[ -n "$WORKSPACE" && -d "$WORKSPACE" ]] || die "workspace $WORKSPACE is not a directory"
+
+DSH_HOME="${DSH_HOME/#\~/$HOME}"   # expand a leading tilde
+
+# ── Prompting helpers (interactive unless --non-interactive) ───────────────
+# ask_opt <env-var> <prompt> <default> — optional (non-secret) value. Env wins,
+# then prompt; in --non-interactive the default is used verbatim (which may be
+# an empty string, i.e. "skip").
+ask_opt() {
+  local env_var="$1" prompt="$2" default="${3:-}" val
+  val="${!env_var:-}"
+  [[ -n "$val" ]] && { printf '%s\n' "$val"; return; }
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then printf '%s\n' "$default"; return; fi
+  local p="$prompt"; [[ -n "$default" ]] && p="$prompt [$default]"
+  IFS= read -r -p "  $p: " val || true
+  [[ -n "$val" ]] || val="$default"
+  printf '%s\n' "$val"
+}
+
+# ask_secret <env-var> <prompt> — required secret. Env wins, then prompt;
+# --non-interactive without an env value fails instead of guessing.
+ask_secret() {
+  local env_var="$1" prompt="$2" val
+  val="${!env_var:-}"
+  [[ -n "$val" ]] && { printf '%s\n' "$val"; return; }
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then
+    die "missing required secret: \$$env_var (unset and --non-interactive)"
+  fi
+  IFS= read -r -s -p "  $prompt: " val || true
+  printf '\n'
+  printf '%s\n' "$val"
+}
+
+# ask_secret_opt <env-var> <prompt> — optional secret (empty = skip).
+ask_secret_opt() {
+  local env_var="$1" prompt="$2" val
+  val="${!env_var:-}"
+  [[ -n "$val" ]] && { printf '%s\n' "$val"; return; }
+  if [[ "$NON_INTERACTIVE" == "1" ]]; then printf '\n'; return; fi
+  IFS= read -r -s -p "  $prompt (leave empty to skip): " val || true
+  printf '\n'
+  printf '%s\n' "$val"
+}
+
+# write_if_absent <path> — materialize only when missing (or --force).
+write_if_absent() {
+  local path="$1"
+  if [[ -e "$path" && "$FORCE" != "1" ]]; then
+    warn "already exists, skipping: $path"
+    return 1
+  fi
+  return 0
+}
+
+# ── 1. Harness home ─────────────────────────────────────────────────────────
+info "harness home: $DSH_HOME  ·  workspace: $WORKSPACE"
+mkdir -p "$DSH_HOME"
+chmod 700 "$DSH_HOME"
+
+# ── 2. settings.yaml ───────────────────────────────────────────────────────
+if write_if_absent "$DSH_HOME/settings.yaml"; then
+  cp "$TEMPLATES/settings.yaml" "$DSH_HOME/settings.yaml"
+  chmod 600 "$DSH_HOME/settings.yaml"
+  ok "settings.yaml -> $DSH_HOME/settings.yaml"
+fi
+
+# ── 3. .credentials.yaml ───────────────────────────────────────────────────
+if write_if_absent "$DSH_HOME/.credentials.yaml"; then
+  PROXY_USER_KEY="$(ask_secret DSH_PROXY_USER_KEY 'Memory proxy user_key (sk-mem-...)')"
+  {
+    printf '# dsh-managed credentials store. Every value here is a secret;\n'
+    printf '# dsh refuses to boot if this file is not owner-only (0600).\n'
+    printf 'PROXY_USER_KEY: "%s"\n' "$PROXY_USER_KEY"
+  } > "$DSH_HOME/.credentials.yaml"
+  chmod 600 "$DSH_HOME/.credentials.yaml"
+  ok ".credentials.yaml -> $DSH_HOME/.credentials.yaml"
+fi
+
+# ── 4. web profile ─────────────────────────────────────────────────────────
+PROFILE_DIR="$DSH_HOME/profiles/web"
+mkdir -p "$PROFILE_DIR"
+
+if write_if_absent "$PROFILE_DIR/package.json"; then
+  cp "$TEMPLATES/profile-web/package.json" "$PROFILE_DIR/package.json"
+  ok "profile package.json -> $PROFILE_DIR/package.json"
+fi
+if write_if_absent "$PROFILE_DIR/cordis.yml"; then
+  cp "$TEMPLATES/profile-web/cordis.yml" "$PROFILE_DIR/cordis.yml"
+  ok "profile cordis.yml -> $PROFILE_DIR/cordis.yml"
+fi
+if write_if_absent "$PROFILE_DIR/pnpm-workspace.yaml"; then
+  cp "$TEMPLATES/profile-web/pnpm-workspace.yaml" "$PROFILE_DIR/pnpm-workspace.yaml"
+  ok "profile pnpm-workspace.yaml -> $PROFILE_DIR/pnpm-workspace.yaml"
+fi
+if write_if_absent "$PROFILE_DIR/cordis.patch.yml"; then
+  FALLBACK_CHAT_ID="$(ask_opt DSH_FEISHU_FALLBACK_CHAT_ID 'Feishu fallback chat id (approval cards; empty to skip)' '')"
+  sed -e "s|__WORKSPACE__|$WORKSPACE|g" \
+      -e "s|__FALLBACK_CHAT_ID__|$FALLBACK_CHAT_ID|g" \
+      "$TEMPLATES/profile-web/cordis.patch.yml" > "$PROFILE_DIR/cordis.patch.yml"
+  ok "profile cordis.patch.yml -> $PROFILE_DIR/cordis.patch.yml"
+fi
+
+# ── 5. repo .env (gitignored) ──────────────────────────────────────────────
+if [[ -e "$REPO_ROOT/.env" && "$FORCE" != "1" ]]; then
+  warn "already exists, skipping: $REPO_ROOT/.env"
+else
+  ASK_DEEPSEEK="$(ask_secret_opt DSH_DEEPSEEK_API_KEY 'DEEPSEEK_API_KEY (direct-API tests/demos; empty to skip)')"
+  ASK_FEISHU_ID="$(ask_opt DSH_FEISHU_APP_ID 'FEISHU_APP_ID (empty to skip)' '')"
+  ASK_FEISHU_SECRET="$(ask_secret_opt DSH_FEISHU_APP_SECRET 'FEISHU_APP_SECRET')"
+  umask 077
+  {
+    printf 'DEEPSEEK_API_KEY=%s\n' "$ASK_DEEPSEEK"
+    printf 'FEISHU_APP_ID=%s\n' "$ASK_FEISHU_ID"
+    printf 'FEISHU_APP_SECRET=%s\n' "$ASK_FEISHU_SECRET"
+  } > "$REPO_ROOT/.env"
+  ok ".env -> $REPO_ROOT/.env"
+fi
+
+# ── 6. TencentDB-Agent-Memory stack ─────────────────────────────────────────
+MEMORY_ROOT="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory"
+
+if [[ "$SKIP_MEMORY" == "1" ]]; then
+  warn "--skip-memory: leaving the memory stack as-is (if any)"
+else
+  if [[ ! -d "$MEMORY_ROOT/.git" ]]; then
+    mkdir -p "$(dirname "$MEMORY_ROOT")"
+    info "cloning $MEMORY_REPO_URL (branch $MEMORY_BRANCH)"
+    if [[ "$FORCE" == "1" && -d "$MEMORY_ROOT" ]]; then rm -rf "$MEMORY_ROOT"; fi
+    git clone --branch "$MEMORY_BRANCH" "$MEMORY_REPO_URL" "$MEMORY_ROOT"
+    ok "memory stack -> $MEMORY_ROOT"
+  else
+    (cd "$MEMORY_ROOT" && git checkout "$MEMORY_BRANCH" 2>/dev/null || true)
+    ok "memory stack already present: $MEMORY_ROOT"
+  fi
+
+  # 6a. MemoryProxy (8096) — upstream + local core endpoints into a minimal config.yaml
+  if [[ ! -f "$MEMORY_ROOT/MemoryProxy/config.yaml" || "$FORCE" == "1" ]]; then
+    PROXY_UPSTREAM_URL="$(ask_opt DSH_PROXY_UPSTREAM_URL 'Proxy upstream LLM URL (no /v1)' '')"
+    [[ -n "$PROXY_UPSTREAM_URL" ]] || die "proxy upstream URL is required (set DSH_PROXY_UPSTREAM_URL)"
+    PROXY_UPSTREAM_API_KEY="$(ask_secret_opt DSH_PROXY_UPSTREAM_API_KEY 'Proxy upstream LLM API key')"
+    KERNEL_API_KEY="${DSH_KERNEL_GATEWAY_API_KEY:-}"
+    cat > "$MEMORY_ROOT/MemoryProxy/config.yaml" <<YAML
+# Generated by scripts/setup-dsh/setup.sh — re-run setup to regenerate.
+server:
+  host: 127.0.0.1
+  port: 8096
+  forwardTimeoutMs: 600000
+
+upstream:
+  url: "${PROXY_UPSTREAM_URL}"
+  apiKey: "${PROXY_UPSTREAM_API_KEY}"
+
+log:
+  file: ""
+  level: info
+  backend: console
+
+tdai:
+  enabled: true
+  endpoint: "http://127.0.0.1:8420"
+  apiKey: "${KERNEL_API_KEY}"
+  serviceId: default
+  memory:
+    enabled: true
+    inject: true
+    writeL0: true
+    recallL1: true
+    injectL2L3: true
+
+skill:
+  endpoint: "http://127.0.0.1:8420"
+  serviceToken: "${KERNEL_API_KEY}"
+
+auth:
+  enabled: true
+  url: "http://127.0.0.1:8420"
+  timeoutMs: 5000
+
+sessionInit:
+  enabled: true
+  maxRetries: 3
+  injectAgentContext: true
+  injectTaskContext: true
+  headerAutoSelect:
+    enabled: true
+    teamHeader: "x-team-id"
+    agentHeader: "x-agent-id"
+    taskHeader: "x-task-id"
+    onMismatch: "form"
+
+costGuard:
+  enabled: false
+
+injection:
+  enabled: true
+  injectors:
+    - skill
+    - knowledge
+    - tdai-memory
+
+redis:
+  enabled: false
+YAML
+    chmod 600 "$MEMORY_ROOT/MemoryProxy/config.yaml"
+    ok "proxy config.yaml -> $MEMORY_ROOT/MemoryProxy/config.yaml"
+  fi
+
+  # 6b. MemoryPanel (8123) — copy .env.example; fill instance registry
+  if [[ ! -f "$MEMORY_ROOT/MemoryPanel/.env" || "$FORCE" == "1" ]]; then
+    cp "$MEMORY_ROOT/MemoryPanel/.env.example" "$MEMORY_ROOT/MemoryPanel/.env"
+    # Bind every interface so a LAN browser can reach Memory Hub (the panel
+    # itself already defaults HOST to 0.0.0.0; keeping it explicit here makes
+    # the intent readable). The panel has no auth gate of its own, so on a
+    # shared network the operator should firewall :8123. Also disable the
+    # startup knowledge-service LLM-binding sync.
+    sed -e 's/^HOST=.*/HOST=0.0.0.0/' \
+        -e 's/^KNOWLEDGE_LLM_BINDING_SYNC=.*/KNOWLEDGE_LLM_BINDING_SYNC=false/' \
+        "$MEMORY_ROOT/MemoryPanel/.env" > "$MEMORY_ROOT/MemoryPanel/.env.tmp"
+    # The sed above only rewrites an existing HOST= line; when the upstream
+    # .env.example carries none, append the LAN bind instead of silently
+    # leaving the panel on the service's built-in default.
+    grep -q '^HOST=' "$MEMORY_ROOT/MemoryPanel/.env.tmp" \
+      || printf 'HOST=0.0.0.0\n' >> "$MEMORY_ROOT/MemoryPanel/.env.tmp"
+    mv "$MEMORY_ROOT/MemoryPanel/.env.tmp" "$MEMORY_ROOT/MemoryPanel/.env"
+    ok "panel .env -> $MEMORY_ROOT/MemoryPanel/.env"
+  fi
+  if [[ ! -f "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json" || "$FORCE" == "1" ]]; then
+    GATEWAY_API_KEY="$(ask_opt DSH_KERNEL_GATEWAY_API_KEY 'Kernel gateway bearer (empty for local, no Bearer gate)' '')"
+    sed -e "s/REPLACE_WITH_KERNEL_BEARER_TOKEN/${GATEWAY_API_KEY}/g" \
+      "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.example.json" \
+      > "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json"
+    chmod 600 "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json"
+    ok "panel metadata-instances.json -> $MEMORY_ROOT/MemoryPanel/config/metadata-instances.json"
+  fi
+
+  # 6c. MemoryKnowledge (8421) — copy .env.example
+  if [[ ! -f "$MEMORY_ROOT/MemoryKnowledge/.env" || "$FORCE" == "1" ]]; then
+    cp "$MEMORY_ROOT/MemoryKnowledge/.env.example" "$MEMORY_ROOT/MemoryKnowledge/.env"
+    ok "knowledge .env -> $MEMORY_ROOT/MemoryKnowledge/.env"
+  fi
+
+  # 6d. MemoryCore (8420) — record LLM env in .env.local (source before start)
+  CORE_ENV_FILE="$MEMORY_ROOT/MemoryCore/.env.local"
+  if [[ ! -f "$CORE_ENV_FILE" || "$FORCE" == "1" ]]; then
+    TDAI_LLM_API_KEY="$(ask_secret DSH_TDAI_LLM_API_KEY 'MemoryCore TDAI_LLM_API_KEY')"
+    TDAI_LLM_BASE_URL="$(ask_opt DSH_TDAI_LLM_BASE_URL 'MemoryCore TDAI_LLM_BASE_URL' 'https://api.lkeap.cloud.tencent.com/v1')"
+    TDAI_LLM_MODEL="$(ask_opt DSH_TDAI_LLM_MODEL 'MemoryCore TDAI_LLM_MODEL' 'deepseek-v3.2')"
+    umask 077
+    {
+      printf 'export TDAI_LLM_API_KEY=%s\n' "$TDAI_LLM_API_KEY"
+      printf 'export TDAI_LLM_BASE_URL=%s\n' "$TDAI_LLM_BASE_URL"
+      printf 'export TDAI_LLM_MODEL=%s\n' "$TDAI_LLM_MODEL"
+      printf 'export TDAI_GATEWAY_CONFIG=%s\n' "$MEMORY_ROOT/MemoryCore/tdai-gateway.yaml"
+    } > "$CORE_ENV_FILE"
+    ok "core env -> $CORE_ENV_FILE"
+  fi
+
+  # 6e. Install service dependencies (matches what each service was built with)
+  if [[ "$SKIP_INSTALL" == "1" ]]; then
+    warn "--skip-install: not installing memory service dependencies"
+  else
+    if [[ ! -d "$MEMORY_ROOT/MemoryProxy/node_modules" || "$FORCE" == "1" ]]; then
+      info "install MemoryProxy deps (npm)"
+      (cd "$MEMORY_ROOT/MemoryProxy" && npm install --no-audit --no-fund)
+    fi
+    for svc in MemoryCore MemoryPanel MemoryKnowledge; do
+      if [[ ! -d "$MEMORY_ROOT/$svc/node_modules" || "$FORCE" == "1" ]]; then
+        info "install $svc deps (pnpm)"
+        (cd "$MEMORY_ROOT/$svc" && pnpm install)
+      fi
+    done
+    ok "memory service dependencies ready"
+  fi
+fi
+
+# ── Summary ────────────────────────────────────────────────────────────────
+echo
+ok "bootstrap complete."
+echo
+echo "Start the full stack (in dependency order):  ./scripts/setup-dsh/start-all.sh"
+echo "Stop it:                                    ./scripts/setup-dsh/stop-all.sh"
+echo
+echo "Or start services one by one:"
+echo "  1. MemoryCore     :8420   cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryCore && set -a && . ./.env.local && set +a && node --import tsx src/gateway/server.ts"
+echo "  2. MemoryProxy    :8096   cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryProxy && npm start"
+echo "  3. MemoryKnowledge :8421  cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryKnowledge && pnpm dev"
+echo "  4. MemoryPanel    :8123   cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryPanel && pnpm dev"
+echo "  5. dsh Web UI     :3080   cd $WORKSPACE && pnpm dsh web --host 0.0.0.0 --port 3080"
+echo
+echo "Verify memory at http://127.0.0.1:8123 (panel) after a chat."
