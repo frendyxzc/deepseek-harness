@@ -24,9 +24,11 @@ llm-pi-ai:
         - id: deepseek-v4-pro-0813
           name: deepseek-v4-pro-0813
 agent-default-model:
-  # llm-deepseek registers under provider id "deepseek-official"; it is the
-  # adapter that sends x-deepseek-harness-session-id / -user-id headers, which
-  # the MemoryProxy needs to bind the session (picker + injection + L0 capture).
+  # llm-deepseek registers under provider id "deepseek-official". Both routes
+  # send x-deepseek-harness-session-id, which the MemoryProxy uses to bind the
+  # session (picker + injection + L0 capture); deepseek-official additionally
+  # sends the anonymous x-deepseek-harness-user-id, which the pi-ai route has no
+  # source for.
   provider: deepseek-official
   model: deepseek-v4-pro-0813
 llm-deepseek:
