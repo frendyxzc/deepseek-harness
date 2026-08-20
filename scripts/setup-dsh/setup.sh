@@ -127,6 +127,16 @@ ask_secret_opt() {
   printf '%s\n' "$val"
 }
 
+# die_on_newline <var-name> — fail when a value about to be interpolated into a
+# generated config contains a literal newline. BSD sed cannot substitute one
+# and reports only a truncated command; checking here names the offending value.
+die_on_newline() {
+  local name="$1" val="${!1:-}"
+  if [[ "$val" == *$'\n'* ]]; then
+    die "value of \$$name contains a newline; unset it and re-run (each value must be a single line)"
+  fi
+}
+
 # write_if_absent <path> — materialize only when missing (or --force).
 write_if_absent() {
   local path="$1"
@@ -152,6 +162,7 @@ fi
 # ── 3. .credentials.yaml ───────────────────────────────────────────────────
 if write_if_absent "$DSH_HOME/.credentials.yaml"; then
   PROXY_USER_KEY="$(ask_secret DSH_PROXY_USER_KEY 'Memory proxy user_key (sk-mem-...)')"
+  die_on_newline PROXY_USER_KEY
   {
     printf '# dsh-managed credentials store. Every value here is a secret;\n'
     printf '# dsh refuses to boot if this file is not owner-only (0600).\n'
@@ -179,6 +190,8 @@ if write_if_absent "$PROFILE_DIR/pnpm-workspace.yaml"; then
 fi
 if write_if_absent "$PROFILE_DIR/cordis.patch.yml"; then
   FALLBACK_CHAT_ID="$(ask_opt DSH_FEISHU_FALLBACK_CHAT_ID 'Feishu fallback chat id (approval cards; empty to skip)' '')"
+  die_on_newline WORKSPACE
+  die_on_newline FALLBACK_CHAT_ID
   sed -e "s|__WORKSPACE__|$WORKSPACE|g" \
       -e "s|__FALLBACK_CHAT_ID__|$FALLBACK_CHAT_ID|g" \
       "$TEMPLATES/profile-web/cordis.patch.yml" > "$PROFILE_DIR/cordis.patch.yml"
@@ -192,6 +205,9 @@ else
   ASK_DEEPSEEK="$(ask_secret_opt DSH_DEEPSEEK_API_KEY 'DEEPSEEK_API_KEY (direct-API tests/demos; empty to skip)')"
   ASK_FEISHU_ID="$(ask_opt DSH_FEISHU_APP_ID 'FEISHU_APP_ID (empty to skip)' '')"
   ASK_FEISHU_SECRET="$(ask_secret_opt DSH_FEISHU_APP_SECRET 'FEISHU_APP_SECRET')"
+  die_on_newline ASK_DEEPSEEK
+  die_on_newline ASK_FEISHU_ID
+  die_on_newline ASK_FEISHU_SECRET
   umask 077
   {
     printf 'DEEPSEEK_API_KEY=%s\n' "$ASK_DEEPSEEK"
@@ -230,6 +246,9 @@ else
     PROXY_UPSTREAM_URL="$(ask_opt DSH_PROXY_UPSTREAM_URL 'Proxy upstream LLM URL (with /v1, e.g. https://host/compatible-mode/v1)' '')"
     [[ -n "$PROXY_UPSTREAM_URL" ]] || die "proxy upstream URL is required (set DSH_PROXY_UPSTREAM_URL)"
     PROXY_UPSTREAM_API_KEY="$(ask_secret_opt DSH_PROXY_UPSTREAM_API_KEY 'Proxy upstream LLM API key')"
+    die_on_newline DSH_HOME
+    die_on_newline PROXY_UPSTREAM_URL
+    die_on_newline PROXY_UPSTREAM_API_KEY
     sed -e "s|__DSH_HOME__|$DSH_HOME|g" \
         -e "s|__PROXY_UPSTREAM_URL__|${PROXY_UPSTREAM_URL}|g" \
         -e "s|__PROXY_UPSTREAM_API_KEY__|${PROXY_UPSTREAM_API_KEY}|g" \
@@ -260,6 +279,7 @@ else
   fi
   if [[ ! -f "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json" || "$FORCE" == "1" ]]; then
     GATEWAY_API_KEY="$(ask_opt DSH_KERNEL_GATEWAY_API_KEY 'Kernel gateway bearer (empty for local, no Bearer gate)' '')"
+    die_on_newline GATEWAY_API_KEY
     sed -e "s/REPLACE_WITH_KERNEL_BEARER_TOKEN/${GATEWAY_API_KEY}/g" \
       "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.example.json" \
       > "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json"
@@ -288,6 +308,10 @@ else
     TDAI_LLM_API_KEY="$(ask_secret DSH_TDAI_LLM_API_KEY 'MemoryCore TDAI_LLM_API_KEY')"
     TDAI_LLM_BASE_URL="$(ask_opt DSH_TDAI_LLM_BASE_URL 'MemoryCore TDAI_LLM_BASE_URL' 'https://api.lkeap.cloud.tencent.com/v1')"
     TDAI_LLM_MODEL="$(ask_opt DSH_TDAI_LLM_MODEL 'MemoryCore TDAI_LLM_MODEL' 'deepseek-v3.2')"
+    die_on_newline TDAI_LLM_API_KEY
+    die_on_newline TDAI_LLM_BASE_URL
+    die_on_newline TDAI_LLM_MODEL
+    die_on_newline MEMORY_DATA_DIR
   fi
   if [[ ! -f "$GATEWAY_CONFIG" || "$FORCE" == "1" ]]; then
     sed -e "s|__TDAI_LLM_API_KEY__|${TDAI_LLM_API_KEY}|g" \
@@ -300,6 +324,10 @@ else
     ok "gateway config -> $GATEWAY_CONFIG"
   fi
   if [[ ! -f "$CORE_ENV_FILE" || "$FORCE" == "1" ]]; then
+    # The service directory is part of the cloned stack, but create it anyway:
+    # a missing dir would make the redirect below fail *silently* — bash's
+    # set -e does not abort on a failed redirect of a { ... } compound.
+    mkdir -p "$(dirname "$CORE_ENV_FILE")"
     umask 077
     {
       printf 'export TDAI_LLM_API_KEY=%s\n' "$TDAI_LLM_API_KEY"
