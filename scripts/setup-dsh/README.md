@@ -40,6 +40,7 @@ secrets fail loudly. A filled-in template lives at
 | `~/.dsh/tdai-stack/config/proxy-config.yaml` | `templates/tdai-stack/proxy-config.yaml` + prompted upstream URL/key | yes (0600) |
 | `~/.dsh/tdai-stack/config/tdai-gateway.yaml` | `templates/tdai-stack/tdai-gateway.yaml` + prompted `TDAI_LLM_*` | yes (0600) |
 | `…/MemoryPanel/.env` + `config/metadata-instances.json` | `.env.example` / prompted gateway bearer | partially |
+| `…/MemoryPanel/web/dist/` | `npm ci && npm run build` in `MemoryPanel/web/` (upstream ships source only; without this the panel returns 404 on `/`) | no |
 | `…/MemoryKnowledge/.env` | `.env.example` | no |
 | `…/MemoryCore/.env.local` | prompted `TDAI_LLM_*` (points `TDAI_GATEWAY_CONFIG` at `tdai-stack/config/tdai-gateway.yaml`) | yes (0600) |
 | `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 build approvals: decides upstream `approve-builds` placeholders (`allowBuilds`: better-sqlite3/esbuild allowed, rest explicitly denied) | no |
