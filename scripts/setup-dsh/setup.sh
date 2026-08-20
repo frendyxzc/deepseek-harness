@@ -344,6 +344,23 @@ else
   fi
 
   # 6e. Install service dependencies (matches what each service was built with)
+  # pnpm 11 stopped reading the "pnpm" field in package.json (it warns about
+  # the ignored keys) and hard-fails when a dependency ships a build script
+  # that is not approved (ERR_PNPM_IGNORED_BUILDS). Approve the scripts this
+  # stack's services actually need; a service without its own workspace yaml
+  # gets one. Generated here so --skip-install still leaves a usable approval
+  # file for a later install.
+  for svc in MemoryCore MemoryPanel MemoryKnowledge; do
+    if [[ ! -f "$MEMORY_ROOT/$svc/pnpm-workspace.yaml" ]]; then
+      cat > "$MEMORY_ROOT/$svc/pnpm-workspace.yaml" <<'EOF'
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  protobufjs: true
+EOF
+      ok "pnpm build approvals -> $MEMORY_ROOT/$svc/pnpm-workspace.yaml"
+    fi
+  done
   if [[ "$SKIP_INSTALL" == "1" ]]; then
     warn "--skip-install: not installing memory service dependencies"
   else
