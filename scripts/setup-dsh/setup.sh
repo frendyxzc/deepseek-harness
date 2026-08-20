@@ -285,6 +285,15 @@ else
   if [[ ! -f "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json" || "$FORCE" == "1" ]]; then
     GATEWAY_API_KEY="$(ask_opt DSH_KERNEL_GATEWAY_API_KEY 'Kernel gateway bearer (empty for local, no Bearer gate)' '')"
     die_on_newline GATEWAY_API_KEY
+    # The panel schema requires a non-empty api_key even though the local
+    # gateway never checks the Bearer value; an empty one makes the panel
+    # crash on start (InstanceRegistryError 500). Fall back to the operator's
+    # own proxy user key, or a fixed local marker when unavailable.
+    if [[ -z "$GATEWAY_API_KEY" ]]; then
+      GATEWAY_API_KEY="${PROXY_USER_KEY:-$(awk -F'"' '/^PROXY_USER_KEY:/{print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null)}"
+      GATEWAY_API_KEY="${GATEWAY_API_KEY:-local}"
+      ok "panel gateway api_key: empty input, using $GATEWAY_API_KEY"
+    fi
     sed -e "s/REPLACE_WITH_KERNEL_BEARER_TOKEN/${GATEWAY_API_KEY}/g" \
       "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.example.json" \
       > "$MEMORY_ROOT/MemoryPanel/config/metadata-instances.json"
