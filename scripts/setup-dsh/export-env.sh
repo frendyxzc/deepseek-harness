@@ -78,7 +78,7 @@ HEADER
 # --- DSH_PROXY_USER_KEY ------------------------------------------------------
 CREDS="$DSH_HOME/.credentials.yaml"
 if [[ -f "$CREDS" ]]; then
-  PROXY_USER_KEY="$(awk '/^PROXY_USER_KEY:/{print $2; exit}' "$CREDS")"
+  PROXY_USER_KEY="$(awk '/^PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$CREDS")"
 fi
 if [[ -n "${PROXY_USER_KEY:-}" ]]; then
   say "# from $CREDS"

@@ -166,7 +166,11 @@ fi
 
 # ── 3. .credentials.yaml ───────────────────────────────────────────────────
 if write_if_absent "$DSH_HOME/.credentials.yaml"; then
-  PROXY_USER_KEY="$(ask_secret DSH_PROXY_USER_KEY 'Memory proxy user_key (sk-mem-...)')"
+  PROXY_USER_KEY="$(ask_secret_opt DSH_PROXY_USER_KEY 'Memory proxy user_key (sk-mem-..., empty to generate random)')"
+  if [[ -z "$PROXY_USER_KEY" ]]; then
+    PROXY_USER_KEY="sk-mem-$(openssl rand -hex 16)"
+    ok "PROXY_USER_KEY: generated random key"
+  fi
   die_on_newline PROXY_USER_KEY
   {
     printf '# dsh-managed credentials store. Every value here is a secret;\n'
@@ -399,6 +403,43 @@ EOF
       (cd "$DSH_HOME/profiles/web" && pnpm install)
     fi
     ok "memory service dependencies ready"
+  fi
+
+  # 6f. MemoryCore admin user — the core creates its database on first start
+  #     but does not auto-create the admin user. If the database already
+  #     exists (from a previous run of start-all.sh), insert the admin user
+  #     keyed with the PROXY_USER_KEY so the agent can authenticate through
+  #     the proxy. Without this step the agent reports "key不可用" because
+  #     the proxy cannot validate the credential against the core.
+  MEMORY_DB="$MEMORY_DATA_DIR/metadata/tdai_metadata_default/metadata.db"
+  if [[ -f "$MEMORY_DB" ]]; then
+    ADMIN_EXISTS=$(sqlite3 "$MEMORY_DB" "SELECT COUNT(*) FROM meta_users WHERE user_type='system_admin';" 2>/dev/null || echo 0)
+    if [[ "$ADMIN_EXISTS" == "0" ]]; then
+      # PROXY_USER_KEY is set in §3 only when .credentials.yaml was freshly
+      # generated; if the file already existed, read the key from it.
+      if [[ -z "${PROXY_USER_KEY:-}" ]]; then
+        PROXY_USER_KEY="$(awk '/^PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
+      fi
+      if [[ -n "$PROXY_USER_KEY" ]]; then
+        USER_ID="usr-$(openssl rand -hex 5)"
+        KEY_ID="uky-$(openssl rand -hex 5)"
+        NOW=$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")
+        sqlite3 "$MEMORY_DB" "
+          INSERT INTO meta_users (user_id, auth_provider, external_id, username, status, user_type, created_at, updated_at, metadata_json)
+          VALUES ('$USER_ID', 'local', '$USER_ID', 'admin', 'active', 'system_admin', '$NOW', '$NOW', '{}');
+          INSERT INTO meta_user_keys (key_id, user_id, key_value, status, is_default, created_at, metadata_json)
+          VALUES ('$KEY_ID', '$USER_ID', '$PROXY_USER_KEY', 'active', 1, '$NOW', '{}');
+        "
+        ok "MemoryCore admin user bootstrapped with PROXY_USER_KEY"
+      else
+        warn "MemoryCore database exists but PROXY_USER_KEY is not set; cannot bootstrap admin user"
+      fi
+    else
+      ok "MemoryCore admin user already exists"
+    fi
+  else
+    mkdir -p "$(dirname "$MEMORY_DB")"
+    ok "MemoryCore database not yet created (first start of the core will create it)"
   fi
 fi
 
