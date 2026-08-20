@@ -42,7 +42,7 @@ secrets fail loudly. A filled-in template lives at
 | `…/MemoryPanel/.env` + `config/metadata-instances.json` | `.env.example` / prompted gateway bearer | partially |
 | `…/MemoryKnowledge/.env` | `.env.example` | no |
 | `…/MemoryCore/.env.local` | prompted `TDAI_LLM_*` (points `TDAI_GATEWAY_CONFIG` at `tdai-stack/config/tdai-gateway.yaml`) | yes (0600) |
-| `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | generated pnpm 11 build approvals (`allowBuilds`: better-sqlite3, esbuild, protobufjs) | no |
+| `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 build approvals: decides upstream `approve-builds` placeholders (`allowBuilds`: better-sqlite3/esbuild allowed, rest explicitly denied) | no |
 
 Templates under `templates/` are the source of truth for the non-secret DSH
 config. Edit them and re-run with `--force` to redeploy.

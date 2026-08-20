@@ -346,20 +346,31 @@ else
   # 6e. Install service dependencies (matches what each service was built with)
   # pnpm 11 stopped reading the "pnpm" field in package.json (it warns about
   # the ignored keys) and hard-fails when a dependency ships a build script
-  # that is not approved (ERR_PNPM_IGNORED_BUILDS). Approve the scripts this
-  # stack's services actually need; a service without its own workspace yaml
-  # gets one. Generated here so --skip-install still leaves a usable approval
-  # file for a later install.
+  # that is not approved (ERR_PNPM_IGNORED_BUILDS). The upstream services ship
+  # an approve-builds placeholder yaml whose values are the literal text
+  # "set this to true or false" — pnpm treats that as unapproved, so decide
+  # every entry here instead of forcing the operator through interactive
+  # approve-builds: allow the scripts this stack really needs (better-sqlite3
+  # native binding, esbuild binary), explicitly deny the rest (a listed deny
+  # does not trip the hard error). A service without a workspace yaml gets a
+  # minimal one. Generated here so --skip-install still leaves a usable
+  # approval file for a later install.
   for svc in MemoryCore MemoryPanel MemoryKnowledge; do
-    if [[ ! -f "$MEMORY_ROOT/$svc/pnpm-workspace.yaml" ]]; then
-      cat > "$MEMORY_ROOT/$svc/pnpm-workspace.yaml" <<'EOF'
+    yaml="$MEMORY_ROOT/$svc/pnpm-workspace.yaml"
+    if [[ ! -f "$yaml" ]]; then
+      cat > "$yaml" <<'EOF'
 allowBuilds:
   better-sqlite3: true
   esbuild: true
-  protobufjs: true
 EOF
-      ok "pnpm build approvals -> $MEMORY_ROOT/$svc/pnpm-workspace.yaml"
+    else
+      sed -e 's/set this to true or false/false/g' \
+          -e 's/^  better-sqlite3: false$/  better-sqlite3: true/' \
+          -e 's/^  esbuild: false$/  esbuild: true/' \
+        "$yaml" > "$yaml.tmp"
+      mv "$yaml.tmp" "$yaml"
     fi
+    ok "pnpm build approvals -> $yaml"
   done
   if [[ "$SKIP_INSTALL" == "1" ]]; then
     warn "--skip-install: not installing memory service dependencies"
