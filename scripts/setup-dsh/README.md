@@ -15,6 +15,19 @@ It is idempotent — existing files are kept unless `--force` is passed. Secrets
 are prompted interactively unless supplied via the `DSH_*` env vars (see
 `setup.sh --help`), or use `--non-interactive` to fail instead of prompting.
 
+## One-key (config-driven) run
+
+```sh
+./scripts/setup-dsh/setup-one.sh [--env PATH] [setup.sh options...]
+```
+
+`setup-one.sh` reads the `DSH_*` values from a config file (default
+`~/.dsh/setup-dsh.env`, override with `--env` or `$DSH_SETUP_ENV_FILE`), exports
+them, and runs `setup.sh --non-interactive`: no prompts, missing required
+secrets fail loudly. A filled-in template lives at
+`scripts/setup-dsh/setup.env.example` — copy it to `~/.dsh/setup-dsh.env`
+(`chmod 600`), fill the values, and keep it out of git.
+
 ## What it writes
 
 | Target | Source | Secret? |
