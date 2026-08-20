@@ -2,7 +2,7 @@
 
 [English](feishu.md) | 中文
 
-飞书（Feishu/Lark）聊天能力 seam——一个同时跨越**发送与接收**、共用同一个 `ctx.feishu` 服务的[能力 seam](../../.agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md)，拆分为多个包：服务定义（[dsh-feishu](../../packages/feishu/feishu)，`ctx.feishu` + 提供方注册表）、服务提供方（[dsh-feishu-bot](../../packages/feishu/feishu-bot)，飞书开放平台 Bot 提供方）以及消费方（[dsh-tool-feishu](../../packages/feishu/tool-feishu)，`feishu_send_message` 工具；[dsh-feishu-receive](../../packages/feishu/feishu-receive)，按聊天路由的接收消费方；[dsh-feishu-approval](../../packages/feishu/feishu-approval)，审批卡片应答器）。飞书是**一个可选能力**，不属于 agent-loop 主干——因此其词汇表在这里，而非 [core.md](core.md)。更换提供方不会改变模型请求发送消息的方式。
+飞书（Feishu/Lark）聊天能力 seam——一个同时跨越**发送与接收**、共用同一个 `ctx.feishu` 服务的[能力 seam](../../.agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md)，拆分为多个包：服务定义（[dsh-feishu](../../packages/feishu/feishu)，`ctx.feishu` + 提供方注册表）、服务提供方（[dsh-feishu-bot](../../packages/feishu/feishu-bot)，飞书开放平台 Bot 提供方）以及消费方（[dsh-tool-feishu](../../packages/feishu/tool-feishu)，`feishu_send_message` 与 `feishu_update_message` 工具；[dsh-feishu-receive](../../packages/feishu/feishu-receive)，按聊天路由的接收消费方；[dsh-feishu-approval](../../packages/feishu/feishu-approval)，审批卡片应答器；[dsh-feishu-question](../../packages/feishu/feishu-question)，问题卡片应答器）。飞书是**一个可选能力**，不属于 agent-loop 主干——因此其词汇表在这里，而非 [core.md](core.md)。更换提供方不会改变模型请求发送消息的方式。
 
 来源：[`packages/feishu/feishu/src/types.ts`](../../packages/feishu/feishu/src/types.ts)
 
@@ -62,7 +62,7 @@ interface FeishuReceiveEvent {
 
 ## 卡片动作事件
 
-操作者点击交互卡片按钮的动作，经与消息相同的长连接通道投递（绝不另开第二条连接），在到达卡片动作处理器之前被归一化为同一种形状。`value` 载荷是攻击者可控的卡片数据：消费方在据此行动之前，必须对照自身可信状态（例如构建卡片时铸造的 nonce）校验它。
+操作者点击交互卡片按钮——或提交卡片内表单——的动作，经与消息相同的长连接通道投递（绝不另开第二条连接），在到达卡片动作处理器之前被归一化为同一种形状。`value` 载荷是攻击者可控的卡片数据：消费方在据此行动之前，必须对照自身可信状态（例如构建卡片时铸造的 nonce）校验它。
 
 ```ts type-equiv
 /**
@@ -82,6 +82,15 @@ interface FeishuCardActionEvent {
    * minted when the card was built) before acting on it.
    */
   readonly value: unknown
+  /**
+   * The submitted form controls' values, present when the tapped action
+   * submitted a card form (a submit button inside a form container). Keys
+   * are the control names the card builder chose; values are
+   * control-shaped (selected indices, checked booleans, typed text).
+   * Attacker-controllable card data with the same validation obligation
+   * as {@link value}; absent for plain button taps that submit no form.
+   */
+  readonly formValue?: Record<string, unknown>
   /** The raw event payload for provider-specific handling. */
   readonly raw: unknown
 }

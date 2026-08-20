@@ -110,12 +110,23 @@ interface AskUserQuestionAnswer {
 
 ## 提供方
 
-同一上下文中只能有一个活跃的提供方。提供方注册绑定到 effect，因此 HMR（热模块替换）或 dispose（资源释放）会移除当前活跃的 UI。
+声明 `accepts` 的提供方是路由应答方：`ask()` 会把请求交给每个谓词接受该请求的路由应答方以及默认提供方，竞速取得第一个人类回答。未声明谓词的提供方竞争唯一的默认槽位，负责应答所有没有路由应答方接受的请求。提供方注册绑定到 effect，因此 HMR（热模块替换）或 dispose（资源释放）会移除当前活跃的 UI。
 
 ```ts type-equiv
 /** UI-side provider for user questions. */
 interface UserQuestionProvider {
   ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
+  /**
+   * Optional participation predicate for routed asks. Declaring it makes this
+   * provider a routed answerer: `ask()` offers a request to every routed
+   * answerer whose predicate accepts it and to the default provider, and the
+   * first answer wins. Providers without a predicate compete for the single
+   * default slot.
+   *
+   * @param request - The ask whose owner, binding, and questions decide participation.
+   * @returns Whether this provider takes part in answering the request.
+   */
+  accepts?(request: AskUserQuestionRequest): boolean
 }
 ```
 
@@ -145,11 +156,13 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 
 ### `ctx.userQuestions` — `UserQuestionService`
 
-`ctx.userQuestions`: one active UI provider plus an `ask()` API.
+`ctx.userQuestions`: routed answerers, one default provider, and a first-answer-wins `ask()` API.
 
 ```ts cordis-catalog
 /**
- * Register the UI provider. Only one provider may be active in a context.
+ * Register a UI provider. A provider declaring `accepts` is a routed
+ * answerer and may coexist with other routed answerers; a provider without
+ * one is the default fallback, of which only one may be active in a context.
  *
  * @param provider UI-side implementation that collects answers.
  * @returns Disposer that unregisters this provider.
@@ -157,7 +170,10 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 registerProvider(provider: UserQuestionProvider): () => void
 
 /**
- * Ask the active UI provider and wait for the user's answer.
+ * Ask the user and wait for the answer. Every routed answerer whose
+ * `accepts` claims the request and the default provider are offered the
+ * request together; the first human answer wins, and the remaining offers
+ * are withdrawn through a derived abort signal.
  *
  * When a caller supplies an agent, human interaction is valid only for the
  * exact live runtime root. Runtime ownership, not durable session lineage,
@@ -167,6 +183,8 @@ registerProvider(provider: UserQuestionProvider): () => void
  *
  * @param request Questions, owner agent, and abort signal.
  * @returns The answer chosen or typed by the human.
+ * @throws {UserQuestionError} code `NO_PROVIDER` when no routed answerer
+ *   accepts the request and no default provider is registered.
  * @throws {UserQuestionError} code `CALLER_NOT_LIVE` when a supplied
  *   agent is not the registry's exact live instance, or `DELEGATED_CALLER`
  *   when that live agent is owned by another agent.
@@ -174,5 +192,5 @@ registerProvider(provider: UserQuestionProvider): () => void
 async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
 ```
 
-Source: [`packages/interaction/user-questions/src/index.ts:51`](../../packages/interaction/user-questions/src/index.ts)
+Source: [`packages/interaction/user-questions/src/index.ts:63`](../../packages/interaction/user-questions/src/index.ts)
 <!-- END GENERATED cordis-surface -->

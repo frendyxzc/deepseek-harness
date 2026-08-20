@@ -2,7 +2,7 @@
 
 Reproduces the configuration this checkout relies on but does not ship: the
 harness home under `~/.dsh` (settings, credentials, the `web` profile) and the
-[TencentDB-Agent-Memory](https://github.com/TencentCloud/TencentDB-Agent-Memory)
+[TencentDB-Agent-Memory](https://github.com/frendyxzc/TencentDB-Agent-Memory)
 stack that the profile's `llm-deepseek.baseURL` points at (`http://127.0.0.1:8096`).
 
 ## Run

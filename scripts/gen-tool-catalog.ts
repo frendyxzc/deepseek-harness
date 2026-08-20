@@ -195,7 +195,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       await ctx.plugin(ToolAskUser)
     },
     note:
-      'ask_user_question pauses the tool call until the active UI provider returns a human answer.',
+      'ask_user_question pauses the tool call until a UI provider returns a human answer.',
   },
   {
     pkg: '@deepseek-ai/dsh-tools',
@@ -566,7 +566,7 @@ const TOOL_PACKAGES: ToolPackage[] = [
       ctx.feishu.registerProvider({
         id: 'catalog',
         available: () => true,
-        sendMessage: async () => ({ messageId: 'catalog' }),
+        sendMessage: () => Promise.resolve({ messageId: 'catalog' }),
       })
       await ctx.plugin(ToolFeishu)
     },

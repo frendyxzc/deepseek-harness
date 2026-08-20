@@ -602,7 +602,7 @@ export interface FeishuRuntimeConfig {
 }
 ```
 
-来源：[`packages/feishu/feishu/src/index.ts:60`](../packages/feishu/feishu/src/index.ts)
+来源：[`packages/feishu/feishu/src/index.ts:77`](../packages/feishu/feishu/src/index.ts)
 
 <a id="deepseek-aidsh-feishu-approval"></a>
 
@@ -618,10 +618,17 @@ export interface Config {
    * automatically. Defaults to 60000; must be a positive finite number.
    */
   timeoutMs?: number
+  /**
+   * Feishu chat that receives approval cards for sessions with no Feishu
+   * chat binding — Web GUI, headless, or ACP sessions. Omitted = such
+   * approvals delegate to the next answerer. Must be a non-empty chat id
+   * when provided.
+   */
+  fallbackChatId?: string
 }
 ```
 
-来源：[`packages/feishu/feishu-approval/src/index.ts:42`](../packages/feishu/feishu-approval/src/index.ts)
+来源：[`packages/feishu/feishu-approval/src/index.ts:46`](../packages/feishu/feishu-approval/src/index.ts)
 
 <a id="deepseek-aidsh-feishu-bot"></a>
 
@@ -647,6 +654,26 @@ export interface Config {
 
 来源：[`packages/feishu/feishu-bot/src/index.ts:37`](../packages/feishu/feishu-bot/src/index.ts)
 
+<a id="deepseek-aidsh-feishu-question"></a>
+
+## `@deepseek-ai/dsh-feishu-question`
+
+需要：`feishu` · `userQuestions`
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /**
+   * How long (ms) one question card waits for a submission before it is
+   * rejected automatically. Defaults to 300000; must be a positive finite
+   * number.
+   */
+  timeoutMs?: number
+}
+```
+
+来源：[`packages/feishu/feishu-question/src/index.ts:55`](../packages/feishu/feishu-question/src/index.ts)
+
 <a id="deepseek-aidsh-feishu-receive"></a>
 
 ## `@deepseek-ai/dsh-feishu-receive`
@@ -662,10 +689,17 @@ export interface Config {
    * message from any chat is rejected until a live root with a cwd appears.
    */
   cwd?: string
+  /**
+   * Reply to every incoming chat message with a short acknowledgement before
+   * the per-chat agent starts working, so the user gets immediate feedback
+   * that the message arrived. Defaults to true; a failed acknowledgement is
+   * logged and never blocks delivery.
+   */
+  ack?: boolean
 }
 ```
 
-来源：[`packages/feishu/feishu-receive/src/index.ts:56`](../packages/feishu/feishu-receive/src/index.ts)
+来源：[`packages/feishu/feishu-receive/src/index.ts:57`](../packages/feishu/feishu-receive/src/index.ts)
 
 <a id="deepseek-aidsh-fs-local"></a>
 
@@ -2461,16 +2495,18 @@ export interface Config {
 需要：`tools` · `feishu` · `systemPrompt`
 
 ```ts config-catalog
-/** Plugin config: whether to register the tool and its timeout budget. */
+/** Plugin config: whether to register the tools and their timeout budget. */
 export interface Config {
   /** Register `feishu_send_message`. Defaults to true. */
   send?: boolean
-  /** Cooperative timeout budget (ms) for `feishu_send_message`. Defaults to 30000. */
+  /** Register `feishu_update_message`. Defaults to true. */
+  update?: boolean
+  /** Cooperative timeout budget (ms) for the Feishu tools. Defaults to 30000. */
   timeoutMs?: number
 }
 ```
 
-来源：[`packages/feishu/tool-feishu/src/index.ts:24`](../packages/feishu/tool-feishu/src/index.ts)
+来源：[`packages/feishu/tool-feishu/src/index.ts:25`](../packages/feishu/tool-feishu/src/index.ts)
 
 <a id="deepseek-aidsh-tool-fs"></a>
 
@@ -3149,6 +3185,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-settings`（[`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-general`（[`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-im`（[`packages/client/ui-settings-im/src/index.ts`](../packages/client/ui-settings-im/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-settings-memory`（[`packages/client/ui-settings-memory/src/index.ts`](../packages/client/ui-settings-memory/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-models`（[`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory`（[`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-settings-plugins`（[`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts)）

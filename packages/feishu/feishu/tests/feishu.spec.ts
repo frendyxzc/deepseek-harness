@@ -225,6 +225,24 @@ describe('FeishuRuntime card-action receive', () => {
     expect(handler).toBeTypeOf('function')
   })
 
+  it('delivers card-action events with their form value intact to subscribers', async () => {
+    const { feishu } = await mountFeishu()
+    const seen: FeishuCardActionEvent[] = []
+    let handler: ((event: FeishuCardActionEvent) => void) | undefined
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1')), undefined, undefined, (h) => { handler = h; return () => {} }))
+    feishu.startReceivingCardActions(event => seen.push(event))
+    const event: FeishuCardActionEvent = {
+      operatorId: 'ou_1',
+      chatId: 'oc_1',
+      messageId: 'om_1',
+      value: { nonce: 'n1' },
+      formValue: { q1: ['0'], q1x: 'custom answer' },
+      raw: {},
+    }
+    handler!(event)
+    expect(seen).toEqual([event])
+  })
+
   it('throws FEISHU_RECEIVE_UNSUPPORTED when the provider has no startReceivingCardActions', async () => {
     const { feishu } = await mountFeishu()
     feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1'))))

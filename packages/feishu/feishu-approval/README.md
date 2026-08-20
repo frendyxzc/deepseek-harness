@@ -25,7 +25,7 @@ Requires `ctx.feishu` (the Feishu seam — sends the card, receives card actions
 
 ## Model Experience
 
-None directly: the answerer never adds model-visible content. Its outcomes route through `ApprovalService`, which owns the model-facing approval policy text and the durable `approval/asked` / `approval/decided` audit pair on the requesting session.
+Indirectly, through `ApprovalService`, which owns the model-facing approval policy text and the durable `approval/asked` / `approval/decided` audit pair on the requesting session, while the answerer itself never adds model-visible content.
 
 #### KV Cache effect
 

@@ -47,7 +47,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEMPLATES="$SCRIPT_DIR/templates"
 
-MEMORY_REPO_URL="${DSH_MEMORY_REPO_URL:-https://github.com/TencentCloud/TencentDB-Agent-Memory.git}"
+MEMORY_REPO_URL="${DSH_MEMORY_REPO_URL:-https://github.com/frendyxzc/TencentDB-Agent-Memory.git}"
 MEMORY_BRANCH="${DSH_MEMORY_BRANCH:-feat/server_team}"
 
 DSH_HOME="${DSH_HOME:-$HOME/.dsh}"

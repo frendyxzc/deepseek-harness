@@ -274,8 +274,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     pkg: 'user-questions',
     title: 'Human question/answer seam',
     mode: 'seam',
-    consumers: ['tool-ask-user'],
-    note: 'UI front ends provide the active human-answer provider; tool-ask-user pauses a tool call on the provider-neutral ask() promise.',
+    consumers: ['tool-ask-user', 'feishu-question'],
+    note: 'UI front ends provide the default human-answer provider and routed answerers (feishu-question for Feishu chat agents) opt into asks through `accepts`; `ask()` races every willing provider for the first human answer, and tool-ask-user pauses a tool call on the provider-neutral ask() promise.',
   },
   {
     key: 'planMode',
@@ -493,8 +493,8 @@ const SERVICE_ROLES: ServiceRole[] = [
     title: 'Feishu chat provider registry',
     mode: 'seam',
     implementations: ['feishu-bot'],
-    consumers: ['tool-feishu', 'feishu-receive', 'feishu-approval'],
-    note: 'The Feishu Bot API provider registers into one ctx.feishu seam; tool-feishu owns the stable model-facing send name, feishu-receive bridges inbound messages into per-chat agent sessions, and feishu-approval answers those sessions\' tool-approval requests with interactive Allow/Deny cards.',
+    consumers: ['tool-feishu', 'feishu-receive', 'feishu-approval', 'feishu-question'],
+    note: 'The Feishu Bot API provider registers into one ctx.feishu seam; tool-feishu owns the stable model-facing send and update names, feishu-receive bridges inbound messages into per-chat agent sessions, feishu-approval answers those sessions\' tool-approval requests with interactive Allow/Deny cards, and feishu-question answers their ask_user_question asks with interactive form cards.',
   },
   {
     key: 'spillStore',

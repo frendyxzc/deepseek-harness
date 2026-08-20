@@ -33,7 +33,7 @@ const sdkMock = vi.hoisted(() => ({
 vi.mock('@larksuiteoapi/node-sdk', () => {
   class FakeEventDispatcher {
     handles: Record<string, ReceiveHandle> = {}
-    register(handles: Record<string, ReceiveHandle>): FakeEventDispatcher {
+    register(handles: Record<string, ReceiveHandle>): this {
       this.handles = handles
       sdkMock.dispatchers.push(this)
       return this
@@ -69,7 +69,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function expectFetchUrls(urls: string[]): void {
   const calls = vi.mocked(fetch).mock.calls
-  expect(calls.map(call => String(call[0]))).toEqual(urls)
+  expect(calls.map(call => call[0] as unknown as string)).toEqual(urls)
 }
 
 describe('FeishuBotProvider.available', () => {
@@ -320,6 +320,25 @@ describe('FeishuBotProvider.startReceivingCardActions', () => {
       value: { nonce: 'n1' },
     })
     expect(actions[0]!.raw).toBe(raw)
+  })
+
+  it('passes a submitted form value through to card-action subscribers', async () => {
+    const actions: FeishuCardActionEvent[] = []
+    const provider = new FeishuBotProvider(options())
+    provider.startReceivingCardActions(event => actions.push(event))
+    await flush()
+    const onCardAction = sdkMock.dispatchers[0]!.handles['card.action.trigger']!
+
+    onCardAction({
+      context: { open_chat_id: 'oc_3', open_message_id: 'om_3' },
+      operator: { open_id: 'ou_3' },
+      action: { tag: 'button', value: { nonce: 'n3' }, form_value: { q1: ['0'], q1x: 'custom' } },
+    })
+    // Garbage form values (non-objects) stay absent rather than leaking.
+    onCardAction({ action: { tag: 'button', form_value: 'garbage' } })
+    expect(actions).toHaveLength(2)
+    expect(actions[0]!.formValue).toEqual({ q1: ['0'], q1x: 'custom' })
+    expect(actions[1]!.formValue).toBeUndefined()
   })
 
   it('falls back to top-level ids and tolerates malformed payloads', async () => {

@@ -29,7 +29,7 @@ let context: Context | undefined
 
 function handler(req: IncomingMessage, res: ServerResponse): void {
   const chunks: Buffer[] = []
-  req.on('data', chunk => chunks.push(Buffer.from(chunk)))
+  req.on('data', (chunk: Buffer) => chunks.push(Buffer.from(chunk)))
   req.on('end', () => {
     res.writeHead(200, { 'content-type': 'application/json' })
     if (req.url?.startsWith('/auth/v3/tenant_access_token/internal')) {
@@ -113,6 +113,21 @@ describe('feishu real composition', () => {
       callId: CallId('c-1'),
       name: 'feishu_send_message',
       arguments: { receiveId: 'ou_1', content: 'hello' },
+    })
+    expect(out.isError).toBe(false)
+    expect(out.content.map(b => (b.type === 'text' ? b.text : '')).join('')).toContain('mid-1')
+  })
+
+  it('mounts the update tool and updates a message end-to-end', async () => {
+    const { ctx } = await loadComposition()
+
+    expect(ctx.tools.schemas().map(s => s.name)).toContain('feishu_update_message')
+
+    const out = await ctx.tools.execute({
+      signal: new AbortController().signal,
+      callId: CallId('c-2'),
+      name: 'feishu_update_message',
+      arguments: { messageId: 'mid-1', content: 'revised reply' },
     })
     expect(out.isError).toBe(false)
     expect(out.content.map(b => (b.type === 'text' ? b.text : '')).join('')).toContain('mid-1')

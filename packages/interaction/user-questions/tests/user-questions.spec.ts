@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import UserQuestionService, {
   UserQuestionError,
+  type AskUserQuestionAnswer,
   type AskUserQuestionRequest,
   type UserQuestionProvider,
 } from '@deepseek-ai/dsh-user-questions'
@@ -60,13 +61,108 @@ describe('UserQuestionService', () => {
       .rejects.toMatchObject({ code: 'NO_PROVIDER' })
   })
 
-  it('rejects duplicate providers instead of replacing the active UI', async () => {
+  it('rejects duplicate default providers instead of replacing the active UI', async () => {
     const ctx = new Context()
     await ctx.plugin(UserQuestionService)
     ctx.userQuestions.registerProvider(provider('first'))
 
     expect(() => ctx.userQuestions.registerProvider(provider('second')))
       .toThrow(UserQuestionError)
+  })
+
+  it('offers one ask to the default provider and every accepting router, first answer wins', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    const asked: string[] = []
+    let resolveRouter!: (answer: AskUserQuestionAnswer) => void
+    const routerGate = new Promise<AskUserQuestionAnswer>((resolve) => { resolveRouter = resolve })
+
+    ctx.userQuestions.registerProvider({
+      ask: () => {
+        asked.push('default')
+        return new Promise<AskUserQuestionAnswer>(() => {})
+      },
+    })
+    ctx.userQuestions.registerProvider({
+      accepts: () => true,
+      ask: () => {
+        asked.push('router')
+        return routerGate
+      },
+    })
+
+    const asking = ctx.userQuestions.ask({ questions: [{ id: 'confirm', question: 'Proceed?' }] })
+    await vi.waitFor(() => { expect(asked).toEqual(['router', 'default']) })
+    resolveRouter({ answers: [{ id: 'confirm', selected: ['router'] }] })
+
+    await expect(asking).resolves.toEqual({ answers: [{ id: 'confirm', selected: ['router'] }] })
+  })
+
+  it('falls back to the default provider when no router accepts', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    const fallback = provider('fallback')
+    ctx.userQuestions.registerProvider(fallback)
+    ctx.userQuestions.registerProvider({ ask: vi.fn(async () => ({ answers: [] })), accepts: () => false })
+
+    const result = await ctx.userQuestions.ask({ questions: [{ id: 'confirm', question: 'Proceed?' }] })
+
+    expect(result.answers[0]?.selected).toEqual(['fallback'])
+  })
+
+  it('withdraws the remaining offers through a derived abort signal once an answer wins', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    let loserAborted = false
+    let resolveWinner!: (answer: AskUserQuestionAnswer) => void
+    const winnerGate = new Promise<AskUserQuestionAnswer>((resolve) => { resolveWinner = resolve })
+
+    ctx.userQuestions.registerProvider({
+      ask(request: AskUserQuestionRequest) {
+        request.signal?.addEventListener('abort', () => { loserAborted = true }, { once: true })
+        return new Promise<AskUserQuestionAnswer>(() => {})
+      },
+    })
+    ctx.userQuestions.registerProvider({
+      accepts: () => true,
+      ask: () => winnerGate,
+    })
+
+    const asking = ctx.userQuestions.ask({ questions: [{ id: 'confirm', question: 'Proceed?' }] })
+    resolveWinner({ answers: [{ id: 'confirm', selected: ['winner'] }] })
+
+    await expect(asking).resolves.toEqual({ answers: [{ id: 'confirm', selected: ['winner'] }] })
+    expect(loserAborted).toBe(true)
+  })
+
+  it('rejects when only routers are registered and none accepts', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    ctx.userQuestions.registerProvider({ ask: vi.fn(async () => ({ answers: [] })), accepts: () => false })
+
+    await expect(ctx.userQuestions.ask({ questions: [{ id: 'confirm', question: 'Proceed?' }] }))
+      .rejects.toMatchObject({ code: 'NO_PROVIDER' })
+  })
+
+  it('stops routing after a router is disposed', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    const fallback = provider('fallback')
+    ctx.userQuestions.registerProvider(fallback)
+    const dispose = ctx.userQuestions.registerProvider({ ask: vi.fn(async () => ({ answers: [] })), accepts: () => true })
+    dispose()
+
+    const result = await ctx.userQuestions.ask({ questions: [{ id: 'confirm', question: 'Proceed?' }] })
+
+    expect(result.answers[0]?.selected).toEqual(['fallback'])
+  })
+
+  it('lets a routing provider coexist with the default slot', async () => {
+    const ctx = new Context()
+    await ctx.plugin(UserQuestionService)
+    ctx.userQuestions.registerProvider(provider('fallback'))
+    expect(() => ctx.userQuestions.registerProvider({ ask: vi.fn(async () => ({ answers: [] })), accepts: () => false }))
+      .not.toThrow()
   })
 
   it('fails before reaching the provider when the signal is already aborted', async () => {

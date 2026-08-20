@@ -2,7 +2,8 @@
  * Service Definition for the user-questions capability seam (`ctx.userQuestions`): a UI-backed service for
  * pausing an agent tool call until the human answers a question. The model-
  * facing tool lives in `@deepseek-ai/dsh-tool-ask-user`; UI packages provide
- * the single active provider.
+ * routed providers (opting into asks via `accepts`) and one default provider,
+ * and `ask()` races every willing provider for the first human answer.
  *
  * @module @deepseek-ai/dsh-user-questions
  */
@@ -37,6 +38,17 @@ export interface AskUserQuestionRequest {
 /** UI-side provider for user questions. */
 export interface UserQuestionProvider {
   ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>
+  /**
+   * Optional participation predicate for routed asks. Declaring it makes this
+   * provider a routed answerer: `ask()` offers a request to every routed
+   * answerer whose predicate accepts it and to the default provider, and the
+   * first answer wins. Providers without a predicate compete for the single
+   * default slot.
+   *
+   * @param request - The ask whose owner, binding, and questions decide participation.
+   * @returns Whether this provider takes part in answering the request.
+   */
+  accepts?(request: AskUserQuestionRequest): boolean
 }
 
 /** Stable error taxonomy for user-questions failures. */
@@ -47,24 +59,37 @@ export class UserQuestionError extends HarnessError {
   }
 }
 
-/** `ctx.userQuestions`: one active UI provider plus an `ask()` API. */
+/** `ctx.userQuestions`: routed answerers, one default provider, and a first-answer-wins `ask()` API. */
 export class UserQuestionService extends Service {
   private provider: UserQuestionProvider | undefined
+  private readonly routers: UserQuestionProvider[] = []
 
   constructor(ctx: Context) {
     super(ctx, 'userQuestions')
   }
 
   /**
-   * Register the UI provider. Only one provider may be active in a context.
+   * Register a UI provider. A provider declaring `accepts` is a routed
+   * answerer and may coexist with other routed answerers; a provider without
+   * one is the default fallback, of which only one may be active in a context.
    *
    * @param provider UI-side implementation that collects answers.
    * @returns Disposer that unregisters this provider.
    */
   registerProvider(provider: UserQuestionProvider): () => void {
     const dispose = this.ctx.effect(function* (this: UserQuestionService) {
+      if (provider.accepts !== undefined) {
+        this.routers.push(provider)
+        yield () => {
+          const index = this.routers.indexOf(provider)
+          /* v8 ignore next -- defensive: dispose runs once per registration,
+             so the provider is always still in the list here */
+          if (index >= 0) this.routers.splice(index, 1)
+        }
+        return
+      }
       if (this.provider !== undefined) {
-        throw new UserQuestionError('a user-questions provider is already registered', 'DUPLICATE_PROVIDER')
+        throw new UserQuestionError('a default user-questions provider is already registered', 'DUPLICATE_PROVIDER')
       }
       this.provider = provider
       yield () => {
@@ -75,7 +100,10 @@ export class UserQuestionService extends Service {
   }
 
   /**
-   * Ask the active UI provider and wait for the user's answer.
+   * Ask the user and wait for the answer. Every routed answerer whose
+   * `accepts` claims the request and the default provider are offered the
+   * request together; the first human answer wins, and the remaining offers
+   * are withdrawn through a derived abort signal.
    *
    * When a caller supplies an agent, human interaction is valid only for the
    * exact live runtime root. Runtime ownership, not durable session lineage,
@@ -85,6 +113,8 @@ export class UserQuestionService extends Service {
    *
    * @param request Questions, owner agent, and abort signal.
    * @returns The answer chosen or typed by the human.
+   * @throws {UserQuestionError} code `NO_PROVIDER` when no routed answerer
+   *   accepts the request and no default provider is registered.
    * @throws {UserQuestionError} code `CALLER_NOT_LIVE` when a supplied
    *   agent is not the registry's exact live instance, or `DELEGATED_CALLER`
    *   when that live agent is owned by another agent.
@@ -133,10 +163,51 @@ export class UserQuestionService extends Service {
           'BAD_INTENT')
       }
     }
-    if (this.provider === undefined) {
+    const candidates: UserQuestionProvider[] = []
+    for (const router of this.routers) {
+      if (router.accepts !== undefined && router.accepts(request)) candidates.push(router)
+    }
+    if (this.provider !== undefined) candidates.push(this.provider)
+    if (candidates.length === 0) {
       throw new UserQuestionError('no user-questions provider is registered', 'NO_PROVIDER')
     }
-    return this.provider.ask(request)
+    if (candidates.length === 1) {
+      const single = candidates[0]
+      /* v8 ignore next -- defensive: a non-empty array always has index 0 */
+      if (single !== undefined) return single.ask(request)
+    }
+    // Fan-out: more than one UI can answer this request — a Feishu-bound agent
+    // asked from chat while its Web session is open, for example. Offer it to
+    // every candidate and let the first human answer win; the losers are
+    // withdrawn through a derived abort signal once a winner settles, so a
+    // later answer in another UI is inert.
+    const settle = new AbortController()
+    const signal = request.signal === undefined ? settle.signal : AbortSignal.any([request.signal, settle.signal])
+    return new Promise<AskUserQuestionAnswer>((resolve, reject) => {
+      let claimed = false
+      let remaining = candidates.length
+      for (const candidate of candidates) {
+        // The extra microtask isolates a sync throw from one provider's `ask`
+        // so a single bad candidate cannot pre-empt the others before they
+        // are even offered the request.
+        void Promise.resolve()
+          .then(() => candidate.ask({ ...request, signal }))
+          .then(
+            (answer) => {
+              if (claimed) return
+              claimed = true
+              settle.abort()
+              resolve(answer)
+            },
+            (error: unknown) => {
+              remaining -= 1
+              if (!claimed && remaining === 0) {
+                reject(error instanceof Error ? error : new Error(String(error)))
+              }
+            },
+          )
+      }
+    })
   }
 }
 

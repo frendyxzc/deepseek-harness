@@ -76,6 +76,15 @@ export interface FeishuCardActionEvent {
    * minted when the card was built) before acting on it.
    */
   readonly value: unknown
+  /**
+   * The submitted form controls' values, present when the tapped action
+   * submitted a card form (a submit button inside a form container). Keys
+   * are the control names the card builder chose; values are
+   * control-shaped (selected indices, checked booleans, typed text).
+   * Attacker-controllable card data with the same validation obligation
+   * as {@link value}; absent for plain button taps that submit no form.
+   */
+  readonly formValue?: Record<string, unknown>
   /** The raw event payload for provider-specific handling. */
   readonly raw: unknown
 }

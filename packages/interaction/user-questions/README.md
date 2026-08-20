@@ -8,8 +8,8 @@ User-interaction Service Definition. It owns `ctx.userQuestions`, the service a 
 
 ### Public API
 
-- `ctx.userQuestions.registerProvider(provider): () => void` Register the UI-side provider. Only one provider may be active in a context; disposal unregisters it.
-- `ctx.userQuestions.ask(request): Promise<AskUserQuestionAnswer>` Ask the active provider and wait for the answer.
+- `ctx.userQuestions.registerProvider(provider): () => void` Register a UI-side provider. A provider declaring `accepts` is a routed answerer and may coexist with others; a provider without one is the single default fallback. Disposal unregisters it.
+- `ctx.userQuestions.ask(request): Promise<AskUserQuestionAnswer>` Offer the ask to every accepting routed answerer and the default provider, and wait for the first answer.
 
 ### Key Types
 
@@ -17,7 +17,7 @@ User-interaction Service Definition. It owns `ctx.userQuestions`, the service a 
 - `AskUserQuestionOption` — `{ label, description? }`.
 - `AskUserQuestionIntent` — `{ kind: 'plan-review', approve }`; the tagged presentation intent below.
 - `AskUserQuestionAnswer` — `{ answers: [{ id, selected, custom? }] }`.
-- `UserQuestionProvider` — UI implementation with `ask(request)`.
+- `UserQuestionProvider` — UI implementation with `ask(request)` and an optional `accepts(request)` participation predicate.
 - `UserQuestionError` — `HarnessError` subclass with codes such as `EMPTY_QUESTIONS`, `BAD_INTENT`, `NO_PROVIDER`, `DUPLICATE_PROVIDER`, `ASK_ABORTED`, `CALLER_NOT_LIVE`, and `DELEGATED_CALLER`.
 
 For a single-select question, `custom` overrides the selected choice and `selected` is empty. For a multi-select question, `custom` may supplement the labels in `selected`. A UI may preserve a skipped item as `{ id, selected: [] }`, keeping the existing answer shape while retaining other answers in the batch.
@@ -30,7 +30,7 @@ When a request carries an agent, `ask()` authenticates its exact identity throug
 
 ## Role
 
-This is the Service Definition package. Consumers such as `@deepseek-ai/dsh-tool-ask-user` depend on this service; the Web host runtime supplies the shipped Service Provider. The loop stays unchanged: a tool call awaits a promise, and the tool result resumes the normal agent loop.
+This is the Service Definition package. Consumers such as `@deepseek-ai/dsh-tool-ask-user` depend on this service; the Web host runtime supplies the shipped default provider, and `@deepseek-ai/dsh-feishu-question` ships a routed answerer for Feishu-bound asks. `ask()` races every willing provider for the first human answer. The loop stays unchanged: a tool call awaits a promise, and the tool result resumes the normal agent loop.
 
 ## Model Experience
 
@@ -42,5 +42,5 @@ No direct invalidation; the named consumer owns any request-prefix changes.
 
 ## Known Limitations and Deferred Work
 
-- **One provider per context** — there is no routing or fan-out to multiple UIs; a second registration throws `DUPLICATE_PROVIDER`, and with none registered `ask()` throws `NO_PROVIDER` rather than degrading.
+- **One default provider per context** — routed answerers may register without limit, but a second default provider (no `accepts`) still throws `DUPLICATE_PROVIDER`; with no provider that accepts the ask, `ask()` throws `NO_PROVIDER` rather than degrading.
 - **The vocabulary is the question-form shape only** — selectable options plus optional custom text; richer interaction shapes (file pickers, diff-preview confirmations) have no seam vocabulary yet.

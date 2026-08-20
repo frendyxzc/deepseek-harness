@@ -8,8 +8,8 @@
 
 ### 公开 API
 
-- `ctx.userQuestions.registerProvider(provider): () => void` 注册 UI 侧提供方。同一上下文中只能有一个活跃提供方；dispose（资源释放）会将其注销。
-- `ctx.userQuestions.ask(request): Promise<AskUserQuestionAnswer>` 向活跃提供方提问并等待回答。
+- `ctx.userQuestions.registerProvider(provider): () => void` 注册 UI 侧提供方。声明 `accepts` 的提供方是路由应答方，可与其它应答方共存；未声明者是唯一的默认兜底。dispose（资源释放）会将其注销。
+- `ctx.userQuestions.ask(request): Promise<AskUserQuestionAnswer>` 将提问交给每个接受它的路由应答方与默认提供方，并等待第一个回答。
 
 ### 关键类型
 
@@ -17,7 +17,7 @@
 - `AskUserQuestionOption`：`{ label, description? }`。
 - `AskUserQuestionIntent`：`{ kind: 'plan-review', approve }`；即下文的带标签呈现意图。
 - `AskUserQuestionAnswer`：`{ answers: [{ id, selected, custom? }] }`。
-- `UserQuestionProvider`：包含 `ask(request)` 的 UI 实现。
+- `UserQuestionProvider`：包含 `ask(request)` 与可选 `accepts(request)` 参与谓词的 UI 实现。
 - `UserQuestionError`：`HarnessError` 的子类，包含 `EMPTY_QUESTIONS`、`BAD_INTENT`、`NO_PROVIDER`、`DUPLICATE_PROVIDER`、`ASK_ABORTED`、`CALLER_NOT_LIVE` 和 `DELEGATED_CALLER` 等代码。
 
 对于单选题，`custom` 会覆盖选中的选项，且 `selected` 为空。对于多选题，`custom` 可以补充 `selected` 中的标签。UI 可以把跳过的条目保留为 `{ id, selected: [] }`，既维持现有回答形态，也保留该批次中的其他回答。
@@ -30,7 +30,7 @@
 
 ## 职责
 
-这是 Service Definition 包。`@deepseek-ai/dsh-tool-ask-user` 等 Consumer 依赖此服务；Web 宿主运行时提供随产品交付的 Service Provider。循环保持不变：工具调用等待 Promise，工具结果随后恢复正常的 agent loop（智能体循环）。
+这是 Service Definition 包。`@deepseek-ai/dsh-tool-ask-user` 等 Consumer 依赖此服务；Web 宿主运行时提供随产品交付的默认提供方，`@deepseek-ai/dsh-feishu-question` 为飞书绑定的提问提供路由应答方。`ask()` 会让每个愿意回答的提供方竞速，取第一个人类回答。循环保持不变：工具调用等待 Promise，工具结果随后恢复正常的 agent loop（智能体循环）。
 
 ## 模型体验
 
@@ -42,5 +42,5 @@
 
 ## 已知限制与暂缓事项
 
-- **每个上下文只能有一个提供方**：不支持路由或扇出到多个 UI；第二次注册会抛出 `DUPLICATE_PROVIDER`，未注册任何提供方时，`ask()` 会抛出 `NO_PROVIDER`，而不会降级。
+- **每个上下文只能有一个默认提供方**：路由应答方可以无限量注册，但第二个默认提供方（无 `accepts`）仍会抛出 `DUPLICATE_PROVIDER`；没有任何提供方接受该提问时，`ask()` 会抛出 `NO_PROVIDER`，而不会降级。
 - **词汇仅包含问题表单形态**：可供选择的选项加可选的自定义文本；更丰富的交互形态（文件选择器、diff 预览确认）尚无 seam 词汇。

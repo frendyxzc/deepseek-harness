@@ -25,7 +25,7 @@ DeepSeek Harness 的飞书审批卡片应答器。通过所属聊天中的交互
 
 ## 模型体验
 
-无直接影响：应答器从不添加模型可见内容。其结果经由 `ApprovalService` 路由，后者拥有面向模型的审批策略文本以及请求会话上持久的 `approval/asked` / `approval/decided` 审计对。
+间接地，通过 `ApprovalService` 发挥作用——后者拥有面向模型的审批策略文本以及请求会话上持久的 `approval/asked` / `approval/decided` 审计对，而应答器自身从不添加模型可见内容。
 
 #### KV Cache 影响
 

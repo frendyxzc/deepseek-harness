@@ -8,7 +8,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
-import FeishuRuntime, { type FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
+import FeishuRuntime, { FeishuError, type FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
 import * as FeishuReceive from '@deepseek-ai/dsh-feishu-receive'
 
 interface CreatedAgent {
@@ -28,7 +28,14 @@ interface MountOptions {
   onRoots?: () => unknown[]
   presetOfRoot?: string
   defaultId?: string
-  config?: { cwd?: string }
+  config?: { cwd?: string; ack?: boolean }
+}
+
+/** One acknowledgement (or any message) the scripted provider sent. */
+interface SentMessage {
+  receiveId: string
+  receiveIdType?: string
+  content: string
 }
 
 function root(): unknown {
@@ -63,16 +70,28 @@ function mountReceive(options: MountOptions = {}): Promise<{
   create: ReturnType<typeof vi.fn>
   agents: CreatedAgent[]
   systemPrompt: ReturnType<typeof mockSystemPrompt>
+  sends: SentMessage[]
+  controls: { failSend: boolean }
 }> {
   return (async () => {
     const ctx = new Context()
     await ctx.plugin(FeishuRuntime, {})
 
     let handler: ((event: FeishuReceiveEvent) => void) | undefined
+    const sends: SentMessage[] = []
+    const controls = { failSend: false }
     ctx.feishu.registerProvider({
       id: 'scripted',
       available: () => true,
-      sendMessage: async () => ({ messageId: 'm' }),
+      sendMessage: async (request) => {
+        if (controls.failSend) throw new FeishuError('scripted send failure', 'FEISHU_PROVIDER_ERROR')
+        sends.push({
+          receiveId: request.receiveId,
+          ...(request.receiveIdType !== undefined ? { receiveIdType: request.receiveIdType } : {}),
+          content: request.content,
+        })
+        return { messageId: 'm' }
+      },
       startReceiving: (h) => { handler = h; return () => {} },
     })
 
@@ -103,7 +122,7 @@ function mountReceive(options: MountOptions = {}): Promise<{
     } as never)
 
     const fiber = await ctx.plugin(FeishuReceive, options.config ?? {})
-    return { ctx, handler: handler!, fiber, create, agents, systemPrompt }
+    return { ctx, handler: handler!, fiber, create, agents, systemPrompt, sends, controls }
   })()
 }
 
@@ -231,7 +250,7 @@ describe('feishu-receive', () => {
 
     await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(2) })
     expect(create).toHaveBeenCalledTimes(1)
-    expect(create.mock.calls[0]![0].sessionId).toMatch(/^feishu-/)
+    expect((create.mock.calls[0]![0] as CreatedOptions).sessionId).toMatch(/^feishu-/)
     await ctx.fiber.dispose()
     await fiber.dispose()
   })
@@ -243,9 +262,11 @@ describe('feishu-receive', () => {
     handler(event('b', 'oc_2'))
 
     await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(2) })
-    expect(create.mock.calls[0]![0].sessionId).toMatch(/^feishu-/)
-    expect(create.mock.calls[1]![0].sessionId).toMatch(/^feishu-/)
-    expect(create.mock.calls[0]![0].sessionId).not.toBe(create.mock.calls[1]![0].sessionId)
+    const first = create.mock.calls[0]![0] as CreatedOptions
+    const second = create.mock.calls[1]![0] as CreatedOptions
+    expect(first.sessionId).toMatch(/^feishu-/)
+    expect(second.sessionId).toMatch(/^feishu-/)
+    expect(first.sessionId).not.toBe(second.sessionId)
     await vi.waitFor(() => { expect(agents[1]!.followup).toHaveBeenCalledTimes(1) })
     await ctx.fiber.dispose()
     await fiber.dispose()
@@ -424,5 +445,42 @@ describe('feishu-receive', () => {
     expect(handlers).toHaveLength(1)
     await fiber.dispose()
     await ctx.fiber.dispose()
+  })
+
+  it('acknowledges each incoming message in its chat before delivery', async () => {
+    const { ctx, handler, fiber, sends, agents } = await mountReceive({ onRoots: () => [root()] })
+
+    handler(event('hello', 'oc_9'))
+
+    await vi.waitFor(() => { expect(sends).toHaveLength(1) })
+    expect(sends[0]).toEqual({ receiveId: 'oc_9', receiveIdType: 'chat_id', content: expect.stringContaining('已收到') as string })
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('skips the acknowledgement when ack is disabled', async () => {
+    const { ctx, handler, fiber, sends, agents } = await mountReceive({
+      onRoots: () => [root()],
+      config: { ack: false },
+    })
+
+    handler(event('hello'))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    expect(sends).toHaveLength(0)
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('still delivers the message when the acknowledgement send fails', async () => {
+    const { ctx, handler, fiber, controls, agents } = await mountReceive({ onRoots: () => [root()] })
+    controls.failSend = true
+
+    expect(() => { handler(event('hello')) }).not.toThrow()
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    await ctx.fiber.dispose()
+    await fiber.dispose()
   })
 })

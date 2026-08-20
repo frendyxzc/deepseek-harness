@@ -1,6 +1,6 @@
 {
-  "name": "@deepseek-ai/dsh-tool-feishu",
-  "description": "Model-facing `feishu_send_message` and `feishu_update_message` tools for the DeepSeek Harness Feishu chat capability seam (ctx.feishu)",
+  "name": "@deepseek-ai/dsh-feishu-question",
+  "description": "Feishu question-card answerer for the DeepSeek Harness — answers user-questions asks from Feishu chat agents through interactive form cards",
   "version": "0.1.0-rc.7",
   "publishConfig": {
     "access": "public"
@@ -8,7 +8,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
-    "directory": "packages/feishu/tool-feishu"
+    "directory": "packages/feishu/feishu-question"
   },
   "type": "module",
   "main": "lib/index.js",
@@ -32,20 +32,23 @@
   ],
   "license": "MIT",
   "peerDependencies": {
+    "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-feishu": "workspace:^",
+    "@deepseek-ai/dsh-feishu-receive": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-user-questions": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   },
-  "dependencies": {
-    "@deepseek-ai/schemastery": "workspace:^"
-  },
   "devDependencies": {
+    "@deepseek-ai/dsh-agent": "workspace:^",
     "@deepseek-ai/dsh-feishu": "workspace:^",
+    "@deepseek-ai/dsh-feishu-receive": "workspace:^",
     "@deepseek-ai/dsh-invariants": "workspace:^",
-    "@deepseek-ai/dsh-system-prompt": "workspace:^",
-    "@deepseek-ai/dsh-tools": "workspace:^",
+    "@deepseek-ai/dsh-session": "workspace:^",
+    "@deepseek-ai/dsh-user-questions": "workspace:^",
+    "@deepseek-ai/schemastery": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   }
 }

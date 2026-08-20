@@ -390,8 +390,6 @@ export class FeishuBotProvider implements FeishuProvider {
         options.appSecret, options.resolveAppSecret, options.appSecretEnv ?? 'FEISHU_APP_SECRET',
         'App Secret', state.controller.signal,
       )
-      if (state.controller.signal.aborted) return
-
       const sdk = await import('@larksuiteoapi/node-sdk')
       if (state.controller.signal.aborted) return
 
@@ -670,11 +668,13 @@ function toCardActionEvent(raw: unknown): FeishuCardActionEvent {
   const context = isRecord(event?.context) ? event.context : undefined
   const operator = isRecord(event?.operator) ? event.operator : undefined
   const action = isRecord(event?.action) ? event.action : undefined
+  const formValue = isRecord(action?.form_value) ? action.form_value : undefined
   return {
     operatorId: firstString(operator?.open_id),
     chatId: firstString(context?.open_chat_id, event?.open_chat_id),
     messageId: firstString(context?.open_message_id, event?.open_message_id),
     value: action?.value,
+    ...(formValue === undefined ? {} : { formValue }),
     raw,
   }
 }

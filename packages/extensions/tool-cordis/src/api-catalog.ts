@@ -2053,21 +2053,21 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
   },
   {
     key: 'userQuestions',
-    summary: '`ctx.userQuestions`: one active UI provider plus an `ask()` API.',
-    description: '`ctx.userQuestions`: one active UI provider plus an `ask()` API.',
+    summary: '`ctx.userQuestions`: routed answerers, one default provider, and a first-answer-wins `ask()` API.',
+    description: '`ctx.userQuestions`: routed answerers, one default provider, and a first-answer-wins `ask()` API.',
     methods: [
       {
         signature: 'registerProvider(provider: UserQuestionProvider): () => void',
-        description: 'Register the UI provider. Only one provider may be active in a context.',
+        description: 'Register a UI provider. A provider declaring `accepts` is a routed answerer and may coexist with other routed answerers; a provider without one is the default fallback, of which only one may be active in a context.',
         parameters: [{ name: 'provider', description: 'UI-side implementation that collects answers.' }],
         returns: 'Disposer that unregisters this provider.',
       },
       {
         signature: 'async ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>',
-        description: 'Ask the active UI provider and wait for the user\'s answer.\n\nWhen a caller supplies an agent, human interaction is valid only for the exact live runtime root. Runtime ownership, not durable session lineage, decides this boundary: an owned child has no human answerer and would block forever, while a lineage-bearing session resumed as a new runtime root may ask normally.',
+        description: 'Ask the user and wait for the answer. Every routed answerer whose `accepts` claims the request and the default provider are offered the request together; the first human answer wins, and the remaining offers are withdrawn through a derived abort signal.\n\nWhen a caller supplies an agent, human interaction is valid only for the exact live runtime root. Runtime ownership, not durable session lineage, decides this boundary: an owned child has no human answerer and would block forever, while a lineage-bearing session resumed as a new runtime root may ask normally.',
         parameters: [{ name: 'request', description: 'Questions, owner agent, and abort signal.' }],
         returns: 'The answer chosen or typed by the human.',
-        throws: ['{UserQuestionError} code `CALLER_NOT_LIVE` when a supplied agent is not the registry\'s exact live instance, or `DELEGATED_CALLER` when that live agent is owned by another agent.'],
+        throws: ['{UserQuestionError} code `NO_PROVIDER` when no routed answerer accepts the request and no default provider is registered.', '{UserQuestionError} code `CALLER_NOT_LIVE` when a supplied agent is not the registry\'s exact live instance, or `DELEGATED_CALLER` when that live agent is owned by another agent.'],
       },
     ],
   },
@@ -3103,7 +3103,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'FeishuCardActionEvent',
-    declaration: 'export interface FeishuCardActionEvent {\n    readonly operatorId: string;\n    readonly chatId: string;\n    readonly messageId: string;\n    readonly value: unknown;\n    readonly raw: unknown;\n}',
+    declaration: 'export interface FeishuCardActionEvent {\n    readonly operatorId: string;\n    readonly chatId: string;\n    readonly messageId: string;\n    readonly value: unknown;\n    readonly formValue?: Record<string, unknown>;\n    readonly raw: unknown;\n}',
   },
   {
     name: 'FeishuCardActionHandler',
@@ -4651,7 +4651,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'UserQuestionProvider',
-    declaration: 'export interface UserQuestionProvider {\n    ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>;\n}',
+    declaration: 'export interface UserQuestionProvider {\n    ask(request: AskUserQuestionRequest): Promise<AskUserQuestionAnswer>;\n    accepts?(request: AskUserQuestionRequest): boolean;\n}',
   },
   {
     name: 'WebBootEntry',

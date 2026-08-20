@@ -61,11 +61,27 @@ export interface Config {
    * message from any chat is rejected until a live root with a cwd appears.
    */
   cwd?: string
+  /**
+   * Reply to every incoming chat message with a short acknowledgement before
+   * the per-chat agent starts working, so the user gets immediate feedback
+   * that the message arrived. Defaults to true; a failed acknowledgement is
+   * logged and never blocks delivery.
+   */
+  ack?: boolean
 }
 
 export const Config: z<Config> = z.object({
   cwd: z.string(),
+  ack: z.boolean().default(true),
 })
+
+/** Config after schemastery applies field defaults. */
+interface ResolvedConfig extends Config {
+  ack: boolean
+}
+
+/** The acknowledgement text sent back to the chat before the agent starts. */
+const ACK_MESSAGE = '已收到，正在处理…'
 
 /**
  * Prefix of each per-chat agent's session id. The suffix is a fresh UUID so a
@@ -81,6 +97,7 @@ const SESSION_ID_PREFIX = 'feishu-'
  * it. Every created agent is disposed together with this plugin's fiber.
  */
 export function apply(ctx: Context, config: Config = {}): void {
+  const resolved = config as ResolvedConfig
   const handles = new Map<string, Promise<AgentHandle>>()
   const created = new Set<AgentHandle>()
   let presetId: string | undefined
@@ -132,6 +149,10 @@ export function apply(ctx: Context, config: Config = {}): void {
     try {
       template = resolveTemplate()
     } catch (error: unknown) {
+      // Preserve resolveTemplate's exact failure value; the caller owns this
+      // rejection and inspects it, and the template closure may throw
+      // arbitrary values.
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors
       return Promise.reject(error)
     }
     const { presetId: preset, agentOptions: options, cwd: workingDir } = template
@@ -192,14 +213,25 @@ export function apply(ctx: Context, config: Config = {}): void {
             ctx.logger.warn('feishu-receive: event without a chat id; dropped')
             return
           }
-          void getOrCreate(chatId).then((handle) => {
+          void (async () => {
+            // Immediate feedback before the agent starts: the acknowledgement
+            // is awaited so it lands ahead of any reply, and a failure only
+            // logs — delivery must never depend on it.
+            if (resolved.ack) {
+              try {
+                await ctx.feishu.sendMessage({ receiveId: chatId, receiveIdType: 'chat_id', content: ACK_MESSAGE })
+              } catch (error: unknown) {
+                ctx.logger.warn('feishu-receive: failed to acknowledge chat %s: %s', chatId, String(error))
+              }
+            }
+            const handle = await getOrCreate(chatId)
             created.add(handle)
             handle.agent.followup(createUserMessage({
               content: [{ type: 'text', text: event.content }],
               source: { kind: 'user' },
             }))
             ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)
-          }, (error: unknown) => {
+          })().catch((error: unknown) => {
             ctx.logger.error('feishu-receive: failed to create the per-chat agent for chat %s: %s', chatId, String(error))
           })
         })

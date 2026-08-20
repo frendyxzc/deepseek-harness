@@ -165,6 +165,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/feishu/feishu': { kind: 'indirect', reason: 'The provider registry delegates model rendering to dsh-tool-feishu.' },
   'packages/feishu/feishu-bot': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-feishu.' },
   'packages/feishu/feishu-receive': { kind: 'indirect', reason: 'The receive consumer injects messages into the session log; the agent loop owns the model-visible request assembly.' },
+  'packages/feishu/feishu-approval': { kind: 'indirect', reason: 'The answerer renders approval cards to the human in Feishu; ApprovalService owns the model-facing approval policy text and audit pair.' },
+  'packages/feishu/feishu-question': { kind: 'indirect', reason: 'The answerer renders question cards to the human in Feishu; parsed answers return through UserQuestionService.ask() to the waiting tool call.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
 }
 

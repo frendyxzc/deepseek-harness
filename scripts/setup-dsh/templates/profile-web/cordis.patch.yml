@@ -8,6 +8,9 @@
 # feishu-approval answers approval/request with interactive cards in the owning
 # chat (or the configured fallback chat for sessions with no Feishu binding,
 # e.g. Web GUI), so remote operators approve protected operations from Feishu.
+# feishu-question answers ask_user_question (and plan-mode reviews) of
+# Feishu-bound chats with interactive form cards; unbound sessions keep the
+# Web default provider.
 # Credentials come from FEISHU_APP_ID / FEISHU_APP_SECRET (root .env), never
 # from this file.
 #
@@ -36,3 +39,8 @@
       config:
         timeoutMs: 300000
         fallbackChatId: __FALLBACK_CHAT_ID__
+
+    - id: feishu-question
+      name: '@deepseek-ai/dsh-feishu-question'
+      config:
+        timeoutMs: 300000
