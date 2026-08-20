@@ -112,7 +112,11 @@ ask_secret() {
     die "missing required secret: \$$env_var (unset and --non-interactive)"
   fi
   IFS= read -r -s -p "  $prompt: " val || true
-  printf '\n'
+  # read -s suppresses the terminal echo; print the newline the user's Enter
+  # would have produced. It must go to stderr: when this function is called
+  # through $(...), a stdout newline would be captured as a leading newline
+  # of the value (command substitution strips trailing newlines only).
+  printf '\n' >&2
   printf '%s\n' "$val"
 }
 
@@ -123,7 +127,8 @@ ask_secret_opt() {
   [[ -n "$val" ]] && { printf '%s\n' "$val"; return; }
   if [[ "$NON_INTERACTIVE" == "1" ]]; then printf '\n'; return; fi
   IFS= read -r -s -p "  $prompt (leave empty to skip): " val || true
-  printf '\n'
+  # See ask_secret: the echo-replacement newline must not reach stdout.
+  printf '\n' >&2
   printf '%s\n' "$val"
 }
 
