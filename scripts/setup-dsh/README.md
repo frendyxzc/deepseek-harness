@@ -4,6 +4,8 @@ Reproduces the configuration this checkout relies on but does not ship: the
 harness home under `~/.dsh` (settings, credentials, the `web` profile) and the
 [TencentDB-Agent-Memory](https://github.com/frendyxzc/TencentDB-Agent-Memory)
 stack that the profile's `llm-deepseek.baseURL` points at (`http://127.0.0.1:8096`).
+When a bot username is supplied, it also installs the optional
+[GitLab MR integration](#gitlab-mr-integration-optional) (`gitlab-mr/` at the repo root).
 
 ## Run
 
@@ -44,9 +46,35 @@ secrets fail loudly. A filled-in template lives at
 | `…/MemoryCore/.env.local` | prompted `TDAI_LLM_*` (points `TDAI_GATEWAY_CONFIG` at `tdai-stack/config/tdai-gateway.yaml`) | yes (0600) |
 | `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 build approvals: decides upstream `approve-builds` placeholders (`allowBuilds`: better-sqlite3/esbuild allowed, rest explicitly denied) | no |
 | `…/metadata.db` → `meta_users` + `meta_user_keys` | Bootstraps the MemoryCore admin user keyed with `PROXY_USER_KEY` when the database exists but no admin user is present (so the agent can authenticate through the proxy) | yes |
+| `~/.dsh/skills/gitlab-mr-workflow/` | `gitlab-mr/gitlab-mr-workflow/*` (repo) — GitLab MR workflow skill | no |
+| `~/.dsh/profiles/web/cordis.patch.yml` (+`gitlab-mr` entry) | `gitlab-mr/gitlab-mr-poller.mjs` (repo) — poller plugin mount | no |
+| `<repo>/.env` (+`GITLAB_TOKEN`) | prompted `DSH_GITLAB_TOKEN` | yes (gitignored, appended by §7) |
 
 Templates under `templates/` are the source of truth for the non-secret DSH
 config. Edit them and re-run with `--force` to redeploy.
+
+## GitLab MR integration (optional)
+
+Supplying `DSH_GITLAB_BOT_USERNAME` (or answering the prompt with a bot's GitLab
+username) enables the GitLab MR closed loop; an empty value skips it entirely.
+Enabled, setup.sh installs three things (see the [gitlab-mr README](../../gitlab-mr/README.md)):
+
+1. **Skill** — `gitlab-mr/gitlab-mr-workflow` is copied to `~/.dsh/skills/`, the
+   user skills root `skill-filesystem` scans, so the agent gains the git + `glab`
+   outbound workflow (branch/commit/MR/comment) and the merge-distill template.
+2. **Poller plugin** — a `gitlab-mr` patch entry is appended to
+   `~/.dsh/profiles/web/cordis.patch.yml`, mounting `gitlab-mr-poller.mjs` (by
+   absolute path into this checkout). It registers the `gitlab_watch_mr` tool
+   and polls registered MRs so new comments / merge / close wake the owning
+   session.
+3. **Token** — `DSH_GITLAB_TOKEN` is appended to `<repo>/.env` as `GITLAB_TOKEN`
+   (when supplied and not already present); both the poller and the agent's
+   `glab` read it from the environment.
+
+Relevant vars: `DSH_GITLAB_BOT_USERNAME` (enable), `DSH_GITLAB_API_BASE`
+(default `https://gitlab.com/api/v4`), `DSH_GITLAB_TOKEN` (the bot PAT).
+Set them in `~/.dsh/setup-dsh.env` (`setup.env.example` has a filled template)
+for the no-prompt `setup-one.sh` path.
 
 ## Start the services (after setup)
 

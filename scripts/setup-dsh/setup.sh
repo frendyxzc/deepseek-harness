@@ -10,7 +10,8 @@
 #   ~/.dsh/profiles/web/{package.json, cordis.yml, cordis.patch.yml, pnpm-workspace.yaml}
 #   ~/.dsh/tdai-stack/TencentDB-Agent-Memory   git clone + per-service config
 #   ~/.dsh/tdai-stack/config/{proxy-config,tdai-gateway}.yaml   generated from templates/tdai-stack/
-#   <repo>/.env                         DEEPSEEK_API_KEY + FEISHU_* (prompted)
+#   ~/.dsh/skills/gitlab-mr-workflow           optional GitLab MR workflow skill (see §7)
+#   <repo>/.env                         DEEPSEEK_API_KEY + FEISHU_* (prompted) + GITLAB_TOKEN (§7)
 #
 # Idempotent: existing files are kept unless --force is passed. Secrets are
 # prompted interactively (or read from the DSH_* env vars below); pass
@@ -40,6 +41,9 @@
 #   DSH_TDAI_LLM_BASE_URL         -> memory core gateway tdai-gateway.yaml
 #   DSH_TDAI_LLM_MODEL            -> memory core gateway tdai-gateway.yaml
 #   DSH_MEMORY_DATA_DIR           -> gateway data.baseDir (default ~/.memory-tencentdb/memory-tdai)
+#   DSH_GITLAB_BOT_USERNAME       -> enables GitLab MR integration (bot's GitLab username)
+#   DSH_GITLAB_API_BASE           -> GitLab API base URL (default https://gitlab.com/api/v4)
+#   DSH_GITLAB_TOKEN              -> bot PAT appended to <repo>/.env GITLAB_TOKEN
 set -euo pipefail
 
 # ── Resolve the checked-out repo root and defaults ───────────────────────────
@@ -441,6 +445,72 @@ EOF
     mkdir -p "$(dirname "$MEMORY_DB")"
     ok "MemoryCore database not yet created (first start of the core will create it)"
   fi
+fi
+
+# ── 7. GitLab MR integration (optional) ──────────────────────────────────────
+# Enabled only when a bot username is supplied (env or prompt); an empty value
+# skips the whole section. The integration mirrors the Feishu pattern: a skill
+# teaches the agent the git/glab outbound workflow, and a poller plugin watches
+# the created MRs for new comments / merge / close and wakes the owning session.
+GITLAB_ARTIFACT_DIR="$REPO_ROOT/gitlab-mr"
+GITLAB_BOT_USERNAME="$(ask_opt DSH_GITLAB_BOT_USERNAME 'GitLab bot username (empty to skip GitLab MR integration)' '')"
+if [[ -n "$GITLAB_BOT_USERNAME" ]]; then
+  GITLAB_API_BASE="$(ask_opt DSH_GITLAB_API_BASE 'GitLab API base URL' 'https://gitlab.com/api/v4')"
+  GITLAB_TOKEN="$(ask_secret_opt DSH_GITLAB_TOKEN 'GitLab bot PAT (scope api; empty to set manually later)')"
+  die_on_newline GITLAB_BOT_USERNAME
+  die_on_newline GITLAB_API_BASE
+  die_on_newline GITLAB_TOKEN
+
+  # 7a. Skill — the agent's outbound workflow (git + glab commands, MR/comment
+  #     conventions, merge-distill template). Installed under the user skills
+  #     root so skill-filesystem discovers it without any further wiring.
+  if [[ ! -e "$DSH_HOME/skills/gitlab-mr-workflow" || "$FORCE" == "1" ]]; then
+    mkdir -p "$DSH_HOME/skills"
+    cp -R "$GITLAB_ARTIFACT_DIR/gitlab-mr-workflow" "$DSH_HOME/skills/"
+    ok "gitlab-mr skill -> $DSH_HOME/skills/gitlab-mr-workflow"
+  else
+    warn "gitlab-mr skill already exists, skipping: $DSH_HOME/skills/gitlab-mr-workflow"
+  fi
+
+  # 7b. Poller plugin — appended as a second patch entry so it stays separable
+  #     from the Feishu block and survives a --force re-deploy of the profile.
+  POLLER_PLUGIN="$GITLAB_ARTIFACT_DIR/gitlab-mr-poller.mjs"
+  if [[ ! -f "$POLLER_PLUGIN" ]]; then
+    warn "gitlab-mr poller not found at $POLLER_PLUGIN; skipping plugin mount (artifact moves with this checkout)"
+  elif grep -q 'id: gitlab-mr' "$PROFILE_DIR/cordis.patch.yml" 2>/dev/null; then
+    warn "gitlab-mr already mounted in cordis.patch.yml; skipping"
+  else
+    cat >> "$PROFILE_DIR/cordis.patch.yml" <<EOF
+
+# GitLab MR polling + watch tool (see gitlab-mr/README.md). The token reads
+# GITLAB_TOKEN from the environment (root .env or the credentials store); the
+# agent registers each MR it creates via the gitlab_watch_mr tool.
+- insert:
+    - id: gitlab-mr
+      name: $POLLER_PLUGIN
+      config:
+        apiBase: '$GITLAB_API_BASE'
+        botUsername: '$GITLAB_BOT_USERNAME'
+EOF
+    ok "gitlab-mr poller -> $PROFILE_DIR/cordis.patch.yml"
+  fi
+
+  # 7c. Token — append to the repo .env (only when supplied and not already
+  #     present), so the poller and the agent's glab both read GITLAB_TOKEN.
+  if [[ -n "$GITLAB_TOKEN" ]]; then
+    if [[ ! -e "$REPO_ROOT/.env" ]]; then
+      umask 077
+      : > "$REPO_ROOT/.env"
+    fi
+    if grep -q '^GITLAB_TOKEN=' "$REPO_ROOT/.env"; then
+      warn "GITLAB_TOKEN already present in .env; skipping"
+    else
+      printf 'GITLAB_TOKEN=%s\n' "$GITLAB_TOKEN" >> "$REPO_ROOT/.env"
+      ok "GITLAB_TOKEN -> $REPO_ROOT/.env"
+    fi
+  fi
+else
+  info "GitLab MR integration skipped (no bot username)"
 fi
 
 # ── Summary ────────────────────────────────────────────────────────────────
