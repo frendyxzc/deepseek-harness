@@ -22,6 +22,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=lib.sh
 source "$SCRIPT_DIR/lib.sh"
 
+# The TencentDB memory stack pins Node v22; the bundled node22 (installed by
+# setup.sh) takes precedence when present so every service starts on it.
+NODE22_BIN="$DSH_HOME/tdai-stack/node22/bin"
+if [[ -x "$NODE22_BIN/node" ]]; then
+  PATH="$NODE22_BIN:$PATH"
+fi
+
 WORKSPACE="${DSH_WORKSPACE:-$REPO_ROOT}"
 
 while [[ $# -gt 0 ]]; do
