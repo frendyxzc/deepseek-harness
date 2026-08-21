@@ -90,3 +90,96 @@ wait_healthy() {
   done
   die "$name not ready within ${max}s (http=${code:-timeout}) — see $(logfile "$name")"
 }
+
+# ── Launchd interop (macOS) ────────────────────────────────────────────────────
+# The TDAI memory stack can also run under launchd via tdai-stack/start.sh
+# (local.tdai-memory-* LaunchAgents). start-all.sh / stop-all.sh own the stack:
+# they unload any live launchd instance and park its plist so a future login
+# cannot auto-load it (RunAtLoad) and bind the port ahead of the pidfile-
+# managed process.
+
+# launchd_label <name> — the launchd label for a stack service, or empty.
+launchd_label() {
+  case "$1" in
+    core)      printf 'local.tdai-memory-core' ;;
+    proxy)     printf 'local.tdai-memory-proxy' ;;
+    panel)     printf 'local.tdai-memory-panel' ;;
+    knowledge) printf 'local.tdai-memory-knowledge' ;;
+  esac
+}
+
+# port_of <name> — the TCP port a stack service binds, or empty.
+port_of() {
+  case "$1" in
+    core)      printf '8420' ;;
+    proxy)     printf '8096' ;;
+    knowledge) printf '8421' ;;
+    panel)     printf '8123' ;;
+    dsh-web)   printf '3080' ;;
+  esac
+}
+
+# unload_launchd <name> — bootout the service's launchd instance if loaded, and
+# park its plist out of ~/Library/LaunchAgents so a login cannot re-load it.
+# No-op on Linux or when the service has no launchd label.
+unload_launchd() {
+  local name="$1" label uid plist
+  label="$(launchd_label "$name")"
+  [[ -n "$label" ]] || return 0
+  command -v launchctl >/dev/null 2>&1 || return 0
+  uid="$(id -u)"
+  if launchctl print "gui/$uid/$label" >/dev/null 2>&1; then
+    info "unloading launchd $label (stack scripts take over)"
+    launchctl bootout "gui/$uid/$label" 2>/dev/null \
+      || warn "launchctl bootout $label failed"
+  fi
+  plist="$HOME/Library/LaunchAgents/$label.plist"
+  if [[ -f "$plist" ]]; then
+    mkdir -p "$DSH_HOME/tdai-stack/launchd-disabled"
+    if mv "$plist" "$DSH_HOME/tdai-stack/launchd-disabled/$label.plist" 2>/dev/null; then
+      ok "parked $plist (restore: mv $DSH_HOME/tdai-stack/launchd-disabled/$label.plist $plist)"
+    else
+      warn "could not park $plist — a future login may re-load it"
+    fi
+  fi
+}
+
+# wait_port_free <port> <timeout-seconds> — block until nothing listens on the
+# port (bootout / shutdown grace), then return; never fails the caller.
+wait_port_free() {
+  local port="$1" max="${2:-10}" i=0
+  while (( i < max )); do
+    is_listening "$port" || return 0
+    sleep 1
+    i=$((i + 1))
+  done
+  warn "port :$port still busy after ${max}s — continuing anyway"
+}
+
+# stop_on_port <name> — when the service still listens on its port, TERM the
+# listener, wait for the socket to free, then SIGKILL as a last resort. The
+# pidfile records the launcher, not the listener, so this is what guarantees
+# the port is actually released. Returns 0 when the port ends up free.
+stop_on_port() {
+  local name="$1" port pid i
+  port="$(port_of "$name")"
+  [[ -n "$port" ]] && is_listening "$port" || return 0
+  pid="$(lsof -nP -tiTCP:"$port" -sTCP:LISTEN 2>/dev/null | head -1 || true)"
+  if [[ -n "$pid" ]]; then
+    warn "killing listener on :$port (pid $pid)"
+    stop_tree "$pid" TERM
+    for i in 1 2 3 4 5 6 7 8 9 10; do
+      is_listening "$port" || return 0
+      sleep 1
+    done
+    if is_listening "$port"; then
+      warn "listener on :$port did not stop gracefully — SIGKILL"
+      stop_tree "$pid" KILL
+      sleep 1
+    fi
+  fi
+  if is_listening "$port"; then
+    warn "port :$port still busy — leaving it alone"
+  fi
+  return 0
+}

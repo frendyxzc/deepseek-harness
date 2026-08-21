@@ -12,6 +12,10 @@
 # starting the next. Already-running services (detected by port) are skipped,
 # so this is safe to re-run. Stop everything with ./stop-all.sh.
 #
+# Every service is pidfile-managed here, including MemoryCore and MemoryProxy:
+# a legacy launchd instance (tdai-stack/start.sh) is unloaded and its plist
+# parked before the port is touched, so the two management paths never fight.
+#
 # Options:
 #   --workspace PATH   repo that serves the dsh Web UI (default: this repo)
 #   -h, --help         this help
@@ -71,6 +75,10 @@ mkdir -p "$PID_DIR" "$LOG_DIR"
 # start_service <name> <port> <health-url> <timeout> <shell-command>
 start_service() {
   local name="$1" port="$2" url="$3" timeout="$4" cmd="$5"
+  # Take over from any legacy launchd instance before touching the port, and
+  # wait for its socket to free up so the pidfile-managed process binds cleanly.
+  unload_launchd "$name"
+  wait_port_free "$port" 10
   if is_listening "$port"; then
     warn "$name already listening on :$port — skipping"
     return 0
