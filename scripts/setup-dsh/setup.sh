@@ -407,6 +407,15 @@ EOF
       (cd "$DSH_HOME/profiles/web" && pnpm install)
     fi
     ok "memory service dependencies ready"
+
+    # MemoryPanel serves its web UI from web/dist/; the upstream repo ships
+    # the source but not the built artifacts, so a fresh clone returns 404
+    # on / even though /health reports 200. Build the frontend once here.
+    if [[ ! -d "$MEMORY_ROOT/MemoryPanel/web/dist" || "$FORCE" == "1" ]]; then
+      info "build MemoryPanel web UI"
+      (cd "$MEMORY_ROOT/MemoryPanel/web" && npm ci && npm run build)
+      ok "MemoryPanel web UI built -> $MEMORY_ROOT/MemoryPanel/web/dist"
+    fi
   fi
 
   # 6f. MemoryCore admin user — the core creates its database on first start
