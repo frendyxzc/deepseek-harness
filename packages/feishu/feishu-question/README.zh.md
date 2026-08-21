@@ -6,7 +6,7 @@ DeepSeek Harness 的飞书问题卡片应答器。通过所属会话中的交互
 
 ## 用途
 
-注册一个路由型 `ctx.userQuestions` provider，接受所有属主 agent 已绑定到飞书会话的 ask——由 [`dsh-feishu-receive`](../feishu-receive/README.md) 通过 `feishu/chat-agent` 事件通告的每会话 agent，或其后代 subagent（在 `agent/created` 时经由会话的 `parentSession` 链绑定）——并将其渲染为一张交互式表单卡片：每题一节、lark_md 标题，单选题用下拉框，多选题每个选项一个勾选框，且每题恒附一个自由文本输入框，让人始终可以打字代替选择。Plan-mode 评审（`intent: plan-review`）走同一流程，使用橙色 "Plan review" 头部，并把计划全文渲染进卡片正文。
+注册一个路由型 `ctx.userQuestions` provider，接受所有属主 agent 已绑定到飞书会话的 ask——由 [`dsh-feishu-receive`](../feishu-receive/README.zh.md) 通过 `feishu/chat-agent` 事件通告的每会话 agent，或其后代 subagent（在 `agent/created` 时经由会话的 `parentSession` 链绑定）——并将其渲染为一张交互式表单卡片：每题一节、lark_md 标题，单选题用下拉框，多选题每个选项一个勾选框，且每题恒附一个自由文本输入框，让人始终可以打字代替选择。Plan-mode 评审（`intent: plan-review`）走同一流程，使用橙色 "Plan review" 头部，并把计划全文渲染进卡片正文。
 
 每张卡片携带一个在构建时铸造的一次性 nonce，内嵌于提交按钮的 `value`；一次提交在消费之前先对照该 nonce 自己的记录校验——回显的 nonce、以及卡片发送到的会话——因此伪造值、被篡改的回显、来自其他会话的点击都会被拒绝且不消费 nonce。同一题上自由文本优先于选择；空提交不消费任何东西，卡片保留以待再次作答。一次有效提交以解析出的答案 resolve 该 ask，并把卡片重绘为"问题 → 答案"摘要；其余路径全部失败关闭：`timeoutMs` 内无人作答以 `ASK_TIMEOUT` reject，回合被撤回以 `ASK_ABORTED` reject，同一会话的新消息以 `ASK_CANCELLED` 超越（supersede）该会话所有挂起卡片（plan mode 将其解释为"用户转而发言——留在 plan mode"），插件卸载则把所有挂起卡片结算为 `ASK_CANCELLED`。pending 登记先于发卡完成，因此与投递竞态到达的回调永不丢配；同一时刻至多 256 张卡片存活，超出则 ask 以 `ASK_BUSY` reject。user-questions seam 让每个接受该 ask 的提供方竞速取得第一个回答，因此飞书绑定的 ask 由会话卡片或默认 provider（Web UI）当中人类先作答的一侧结算，一边作答即撤回另一边。本路由未接受的 ask——属主 agent 无飞书绑定——仅交默认 provider，非飞书会话无需任何配置即保留原有 UI。
 

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-web-lan-access-re-enabled.md
 2026-08-19-web-lan-access-re-enabled.md: 6fc1a95f4cb88760a99c5ef3cfa51fc6d2e978f3
-2026-08-19-web-lan-access-re-enabled.zh.md: fb99cbae74d7ba324f5ca43580f132fc6056056b
+2026-08-19-web-lan-access-re-enabled.zh.md: 829f755ea830c0040c58160a9d618d5d8d058da5

@@ -10,12 +10,12 @@ harness 无法触达飞书（Feishu/Lark）聊天：agent 既不能给用户或�
 
 ## 决策
 
-飞书聊天是遵循[能力 seam Agent Note](../../implemented/architecture/2026-06-13-capability-seams.md)的一等能力 seam，拆分为四个包：
+飞书聊天是遵循[能力 seam Agent Note](../../implemented/architecture/2026-06-13-capability-seams.zh.md)的一等能力 seam，拆分为四个包：
 
 1. `@deepseek-ai/dsh-feishu`（`packages/feishu/feishu`）拥有 `ctx.feishu`、提供方注册、执行期提供方选择、发送/接收词汇表以及 `FeishuError`。
-2. `@deepseek-ai/dsh-feishu-bot`（`packages/feishu/feishu-bot`）是飞书开放平台 Bot 提供方——租户 token 鉴权、`sendMessage` 与长连接 `startReceiving`（[长连接 note](2026-08-18-feishu-long-connection-receive.md)）。
+2. `@deepseek-ai/dsh-feishu-bot`（`packages/feishu/feishu-bot`）是飞书开放平台 Bot 提供方——租户 token 鉴权、`sendMessage` 与长连接 `startReceiving`（[长连接 note](2026-08-18-feishu-long-connection-receive.zh.md)）。
 3. `@deepseek-ai/dsh-tool-feishu`（`packages/feishu/tool-feishu`）拥有面向模型的 `feishu_send_message` 工具 schema（`receiveIdType`/`msgType` 用字符串字面量 enum）、提示引导与展示。
-4. `@deepseek-ai/dsh-feishu-receive`（`packages/feishu/feishu-receive`）把每个飞书聊天路由进各自的 agent 会话（[按聊天路由 note](2026-08-19-feishu-per-chat-receive-routing.md)）。
+4. `@deepseek-ai/dsh-feishu-receive`（`packages/feishu/feishu-receive`）把每个飞书聊天路由进各自的 agent 会话（[按聊天路由 note](2026-08-19-feishu-per-chat-receive-routing.zh.md)）。
 
 提供方向 `ctx.feishu` 注册；只有工具与接收消费方是面向模型或面向用户的。发送与接收是同一个 seam、用同一套选择策略：配置了 `provider` id（或等价的 `DSH_FEISHU_PROVIDER` 环境变量），或在恰好注册了一个可用提供方时自动选择；多个可用提供方且未配置 id 时是 `FEISHU_PROVIDER_AMBIGUOUS`，而非先到先得。
 
@@ -25,7 +25,7 @@ harness 无法触达飞书（Feishu/Lark）聊天：agent 既不能给用户或�
 
 ### 入站投递把每个聊天路由到各自的 agent
 
-`dsh-feishu-receive` 在 `ctx.effect` 内启动接收通道（其 disposer 会关闭长连接），并把每条 `FeishuReceiveEvent` 路由到一个专属的按聊天划分 agent（[按聊天路由 note](2026-08-19-feishu-per-chat-receive-routing.md)）。提供方只提取内容解码后非空的文本消息；其他消息类型被忽略。
+`dsh-feishu-receive` 在 `ctx.effect` 内启动接收通道（其 disposer 会关闭长连接），并把每条 `FeishuReceiveEvent` 路由到一个专属的按聊天划分 agent（[按聊天路由 note](2026-08-19-feishu-per-chat-receive-routing.zh.md)）。提供方只提取内容解码后非空的文本消息；其他消息类型被忽略。
 
 ### 凭据每次操作解析一次
 
@@ -44,6 +44,6 @@ harness 无法触达飞书（Feishu/Lark）聊天：agent 既不能给用户或�
 ## 后果
 
 - 飞书是可选能力：四个包通过常规组合挂载，均不属于 agent-loop 主干或出厂默认。
-- 入站路由按聊天划分、而非单 agent：每个聊天各自有一个 agent 会话（[按聊天路由 note](2026-08-19-feishu-per-chat-receive-routing.md)）；聊天内的发送者归属与跨重启恢复被推迟，记录在 `dsh-feishu-receive` 的 README 中。
+- 入站路由按聊天划分、而非单 agent：每个聊天各自有一个 agent 会话（[按聊天路由 note](2026-08-19-feishu-per-chat-receive-routing.zh.md)）；聊天内的发送者归属与跨重启恢复被推迟，记录在 `dsh-feishu-receive` 的 README 中。
 - 卡片（`interactive`）消息已声明，但卡片 JSON 构造留给调用方；面向模型的工具不校验也不构造卡片 schema。
 - 发送与接收由单元测试（seam 选择与注册表处置、提供方 token/发送/接收、工具 enum 校验与端到端发送、消费方投递）以及一个真实组合测试覆盖：后者通过 Loader 启动 seam、提供方与工具，并在 mock 的飞书 HTTP 边界上验证。

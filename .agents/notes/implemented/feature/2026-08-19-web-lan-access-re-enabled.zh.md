@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-Web 应用曾将 `--host 0.0.0.0` 作为显式开启全接口绑定的选项发布（[web bind address](2026-07-22-web-bind-address.md)），并围绕它构建了 `/api` 信任栅栏（[api browser-trust boundary](../architecture/2026-07-28-api-browser-trust-boundary.md)）。后来的一次评审让命令行提供方以远程代码执行警告拒绝了该 flag，并把 README 改写为“在具备认证之前不受支持”，但未把这一理由记录进任何 Agent Note。于是代码与文档和这两篇设计笔记相矛盾，而局域网浏览器使用——该 flag 存在的意义——失去了受支持的路径。
+Web 应用曾将 `--host 0.0.0.0` 作为显式开启全接口绑定的选项发布（[web bind address](2026-07-22-web-bind-address.zh.md)），并围绕它构建了 `/api` 信任栅栏（[api browser-trust boundary](../architecture/2026-07-28-api-browser-trust-boundary.zh.md)）。后来的一次评审让命令行提供方以远程代码执行警告拒绝了该 flag，并把 README 改写为“在具备认证之前不受支持”，但未把这一理由记录进任何 Agent Note。于是代码与文档和这两篇设计笔记相矛盾，而局域网浏览器使用——该 flag 存在的意义——失去了受支持的路径。
 
 ## 决策
 
@@ -18,7 +18,7 @@ Web 应用曾将 `--host 0.0.0.0` 作为显式开启全接口绑定的选项发�
 
 **现在就添加认证层。** 不予采纳，属范围之外——它是一个独立且更大的决策，留作延后工作；本次改动只影响可达性，不改变栅栏。
 
-**把 `0.0.0.0` 设为默认值。** 不予采纳，理由同 [web bind address](2026-07-22-web-bind-address.md) 的决策：本机使用不应隐式地变为全网范围。
+**把 `0.0.0.0` 设为默认值。** 不予采纳，理由同 [web bind address](2026-07-22-web-bind-address.zh.md) 的决策：本机使用不应隐式地变为全网范围。
 
 ## 后果
 

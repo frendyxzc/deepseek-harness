@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-feishu-approval-cards.md
 2026-08-18-feishu-approval-cards.md: c5e6b5b23ab772b0865212b7381dca57babd162b
-2026-08-18-feishu-approval-cards.zh.md: 6121638f575c882e8646e7322228eaf4f3237c72
+2026-08-18-feishu-approval-cards.zh.md: 05b2f22aa726b0151ddceb78333c39e2c058c0d1

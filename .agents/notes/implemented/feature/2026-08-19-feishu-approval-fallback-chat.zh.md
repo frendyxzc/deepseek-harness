@@ -6,7 +6,7 @@ Status: implemented
 
 ## 问题
 
-[审批卡片决策](2026-08-18-feishu-approval-cards.md)把应答绑定在飞书聊天绑定关系上：`dsh-feishu-approval` 只认领经 `feishu/chat-agent` 通告的 agent 及其 subagent 后代的审批请求，其余一律经 `next()` 委托。从别处触发的会话——Web GUI、headless 运行、ACP 自动化——没有绑定关系，其审批只会到达本地应答器。在飞书聊天中工作的操作者无法审批它们：一次从 Web GUI 触发的插件安装引发了权限审批，却始终没有到达操作者正在关注的飞书聊天。
+[审批卡片决策](2026-08-18-feishu-approval-cards.zh.md)把应答绑定在飞书聊天绑定关系上：`dsh-feishu-approval` 只认领经 `feishu/chat-agent` 通告的 agent 及其 subagent 后代的审批请求，其余一律经 `next()` 委托。从别处触发的会话——Web GUI、headless 运行、ACP 自动化——没有绑定关系，其审批只会到达本地应答器。在飞书聊天中工作的操作者无法审批它们：一次从 Web GUI 触发的插件安装引发了权限审批，却始终没有到达操作者正在关注的飞书聊天。
 
 ## 决策
 

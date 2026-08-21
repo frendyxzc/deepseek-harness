@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md
 2026-08-18-feishu-capability-seam.md: 6a0192544af36763b5200303c38a5e6c4a770261
-2026-08-18-feishu-capability-seam.zh.md: 0b2a76946af849726687bc7c4f4de0e1321b7cb7
+2026-08-18-feishu-capability-seam.zh.md: a617e339bdafd44046e0cd1887894cc64b4431eb

@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-feishu-approval-fallback-chat.md
 2026-08-19-feishu-approval-fallback-chat.md: 1500049b7efbd6ee9d0aaad5cf301a1d11a598bd
-2026-08-19-feishu-approval-fallback-chat.zh.md: 9d6338cb9becc27db59c7164d2dbff9f12ca0544
+2026-08-19-feishu-approval-fallback-chat.zh.md: e9e6115cc081cef5fb622e9307fd6d84a6a155c4

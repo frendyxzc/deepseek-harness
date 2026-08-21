@@ -1,107 +1,109 @@
-# dsh-gitlab-mr — 内网 DSH 打通 GitLab MR 闭环
+# dsh-gitlab-mr — GitLab MR closed loop for intranet DSH
 
-自托管/内网部署下，用「出站 = git(SSH) + glab(PAT) + skill，入站 = 轮询插件 + MR 登记工具」跑通
-「改码 → 建独立分支 → 提交 → push → 建 MR → 登记跟踪 → 响应评论区二次修改 → MR 合并 → 沉淀经验」，
-无需公网回调 URL，无需 Composio，无需接入 MCP。
+English | [中文](README.zh.md)
 
-两个资产：
+Under self-hosted/intranet deployment, use "outbound = git (SSH) + glab (PAT) + skill, inbound = polling plugin + MR registration tool" to run the
+"change code → create independent branch → commit → push → create MR → register tracking → respond to comment-thread rework → merge MR → distill experience" loop,
+with no public callback URL, no Composio, and no MCP integration.
 
-| 文件 | 作用 |
+Two assets:
+
+| File | Purpose |
 |---|---|
-| `gitlab-mr-poller.mjs` | 函数插件：提供 `gitlab_watch_mr` 登记工具 + 后台轮询已登记 MR，检测新评论（过滤 bot 作者）与 merged/closed，用 `agent.followup()` 唤醒对应会话 |
-| `gitlab-mr-workflow/SKILL.md` | agent 出站 SOP：git/glab 命令、MR 规范、回复评论规范、合并后沉淀模板 |
+| `gitlab-mr-poller.mjs` | Function plugin: provides the `gitlab_watch_mr` registration tool + polls registered MRs in the background, detects new comments (filtering bot authors) and merged/closed, and wakes the owning session with `agent.followup()` |
+| `gitlab-mr-workflow/SKILL.md` | Agent outbound SOP: git/glab commands, MR rules, comment-reply rules, and the post-merge distillation template |
 
-**登记制（无需手工配置绑定会话）**：agent 建完 MR 后调一次 `gitlab_watch_mr`，插件把
-「当前会话 ↔ MR」的绑定连同游标水位线一起持久化；之后这个 MR 的新评论/合并会自动 wake
-回**创建它的那个会话**，重启后也记得（存在 state 文件里）。
+**Registration-based (no manual session binding needed)**: after the agent creates an MR, it calls `gitlab_watch_mr` once; the plugin persists the
+"current session ↔ MR" binding together with the cursor watermark; afterwards new comments / merges on that MR automatically wake
+**the session that created it**, even after restart (stored in a state file).
 
-## 0. 一键安装（推荐，走 setup-dsh）
+## 0. One-click install (recommended, via setup-dsh)
 
-已集成进 [`scripts/setup-dsh/setup.sh`](../scripts/setup-dsh/setup.sh)：只要提供 bot 用户名即启用
-（交互提示，或填 `DSH_GITLAB_BOT_USERNAME` / `DSH_GITLAB_API_BASE` / `DSH_GITLAB_TOKEN`），
-它会自动完成下面 §1–§3 的全部三步（skill → 插件挂载 → token 写 `.env`）。见
-[setup-dsh README 的 GitLab 小节](../scripts/setup-dsh/README.md#gitlab-mr-integration-optional)。
+Integrated into [`scripts/setup-dsh/setup.sh`](../scripts/setup-dsh/setup.sh): supplying a bot username enables it
+(interactive prompt, or set `DSH_GITLAB_BOT_USERNAME` / `DSH_GITLAB_API_BASE` / `DSH_GITLAB_TOKEN`),
+and it automatically completes all three steps of §1–§3 below (skill → plugin mount → token written to `.env`). See
+[the GitLab section of the setup-dsh README](../scripts/setup-dsh/README.md#gitlab-mr-integration-optional).
 
 ```sh
-./scripts/setup-dsh/setup.sh          # 交互回答 GitLab bot username / apiBase / PAT
-# 或一键：
+./scripts/setup-dsh/setup.sh          # interactively answer GitLab bot username / apiBase / PAT
+# or one key:
 DSH_GITLAB_BOT_USERNAME=dsh-agent \
 DSH_GITLAB_API_BASE='https://gitlab.example.com/api/v4' \
 DSH_GITLAB_TOKEN=glpat-... \
   ./scripts/setup-dsh/setup.sh --non-interactive
 ```
 
-## 1. 安装 skill（手动部署时）
+## 1. Install the skill (manual deployment)
 
 ```bash
-# 项目级（进 git）或用户级（本机全局），二选一
+# project-level (goes into git) or user-level (machine-wide), choose one
 cp -R gitlab-mr-workflow /path/to/project/.agents/skills/
 cp -R gitlab-mr-workflow ~/.dsh/skills/
 ```
 
-## 2. 挂载 poller 插件
+## 2. Mount the poller plugin
 
-`$DSH_HOME/profiles/web/cordis.patch.yml`：
+`$DSH_HOME/profiles/web/cordis.patch.yml`:
 
 ```yaml
 - insert:
     - id: gitlab-mr
       name: /absolute/path/to/gitlab-mr-poller.mjs
       config:
-        apiBase: 'https://<你的gitlab域名>/api/v4'   # 自托管实例
-        botUsername: dsh-agent                         # bot 的 GitLab username
-        pollIntervalMs: 300000                         # 5 分钟
+        apiBase: 'https://<your-gitlab-domain>/api/v4'   # self-hosted instance
+        botUsername: dsh-agent                         # the bot's GitLab username
+        pollIntervalMs: 300000                         # 5 minutes
 ```
 
-## 3. 环境变量
+## 3. Environment variables
 
 ```bash
-export GITLAB_TOKEN=<bot 账号的 PAT>   # scope 至少 api（读 MR/评论；agent 用 glab 写需含写权限）
+export GITLAB_TOKEN=<bot account PAT>   # scope at least api (read MR/comments; agent writes via glab need write scope)
 ```
 
-poller 优先用 DSH 的 `ctx.credentials`（按 `tokenEnv` 引用的值）解析，缺失时回退到同名环境变量。token 永不写入配置。
+The poller resolves the token through DSH's `ctx.credentials` first (referenced by `tokenEnv`), falling back to the same-named environment variable. The token is never written to configuration.
 
-## 4. 登记机制（替代手工绑定会话）
+## 4. Registration mechanism (replaces manual session binding)
 
-agent 在会话里跑完 `glab mr create` 后，调用工具：
+After the agent runs `glab mr create` in a session, it calls the tool:
 
 ```
 gitlab_watch_mr(project="group/repo", mrIid=123)
 ```
 
-插件内部用 `exec.agent.id` 取到当前会话 id，查该 MR 的当前最新 comment id 作为水位线
-（历史评论不回放），把 `{ MR → sessionId → 游标 }` 写入 state 文件。之后：
+The plugin takes the current session id from `exec.agent.id`, reads the MR's current latest comment id as the watermark
+(historical comments are not replayed), and writes `{ MR → sessionId → cursor }` into the state file. Afterwards:
 
-- 该 MR 出现**新评论**（非 bot 作者、非 system 笔记）→ 立即 wake 回这个会话。
-- 该 MR **合并** → wake 回会话做「沉淀」，并从追踪移除。
-- 该 MR **关闭** → wake 提示停止，并从追踪移除。
+- A **new comment** on the MR (non-bot author, non-system note) → immediately wakes this session.
+- The MR is **merged** → wakes the session for "distillation" and removes it from tracking.
+- The MR is **closed** → wakes the session with a stop notice and removes it from tracking.
 
-若登记后会话被关掉/还没 resume，poller 会跳过不投递但**保留登记且不推进游标**，等会话回来后的下个轮询周期补投，不漏事件。
+If the session is closed / not yet resumed after registration, the poller skips delivery but **keeps the registration and does not advance the cursor**, delivering on the next poll cycle after the session returns, so no event is lost.
 
-## 5. 配置字段
+## 5. Configuration fields
 
-| 字段 | 默认 | 说明 |
+| Field | Default | Description |
 |---|---|---|
-| `tokenEnv` | `GITLAB_TOKEN` | token 来源 |
-| `apiBase` | `https://gitlab.com/api/v4` | 自托管改域名 |
-| `botUsername` | —（必填） | 回环过滤：作者等于它的评论不投递 |
-| `pollIntervalMs` | `300000` | 轮询间隔（最小 10s） |
-| `stateFilePath` | `.dsh-gitlab-mr-state.json` | 登记/游标持久化文件（相对 `$DSH_HOME`） |
-| `perPage` | `100` | 单次拉取评论数 |
+| `tokenEnv` | `GITLAB_TOKEN` | token source |
+| `apiBase` | `https://gitlab.com/api/v4` | change the domain for self-hosted |
+| `botUsername` | — (required) | loopback filter: comments authored by it are not delivered |
+| `pollIntervalMs` | `300000` | poll interval (minimum 10s) |
+| `stateFilePath` | `.dsh-gitlab-mr-state.json` | registration/cursor persistence file (relative to `$DSH_HOME`) |
+| `perPage` | `100` | comments fetched per request |
 
-## 6. 语义与限制
+## 6. Semantics and limits
 
-- **只追踪登记过的 MR**：不再扫描项目的 opened MR 全集，避免打扰无关 MR、也避免误投他人 MR 到你的会话。
-- **登记时设水位线**：首次登记只记「当前最新 comment id」，历史评论不回放。
-- **回环防抖**：`botUsername` 评论与 `system` 笔记不投递，但水位线仍推进，防重复触发。
-- **合并/关闭即停**：`merged`/`closed` 时从追踪移除，`merged` 额外注入一条「沉淀」消息。
-- **会话未运行则保留**：绑定会话不在线时跳过投递、不推进游标、不移除登记，恢复后下轮补投。
-- **单机 state 文件**：游标是进程内 JSON，适合内网单实例；多副本需换共享存储。
-- **加载约束**：本地 `.mjs` 是 bare plugin，若 `verify-cordis-config` 报未声明依赖，把它纳入你 profile 的 resolver manifest `dependencies`，或用自己的 bundle 包一层后按名字引用。
+- **Only registered MRs are tracked**: never scan the project's full opened-MR set, avoiding disturbing unrelated MRs and mis-delivering someone else's MR to your session.
+- **Watermark set at registration**: first registration only records the "current latest comment id"; historical comments are not replayed.
+- **Loopback debounce**: comments by `botUsername` and `system` notes are not delivered, but the watermark still advances to prevent duplicate triggers.
+- **Merged/closed means stop**: on `merged`/`closed` it is removed from tracking; `merged` additionally injects a "distillation" message.
+- **Kept when the session is not running**: when the bound session is offline, skip delivery, do not advance the cursor, and do not remove the registration; deliver on the next cycle after recovery.
+- **Single-machine state file**: the cursor is in-process JSON, suitable for a single intranet instance; multiple replicas need shared storage.
+- **Loading constraint**: the local `.mjs` is a bare plugin; if `verify-cordis-config` reports an undeclared dependency, add it to your profile's resolver manifest `dependencies`, or wrap it in your own bundle and reference it by name.
 
-## 7. 快速验证
+## 7. Quick verification
 
-1. 启动 DSH，日志出现 `[gitlab-mr] 启动 …`。
-2. 让 agent 用一个仓库跑通「建分支→提交→`glab mr create`」，然后调用 `gitlab_watch_mr`。
-3. 在 GitLab 用非 bot 账号给这个 MR 发一条评论。
-4. 等一个轮询周期（≤5 分钟），agent 会话应收到 `【GitLab MR 评论】…` 并被唤醒；合并该 MR 后收到 `【GitLab MR 合并】…` 并被唤醒做沉淀。
+1. Start DSH; the log shows `[gitlab-mr] started …`.
+2. Have the agent run "create branch → commit → `glab mr create`" on a repository, then call `gitlab_watch_mr`.
+3. Post a comment on the MR from a non-bot GitLab account.
+4. After one poll cycle (≤5 minutes), the agent session should receive `【GitLab MR comment】…` and be woken; after merging the MR it receives `【GitLab MR merged】…` and is woken for distillation.

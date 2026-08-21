@@ -1,5 +1,7 @@
 # setup-dsh — one-click local environment bootstrap
 
+English | [中文](README.zh.md)
+
 Reproduces the configuration this checkout relies on but does not ship: the
 harness home under `~/.dsh` (settings, credentials, the `web` profile) and the
 [TencentDB-Agent-Memory](https://github.com/frendyxzc/TencentDB-Agent-Memory)

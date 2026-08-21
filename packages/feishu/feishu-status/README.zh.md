@@ -6,7 +6,7 @@
 
 视图携带有效连接状态（`unavailable`、`unconfigured`、`connected` 或 `error`）、选定提供方 id、选定提供方自己的显示安全状态报告（`FeishuProviderStatus`），以及 seam 无法选择提供方时的选择失败说明。提供方在视图过线前对标识性值做脱敏并把密钥降为布尔值；本包不自行脱敏。其公开载荷类型位于 `./types` 下，Typert 生成的宿主与客户端 Remote 工件由 `./typert` 与 `./remote` 暴露。
 
-该服务仅 Remote，故意不声明同进程 Cordis `Context` 合并。客户端包通过显式的 [`api-remotes`](../../api/remotes/README.md) 装配消费它，而不是直接导入宿主实现。
+该服务仅 Remote，故意不声明同进程 Cordis `Context` 合并。客户端包通过显式的 [`api-remotes`](../../api/remotes/README.zh.md) 装配消费它，而不是直接导入宿主实现。
 
 ## 模型体验
 

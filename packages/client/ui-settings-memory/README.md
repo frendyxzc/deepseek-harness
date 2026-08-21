@@ -1,5 +1,7 @@
 # @deepseek-ai/dsh-client-ui-settings-memory
 
+English | [中文](README.zh.md)
+
 Browser half of the Memory panel settings section: a single nav entry on the
 settings surface (owned by `ui-settings-general`) that links out to the running
 TencentDB-Agent-Memory (Memory Hub) panel.

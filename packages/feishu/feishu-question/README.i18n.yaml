@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/feishu-question/README.md
 README.md: 47a1f2a4989cf3be010a87257e67c5972b6d5b6d
-README.zh.md: 2ca65e54779a9ec0e61004fdde895d4c41ca681e
+README.zh.md: 22ab6ab96172d827457df32c8df74436e3842f9e

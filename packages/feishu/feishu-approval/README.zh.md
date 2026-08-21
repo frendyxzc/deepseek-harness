@@ -6,7 +6,7 @@ DeepSeek Harness 的飞书审批卡片应答器。通过所属聊天中的交互
 
 ## 用途
 
-为每个绑定到某个飞书聊天的 agent 应答 `approval/request` waterfall——包括 [`dsh-feishu-receive`](../feishu-receive/README.md) 通过 `feishu/chat-agent` 事件通告的每聊天 agent，以及其后代 subagent（在 `agent/created` 时通过其会话的 `parentSession` 链绑定）。当被拥有 agent 的工具调用需要审批时，插件向所属聊天发送一张交互卡片：工具名、提问方的理由（上限 2000 字符），以及 **Allow once** / **Deny** 按钮。每个按钮携带一个在构建卡片时铸造的一次性 nonce；点击会先对照该 nonce 自身的记录——按钮动作、session id 与聊天——校验**之后**才消费，因此伪造的 value、被篡改的 session、来自其他聊天的点击或重放的 nonce 都会被拒绝且不消耗该 nonce。一次有效的 Allow 点击把审批解析为 `allowed-once`；其余一切均 fail-closed：Deny 点击解析为 `rejected`，无人应答的卡片在 `timeoutMs` 后解析为 `rejected`，被撤销的 turn 解析为 `cancelled`，插件被处置时把所有挂起卡片以 `cancelled` 撤销。当卡片完全无法送达时，该请求会委托给下一个已组合的应答器，而不是在这里失败。每次解析都会通过 seam 的 `updateMessage` 尽力把卡片重绘为结果；插件先于任何兜底应答器被咨询（以 `prepend: true` 注册），同时把它不拥有的每个请求经 `next()` 委托出去。
+为每个绑定到某个飞书聊天的 agent 应答 `approval/request` waterfall——包括 [`dsh-feishu-receive`](../feishu-receive/README.zh.md) 通过 `feishu/chat-agent` 事件通告的每聊天 agent，以及其后代 subagent（在 `agent/created` 时通过其会话的 `parentSession` 链绑定）。当被拥有 agent 的工具调用需要审批时，插件向所属聊天发送一张交互卡片：工具名、提问方的理由（上限 2000 字符），以及 **Allow once** / **Deny** 按钮。每个按钮携带一个在构建卡片时铸造的一次性 nonce；点击会先对照该 nonce 自身的记录——按钮动作、session id 与聊天——校验**之后**才消费，因此伪造的 value、被篡改的 session、来自其他聊天的点击或重放的 nonce 都会被拒绝且不消耗该 nonce。一次有效的 Allow 点击把审批解析为 `allowed-once`；其余一切均 fail-closed：Deny 点击解析为 `rejected`，无人应答的卡片在 `timeoutMs` 后解析为 `rejected`，被撤销的 turn 解析为 `cancelled`，插件被处置时把所有挂起卡片以 `cancelled` 撤销。当卡片完全无法送达时，该请求会委托给下一个已组合的应答器，而不是在这里失败。每次解析都会通过 seam 的 `updateMessage` 尽力把卡片重绘为结果；插件先于任何兜底应答器被咨询（以 `prepend: true` 注册），同时把它不拥有的每个请求经 `next()` 委托出去。
 
 卡片点击通道在已注册的飞书提供方上打开。同级插件是并发加载的，因此当尚无可用提供方注册时，插件会等待 `feishu/provider-added`，届时再打开通道；已注册但无法接收卡片动作的提供方会使其注册响亮失败——没有点击通道就无法应答。
 
