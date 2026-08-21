@@ -11,26 +11,16 @@ import {
   resolveClientBuildEnvironment,
   writeClientBuildRecord,
 } from './client-build-environment.ts'
+import { pnpmInvocation } from './pnpm-invocation.ts'
 
 /** Run one package script through the package manager that invoked this build. */
 function runScript(script: string, environment: NodeJS.ProcessEnv): void {
-  const packageManager = process.env.npm_execpath
-  if (packageManager === undefined || packageManager === '') {
-    throw new Error('build: npm_execpath is unavailable; invoke the build through a package script')
-  }
-  // npm and the standalone pnpm distribution put a JavaScript entrypoint in
-  // npm_execpath; the pnpm exe distribution puts a native binary there, which
-  // must run directly instead of through the current Node process.
-  const entrypointIsJavaScript = /\.(?:c|m)?js$/.test(packageManager)
-  const result = spawnSync(
-    entrypointIsJavaScript ? process.execPath : packageManager,
-    entrypointIsJavaScript ? [packageManager, 'run', script] : ['run', script],
-    {
-      cwd: resolve(import.meta.dirname, '..'),
-      env: environment,
-      stdio: 'inherit',
-    },
-  )
+  const invocation = pnpmInvocation(['run', script], environment)
+  const result = spawnSync(invocation.command, invocation.args, {
+    cwd: resolve(import.meta.dirname, '..'),
+    env: environment,
+    stdio: 'inherit',
+  })
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) {
     throw new Error(`build: ${script} exited with ${String(result.status ?? result.signal)}`)

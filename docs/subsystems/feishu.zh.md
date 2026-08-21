@@ -2,7 +2,7 @@
 
 [English](feishu.md) | 中文
 
-飞书（Feishu/Lark）聊天能力 seam——一个同时跨越**发送与接收**、共用同一个 `ctx.feishu` 服务的[能力 seam](../../.agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md)，拆分为多个包：服务定义（[dsh-feishu](../../packages/feishu/feishu)，`ctx.feishu` + 提供方注册表）、服务提供方（[dsh-feishu-bot](../../packages/feishu/feishu-bot)，飞书开放平台 Bot 提供方）以及消费方（[dsh-tool-feishu](../../packages/feishu/tool-feishu)，`feishu_send_message` 与 `feishu_update_message` 工具；[dsh-feishu-receive](../../packages/feishu/feishu-receive)，按聊天路由的接收消费方；[dsh-feishu-approval](../../packages/feishu/feishu-approval)，审批卡片应答器；[dsh-feishu-question](../../packages/feishu/feishu-question)，问题卡片应答器）。飞书是**一个可选能力**，不属于 agent-loop 主干——因此其词汇表在这里，而非 [core.md](core.md)。更换提供方不会改变模型请求发送消息的方式。
+飞书（Feishu/Lark）聊天能力 seam——一个同时跨越**发送与接收**、共用同一个 `ctx.feishu` 服务的[能力 seam](../../.agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.zh.md)，拆分为多个包：服务定义（[dsh-feishu](../../packages/feishu/feishu)，`ctx.feishu` + 提供方注册表）、服务提供方（[dsh-feishu-bot](../../packages/feishu/feishu-bot)，飞书开放平台 Bot 提供方）以及消费方（[dsh-tool-feishu](../../packages/feishu/tool-feishu)，`feishu_send_message` 与 `feishu_update_message` 工具；[dsh-feishu-receive](../../packages/feishu/feishu-receive)，按聊天路由的接收消费方；[dsh-feishu-approval](../../packages/feishu/feishu-approval)，审批卡片应答器；[dsh-feishu-question](../../packages/feishu/feishu-question)，问题卡片应答器）。飞书是**一个可选能力**，不属于 agent-loop 主干——因此其词汇表在这里，而非 [core.md](core.zh.md)。更换提供方不会改变模型请求发送消息的方式。
 
 来源：[`packages/feishu/feishu/src/types.ts`](../../packages/feishu/feishu/src/types.ts)
 
@@ -108,7 +108,7 @@ interface FeishuCardActionEvent {
 
 ## 错误
 
-`FeishuError extends HarnessError`（[core.md](core.md) 错误分类），带 `code: string`（开放，如同其他所有 seam 的错误——`LlmError`、`SubagentError`），而非封闭联合：提供方可以在不改动 `dsh-feishu` 的情况下抛出自己的 code，消费方必须容忍未知 code。seam 中立的 code 由共享的 `FeishuRuntime` 契约抛出：`FEISHU_PROVIDER_UNAVAILABLE`、`FEISHU_PROVIDER_CONFIGURED_MISSING`、`FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`、`FEISHU_PROVIDER_AMBIGUOUS`、`FEISHU_DUPLICATE_PROVIDER`（注册期的编程错误）、`FEISHU_RECEIVE_UNSUPPORTED`（消息或卡片动作接收）、`FEISHU_UPDATE_UNSUPPORTED` 以及 `FEISHU_PROVIDER_ERROR`（提供方自身失败经 seam 浮现时的兜底）。由 `dsh-feishu-bot` 抛出的提供方 code 包括 `FEISHU_PROVIDER_AUTH_FAILED`、`FEISHU_PROVIDER_CREDENTIAL_MISSING` 和 `FEISHU_ABORTED`。
+`FeishuError extends HarnessError`（[core.md](core.zh.md) 错误分类），带 `code: string`（开放，如同其他所有 seam 的错误——`LlmError`、`SubagentError`），而非封闭联合：提供方可以在不改动 `dsh-feishu` 的情况下抛出自己的 code，消费方必须容忍未知 code。seam 中立的 code 由共享的 `FeishuRuntime` 契约抛出：`FEISHU_PROVIDER_UNAVAILABLE`、`FEISHU_PROVIDER_CONFIGURED_MISSING`、`FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`、`FEISHU_PROVIDER_AMBIGUOUS`、`FEISHU_DUPLICATE_PROVIDER`（注册期的编程错误）、`FEISHU_RECEIVE_UNSUPPORTED`（消息或卡片动作接收）、`FEISHU_UPDATE_UNSUPPORTED` 以及 `FEISHU_PROVIDER_ERROR`（提供方自身失败经 seam 浮现时的兜底）。由 `dsh-feishu-bot` 抛出的提供方 code 包括 `FEISHU_PROVIDER_AUTH_FAILED`、`FEISHU_PROVIDER_CREDENTIAL_MISSING` 和 `FEISHU_ABORTED`。
 
 ## 服务
 
@@ -120,7 +120,7 @@ interface FeishuCardActionEvent {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxfeishu--feishuruntime"></a>
 
@@ -203,7 +203,7 @@ async updateMessage(messageId: string, content: string, signal?: AbortSignal): P
 async describeStatus(): Promise<FeishuRuntimeStatus>
 ```
 
-Source: [`packages/feishu/feishu/src/index.ts:94`](../../packages/feishu/feishu/src/index.ts)
+Source: [`packages/feishu/feishu/src/index.ts`](../../packages/feishu/feishu/src/index.ts)
 
 <a id="feishu-events"></a>
 
@@ -230,9 +230,9 @@ A per-chat agent was published for one Feishu chat: the routing pin is live and 
 'feishu/chat-agent'(payload: { agent: Agent; chatId: string }): void
 ```
 
-Types: [Agent](core.md)
+Types: [Agent](core.zh.md)
 
-Source: [`packages/feishu/feishu-receive/src/index.ts:41`](../../packages/feishu/feishu-receive/src/index.ts)
+Source: [`packages/feishu/feishu-receive/src/index.ts`](../../packages/feishu/feishu-receive/src/index.ts)
 
 <a id="feishuprovider-added--emit"></a>
 
@@ -251,7 +251,7 @@ A Feishu provider was registered with `ctx.feishu.registerProvider`. Load-time c
 'feishu/provider-added'(provider: FeishuProvider): void
 ```
 
-Source: [`packages/feishu/feishu/src/index.ts:55`](../../packages/feishu/feishu/src/index.ts)
+Source: [`packages/feishu/feishu/src/index.ts`](../../packages/feishu/feishu/src/index.ts)
 
 <a id="feishuprovider-removed--emit"></a>
 
@@ -268,5 +268,5 @@ A Feishu provider left the registry (its registering fiber unloaded).
 'feishu/provider-removed'(id: string): void
 ```
 
-Source: [`packages/feishu/feishu/src/index.ts:61`](../../packages/feishu/feishu/src/index.ts)
+Source: [`packages/feishu/feishu/src/index.ts`](../../packages/feishu/feishu/src/index.ts)
 <!-- END GENERATED cordis-surface -->

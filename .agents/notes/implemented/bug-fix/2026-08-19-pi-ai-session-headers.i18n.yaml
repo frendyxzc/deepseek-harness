@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-pi-ai-session-headers.md
 2026-08-19-pi-ai-session-headers.md: af8c5ee76b33a3cb73f954009b86b12735ccb6ac
-2026-08-19-pi-ai-session-headers.zh.md: 0510e26b11672ea4b2106d567a3d7607dc51a689
+2026-08-19-pi-ai-session-headers.zh.md: a7fb8fbe1545cfcaa2d088d71ab1b5b96006e58f

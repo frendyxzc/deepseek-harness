@@ -2,11 +2,11 @@
 
 Status: implemented
 
-中文 | [English](2026-08-19-pi-ai-session-headers.md)
+[English](2026-08-19-pi-ai-session-headers.md) | 中文
 
 ## Problem
 
-`dsh-llm-deepseek` 会给每个请求附加 `x-deepseek-harness-user-id`、`x-deepseek-harness-session-id`，压缩请求再附加 `x-deepseek-harness-compact`，从而让反向代理把请求绑定到其 DSH 会话并注入上下文。`dsh-llm-pi-ai` 一个都没发：`options.sessionId` 只被传进了 pi-ai 自家的 provider 选项，请求只带了 `user-agent` 归属头。因此，一套 dsh 请求代理（例如 TencentDB-Agent-Memory 的 MemoryProxy）会把 pi-ai 流量看成"无会话头"，无法绑定会话——凡是由 pi-ai 路由提供的模型，选择器拦截、上下文注入、L0 回写全被跳过。这些头的语义与隐私边界由 [DeepSeek 请求身份决策](../feature/2026-08-11-deepseek-request-user-id-header.md) 管辖；"归属头 vs 请求身份" 的划分由 [强制请求归属决策](../architecture/2026-06-21-mandatory-app-attribution-headers.md) 管辖。
+`dsh-llm-deepseek` 会给每个请求附加 `x-deepseek-harness-user-id`、`x-deepseek-harness-session-id`，压缩请求再附加 `x-deepseek-harness-compact`，从而让反向代理把请求绑定到其 DSH 会话并注入上下文。`dsh-llm-pi-ai` 一个都没发：`options.sessionId` 只被传进了 pi-ai 自家的 provider 选项，请求只带了 `user-agent` 归属头。因此，一套 dsh 请求代理（例如 TencentDB-Agent-Memory 的 MemoryProxy）会把 pi-ai 流量看成"无会话头"，无法绑定会话——凡是由 pi-ai 路由提供的模型，选择器拦截、上下文注入、L0 回写全被跳过。这些头的语义与隐私边界由 [DeepSeek 请求身份决策](../feature/2026-08-11-deepseek-request-user-id-header.zh.md) 管辖；"归属头 vs 请求身份" 的划分由 [强制请求归属决策](../architecture/2026-06-21-mandatory-app-attribution-headers.zh.md) 管辖。
 
 ## Decision
 
