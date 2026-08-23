@@ -104,11 +104,18 @@ export class FeishuRuntime extends Service {
   })
 
   private providers = new Map<string, FeishuProvider>()
+  /** Last provider that delivered each chat id, so replies route back through the same app. */
+  private readonly chatProvider = new Map<string, string>()
   private readonly providerId: string | undefined
 
   constructor(ctx: Context, config: FeishuRuntimeConfig = {}) {
     super(ctx, 'feishu')
     this.providerId = config.provider ?? process.env.DSH_FEISHU_PROVIDER
+  }
+
+  /** Every registered provider, in registration order. */
+  listProviders(): readonly FeishuProvider[] {
+    return [...this.providers.values()]
   }
 
   /**
@@ -152,7 +159,7 @@ export class FeishuRuntime extends Service {
    * @returns the provider's send result.
    */
   async sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult> {
-    const provider = this.resolveProvider()
+    const provider = this.routeProvider(request)
     return provider.sendMessage(request, signal)
   }
 
@@ -174,6 +181,42 @@ export class FeishuRuntime extends Service {
       )
     }
     return provider.startReceiving(handler)
+  }
+
+  /**
+   * Start receiving from every registered provider that can receive. Each
+   * inbound event is stamped with its provider id and recorded against its chat
+   * id, so a reply to that chat routes back through the same app. Returns a
+   * combined disposer that closes every opened channel.
+   * @param handler - the callback for each received {@link FeishuReceiveEvent}.
+   * @returns a disposer that stops every channel this call opened.
+   */
+  startReceivingAll(handler: FeishuReceiveHandler): () => void {
+    const usable = [...this.providers.values()].filter(provider => provider.available())
+    const receivables = usable.filter(
+      (provider): provider is FeishuProvider & { startReceiving: NonNullable<FeishuProvider['startReceiving']> } =>
+        provider.startReceiving !== undefined,
+    )
+    const [unusable] = usable
+    if (unusable !== undefined && receivables.length === 0) {
+      throw new FeishuError(
+        `Feishu provider "${unusable.id}" does not support receiving messages`,
+        'FEISHU_RECEIVE_UNSUPPORTED',
+      )
+    }
+    const disposers: Array<() => void> = []
+    for (const provider of receivables) {
+      const dispose = provider.startReceiving((event) => {
+        if (event.providerId !== undefined && event.chatId.length > 0) {
+          this.chatProvider.set(event.chatId, event.providerId)
+        }
+        handler(event)
+      })
+      disposers.push(dispose)
+    }
+    return () => {
+      for (const dispose of disposers) dispose()
+    }
   }
 
   /**
@@ -279,6 +322,25 @@ export class FeishuRuntime extends Service {
       providers: this.providers,
       ...this.providerId !== undefined ? { configuredId: this.providerId } : {},
     })
+  }
+
+  /**
+   * Resolve the provider for one send: an explicit request provider id first,
+   * then the provider that last delivered the target chat, then the seam's
+   * default selection rules.
+   * @param request - the send request carrying the optional route hint.
+   * @returns the provider the send must use.
+   */
+  private routeProvider(request: FeishuSendRequest): FeishuProvider {
+    const id = request.providerId ?? this.chatProvider.get(request.receiveId)
+    if (id !== undefined) {
+      const provider = this.providers.get(id)
+      if (provider === undefined) {
+        throw new FeishuError(`Feishu provider "${id}" is not registered`, 'FEISHU_PROVIDER_CONFIGURED_MISSING')
+      }
+      return provider
+    }
+    return this.resolveProvider()
   }
 }
 

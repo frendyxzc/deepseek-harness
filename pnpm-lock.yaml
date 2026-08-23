@@ -902,6 +902,9 @@ importers:
       '@deepseek-ai/dsh-settings':
         specifier: workspace:^
         version: link:../../settings/settings
+      '@deepseek-ai/dsh-tdai-memory':
+        specifier: workspace:^
+        version: link:../../llm/tdai-memory
       '@deepseek-ai/dsh-typert-registry':
         specifier: workspace:^
         version: link:../../typert/registry
@@ -1156,6 +1159,9 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tdai-memory':
+        specifier: workspace:^
+        version: link:../../llm/tdai-memory
       '@deepseek-ai/dsh-token-meter':
         specifier: workspace:^
         version: link:../../llm/token-meter
@@ -2642,6 +2648,10 @@ importers:
         version: 18.3.1
 
   packages/client/ui-settings-im:
+    dependencies:
+      clsx:
+        specifier: ^2.0.0
+        version: 2.1.1
     devDependencies:
       '@deepseek-ai/cordis':
         specifier: workspace:^
@@ -2688,6 +2698,9 @@ importers:
       '@deepseek-ai/cordis':
         specifier: workspace:^
         version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-api-remotes':
+        specifier: workspace:^
+        version: link:../../api/remotes
       '@deepseek-ai/dsh-client-locale':
         specifier: workspace:^
         version: link:../locale
@@ -4591,6 +4604,9 @@ importers:
       '@deepseek-ai/dsh-launch-environment':
         specifier: workspace:^
         version: link:../../util/launch-environment
+      '@deepseek-ai/dsh-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
 
   packages/feishu/feishu-question:
     dependencies:
@@ -4650,6 +4666,9 @@ importers:
       '@deepseek-ai/dsh-system-prompt':
         specifier: workspace:^
         version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tdai-memory':
+        specifier: workspace:^
+        version: link:../../llm/tdai-memory
 
   packages/feishu/feishu-status:
     dependencies:
@@ -5741,6 +5760,9 @@ importers:
 
   packages/llm/llm-deepseek:
     dependencies:
+      '@deepseek-ai/dsh-tdai-memory':
+        specifier: workspace:^
+        version: link:../tdai-memory
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -5787,6 +5809,9 @@ importers:
 
   packages/llm/llm-pi-ai:
     dependencies:
+      '@deepseek-ai/dsh-tdai-memory':
+        specifier: workspace:^
+        version: link:../tdai-memory
       '@deepseek-ai/schemastery':
         specifier: link:../../../vendor/schemastery
         version: link:../../../vendor/schemastery
@@ -5882,6 +5907,34 @@ importers:
       '@deepseek-ai/dsh-tools':
         specifier: workspace:^
         version: link:../../core/tools
+
+  packages/llm/tdai-memory:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:^
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-credentials':
+        specifier: workspace:^
+        version: link:../../credentials/credentials
+      '@deepseek-ai/dsh-feishu-bot':
+        specifier: workspace:^
+        version: link:../../feishu/feishu-bot
+      '@deepseek-ai/dsh-invariants':
+        specifier: workspace:^
+        version: link:../../runtime-diagnostics/invariants
+      '@deepseek-ai/dsh-settings':
+        specifier: workspace:^
+        version: link:../../settings/settings
+      '@deepseek-ai/dsh-typert-protocol':
+        specifier: workspace:^
+        version: link:../../typert/protocol
 
   packages/llm/token-meter:
     dependencies:

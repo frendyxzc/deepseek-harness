@@ -1,0 +1,142 @@
+/* Multi-bot configuration card, styled after the pluggable-plugin item cards. */
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--dsw-border, #e5e6eb);
+  border-radius: 0.5rem;
+  background: var(--dsw-surface, #fff);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.headText {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.description {
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+
+.pending {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.chevron {
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.chevronOpen {
+  transform: rotate(180deg);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0 1rem 1rem;
+}
+
+.readOnly,
+.catalogHint,
+.empty {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bot {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--dsw-border, #e5e6eb);
+  border-radius: 0.4rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  min-height: 1.2em;
+}
+
+.label {
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.add {
+  align-self: flex-start;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.failed {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--dsw-danger, #d4380d);
+}
+
+.remove {
+  flex: none;
+}
+
+.statusDot {
+  align-self: center;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.state {
+  margin: 0;
+}

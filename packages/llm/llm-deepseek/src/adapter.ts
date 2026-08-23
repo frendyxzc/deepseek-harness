@@ -124,6 +124,8 @@ export interface DeepSeekAdapterOptions {
   resolveAttachments?: () => AttachmentStore | undefined
   /** Resolve the process-wide upload reuse store. */
   resolveFiles?: () => DeepSeekFileStore
+  /** Resolve the optional TDAI memory identity headers (`x-team-id` / `x-agent-id` / `x-task-id`). */
+  resolveTdaiHeaders?: (sessionId?: string) => Record<string, string>
 }
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
@@ -523,6 +525,7 @@ export class DeepSeekAdapter extends LlmAdapter {
       'accept': 'text/event-stream',
       ...attributionHeaders(),
       'x-deepseek-harness-user-id': String(userId),
+      ...this.config.resolveTdaiHeaders?.(options.sessionId) ?? {},
       ...options.sessionId !== undefined
         ? { 'x-deepseek-harness-session-id': String(options.sessionId) }
         : {},

@@ -20,6 +20,24 @@
 
 `setup-one.sh` 从配置文件读取 `DSH_*` 值（默认 `~/.dsh/setup-dsh.env`，可用 `--env` 或 `$DSH_SETUP_ENV_FILE` 覆盖），导出后运行 `setup.sh --non-interactive`：无提示，缺失的必需密钥会大声报错。填好的模板在 `scripts/setup-dsh/setup.env.example`——复制到 `~/.dsh/setup-dsh.env`（`chmod 600`），填入各值，并让它不进 git。
 
+## Upgrading an existing deployment
+
+拉取了会改变插件图的新 checkout（例如新增了某个 bundle 依赖，如 per-bot 的 TDAI 记忆身份）之后，无需重新运行完整、且带有破坏性的引导流程，就地迁移即可：
+
+```sh
+./scripts/setup-dsh/setup.sh --upgrade
+```
+
+`--upgrade` 是非破坏性的、可安全重复运行：它从不提示或重新生成密钥，从不覆盖已生成文件，也绝不隐含 `--force`。它做三件事：
+
+1. **迁移 profile 的 `feishu-bot` 补丁** —— 追加一条幂等的 config-override（以 marker 注释为键，重跑即 no-op），把扁平单应用条目换成 `bots` + `credentials` 分离，使 Settings → Plugins → IM 选项卡能按 bot 映射 team/agent。扁平部署在本次运行前仍能正常工作（扁平字段保持向后兼容）；密钥仍留在 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
+2. **修复缺失的 MemoryProxy 绑定** —— 校验 `better-sqlite3` 可加载，缺失时重装（缺失绑定会让代理存储静默降级 `sqlite -> fs -> memory`，并使 memory bridge 返回 `40101`）。
+3. **刷新并重建** —— 在 checkout 里运行 `pnpm install` + `pnpm run build`（链接新增的工作区包，并重建 host libs、client bundles 与 Web 前端），随后在 profile 里运行 `pnpm install`。
+
+之后重启：`./scripts/setup-dsh/start-all.sh` 是幂等的，或仅重启 Web UI 用 `pnpm dsh web --host 0.0.0.0 --port 3080`。
+
+> `setup.sh --force` 不是升级路径：它会重写已生成文件，并且过去可能铸造新的 `PROXY_USER_KEY`，悄悄破坏 MemoryCore 的 admin 绑定。`--force` 保留给从模板全新重部署；`--upgrade` 才是就地路径（而且它始终保留现有 `PROXY_USER_KEY`）。
+
 ## What it writes
 
 | 目标 | 来源 | 密钥？ |

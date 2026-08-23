@@ -23,6 +23,11 @@
 #   --branch REF        TencentDB-Agent-Memory branch (default: feat/server_team)
 #   --skip-memory       do not clone/configure the memory stack
 #   --skip-install      do not run pnpm/npm install in the memory services
+#   --upgrade           migrate an EXISTING deployment in place: append the
+#                       feishu-bot bots/credentials patch, repair a missing
+#                       MemoryProxy native binding, refresh deps + rebuild.
+#                       Never touches secrets or regenerates generated files
+#                       (no --force); safe to re-run.
 #   --force             overwrite existing generated files
 #   --non-interactive   never prompt; fail if a required value is missing
 #   -h, --help          this help
@@ -59,6 +64,7 @@ WORKSPACE="$REPO_ROOT"
 
 SKIP_MEMORY=0
 SKIP_INSTALL=0
+UPGRADE=0
 FORCE=0
 NON_INTERACTIVE=0
 
@@ -79,6 +85,7 @@ while [[ $# -gt 0 ]]; do
     --branch)          MEMORY_BRANCH="$2"; shift 2 ;;
     --skip-memory)     SKIP_MEMORY=1; shift ;;
     --skip-install)    SKIP_INSTALL=1; shift ;;
+    --upgrade)         UPGRADE=1; shift ;;
     --force)           FORCE=1; shift ;;
     --non-interactive) NON_INTERACTIVE=1; shift ;;
     -h|--help)         usage; exit 0 ;;
@@ -156,6 +163,122 @@ write_if_absent() {
   return 0
 }
 
+# ── Upgrade mode (--upgrade): in-place migration of an existing deployment ──
+# Non-destructive by construction: it appends one idempotent patch entry to the
+# profile, repairs a missing MemoryProxy binding, and refreshes/rebuilds the dsh
+# workspace. It never regenerates a secret or overwrites a generated file (no
+# --force), so it is safe to run repeatedly and after every `git pull`.
+
+# ensure_proxy_sqlite <memory-proxy-dir> — verify the better-sqlite3 native
+# binding is loadable and (re)install it when absent. better-sqlite3 is an
+# optionalDependency upstream, so a failed native build is silently skipped by
+# npm while node_modules still exists — the surrounding `! -d node_modules`
+# guard never retries it. Missing, proxy storage degrades sqlite -> fs -> memory
+# (the session->identity binding is dropped and memory-bridge answers 40101).
+ensure_proxy_sqlite() {
+  local dir="$1"
+  if (cd "$dir" && node -e "require('better-sqlite3')" >/dev/null 2>&1); then
+    ok "MemoryProxy better-sqlite3 native binding ready"
+    return 0
+  fi
+  warn "MemoryProxy better-sqlite3 missing — installing explicitly"
+  if ! (cd "$dir" && npm install better-sqlite3 --no-audit --no-fund); then
+    die "MemoryProxy better-sqlite3 install failed — memory-bridge will 40101 without it"
+  fi
+  if (cd "$dir" && node -e "require('better-sqlite3')" >/dev/null 2>&1); then
+    ok "MemoryProxy better-sqlite3 native binding installed"
+  else
+    die "MemoryProxy better-sqlite3 native binding failed to build — check /health storage.effective"
+  fi
+}
+
+# upgrade_feishu_bot_config — migrate a flat single-app `feishu-bot` profile to
+# the multi-bot bots/credentials split by APPENDING a config-override patch entry
+# (the same idempotent pattern §7b uses), never rewrites the insert block. The
+# override is keyed by the marker comment, so a re-run is a no-op; it assumes the
+# setup-generated flat entry (no prior feishu-bot `config`), so a hand-customized
+# feishu-bot config that already carries `bots:`/`credentials:` is left alone.
+upgrade_feishu_bot_config() {
+  local patch="$PROFILE_DIR/cordis.patch.yml"
+  if [[ ! -f "$patch" ]]; then
+    warn "profile patch missing ($patch); run a full ./scripts/setup-dsh/setup.sh first"
+    return 0
+  fi
+  if ! grep -q "id: feishu-bot" "$patch"; then
+    info "feishu-bot is not mounted in $patch; skipping bot-config migration"
+    return 0
+  fi
+  if grep -q "setup-dsh: feishu-bot bots/credentials" "$patch"; then
+    ok "feishu-bot already migrated to bots/credentials; skipping"
+    return 0
+  fi
+  if grep -q "bots:" "$patch" || grep -q "credentials:" "$patch"; then
+    warn "feishu-bot already has bots/credentials config (hand-edited?); leaving it alone"
+    return 0
+  fi
+
+  local app_id="${DSH_FEISHU_APP_ID:-}"
+  if [[ -z "$app_id" ]]; then
+    app_id="$(awk -F'=' '/^[[:space:]]*FEISHU_APP_ID=/{sub(/^[[:space:]]*/,"",$2); print $2; exit}' "$REPO_ROOT/.env" 2>/dev/null || true)"
+  fi
+  die_on_newline app_id
+
+  {
+    printf '\n'
+    printf '# feishu-bot multi-bot config (added by setup.sh --upgrade; setup-dsh: feishu-bot bots/credentials)\n'
+    printf '# Migrates the flat single-app feishu-bot to the bots/credentials split so the\n'
+    printf '# Settings IM tab can map team/agent per bot. Secrets stay in the environment\n'
+    printf '# (FEISHU_APP_ID / FEISHU_APP_SECRET), never in this file.\n'
+    printf -- '- id: feishu-bot\n'
+    printf '  config:\n'
+    printf '    bots:\n'
+    printf '      - id: main\n'
+    if [[ -n "$app_id" ]]; then printf "        appId: '%s'\n" "$app_id"; fi
+    printf '    credentials:\n'
+    printf '      - id: main\n'
+    printf '        appIdEnv: FEISHU_APP_ID\n'
+    printf '        appSecretEnv: FEISHU_APP_SECRET\n'
+  } >> "$patch"
+  ok "feishu-bot bots/credentials config appended -> $patch"
+}
+
+# run_upgrade — the --upgrade body; ends the process on completion.
+run_upgrade() {
+  info "upgrade mode: migrating an existing deployment at $DSH_HOME"
+  mkdir -p "$DSH_HOME"
+
+  PROFILE_DIR="$DSH_HOME/profiles/web"
+  upgrade_feishu_bot_config
+
+  if [[ "$SKIP_MEMORY" != "1" ]]; then
+    local proxy_dir="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryProxy"
+    if [[ -d "$proxy_dir" ]]; then
+      ensure_proxy_sqlite "$proxy_dir"
+    else
+      warn "memory stack not found at $proxy_dir; skipping (run the full setup.sh first)"
+    fi
+  fi
+
+  # Refresh the workspace deps (links the newly-added @deepseek-ai/dsh-tdai-memory
+  # package) and rebuild host libs + client bundles + the Web frontend.
+  (cd "$REPO_ROOT" && pnpm install) || die "pnpm install failed in $REPO_ROOT"
+  (cd "$REPO_ROOT" && pnpm run build) || die "pnpm run build failed in $REPO_ROOT"
+  if [[ -f "$PROFILE_DIR/package.json" ]]; then
+    (cd "$PROFILE_DIR" && pnpm install) || warn "profile pnpm install failed (non-fatal)"
+  fi
+
+  echo
+  ok "upgrade complete."
+  echo
+  echo "Restart to pick up the new code (start-all.sh is idempotent):"
+  echo "  ./scripts/setup-dsh/start-all.sh"
+  echo "or, for just the Web UI:"
+  echo "  cd $REPO_ROOT && pnpm dsh web --host 0.0.0.0 --port 3080"
+  echo
+  exit 0
+}
+if [[ "$UPGRADE" == "1" ]]; then run_upgrade; fi
+
 # ── 1. Harness home ─────────────────────────────────────────────────────────
 info "harness home: $DSH_HOME  ·  workspace: $WORKSPACE"
 mkdir -p "$DSH_HOME"
@@ -169,7 +292,16 @@ if write_if_absent "$DSH_HOME/settings.yaml"; then
 fi
 
 # ── 3. .credentials.yaml ───────────────────────────────────────────────────
-if write_if_absent "$DSH_HOME/.credentials.yaml"; then
+# The proxy user key is a durable identity: MemoryCore's admin user is
+# bootstrapped with it, so once it exists it must never be regenerated — not
+# even under --force — or the proxy stops authenticating the agent. Create it
+# only when absent; otherwise read it back out for the admin bootstrap below.
+if [[ -e "$DSH_HOME/.credentials.yaml" ]]; then
+  ok "keeping existing .credentials.yaml (PROXY_USER_KEY preserved)"
+  if [[ -z "${PROXY_USER_KEY:-}" ]]; then
+    PROXY_USER_KEY="$(awk '/^[[:space:]]*PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
+  fi
+else
   PROXY_USER_KEY="$(ask_secret_opt DSH_PROXY_USER_KEY 'Memory proxy user_key (sk-mem-..., empty to generate random)')"
   if [[ -z "$PROXY_USER_KEY" ]]; then
     PROXY_USER_KEY="sk-mem-$(openssl rand -hex 16)"
@@ -203,9 +335,12 @@ if write_if_absent "$PROFILE_DIR/pnpm-workspace.yaml"; then
 fi
 if write_if_absent "$PROFILE_DIR/cordis.patch.yml"; then
   FALLBACK_CHAT_ID="$(ask_opt DSH_FEISHU_FALLBACK_CHAT_ID 'Feishu fallback chat id (approval cards; empty to skip)' '')"
+  FEISHU_APP_ID="$(ask_opt DSH_FEISHU_APP_ID 'FEISHU_APP_ID (empty to skip)' '')"
   die_on_newline WORKSPACE
   die_on_newline FALLBACK_CHAT_ID
+  die_on_newline FEISHU_APP_ID
   sed -e "s|__WORKSPACE__|$WORKSPACE|g" \
+      -e "s|__FEISHU_APP_ID__|$FEISHU_APP_ID|g" \
       -e "s|__FALLBACK_CHAT_ID__|$FALLBACK_CHAT_ID|g" \
       "$TEMPLATES/profile-web/cordis.patch.yml" > "$PROFILE_DIR/cordis.patch.yml"
   ok "profile cordis.patch.yml -> $PROFILE_DIR/cordis.patch.yml"
@@ -398,6 +533,10 @@ EOF
       info "install MemoryProxy deps (npm)"
       (cd "$MEMORY_ROOT/MemoryProxy" && npm install --no-audit --no-fund)
     fi
+    # better-sqlite3 is MemoryProxy's sqlite storage backend; when it is missing
+    # the proxy silently degrades sqlite -> fs -> memory and memory-bridge answers
+    # 40101, so verify-and-repair it on every run (see ensure_proxy_sqlite).
+    ensure_proxy_sqlite "$MEMORY_ROOT/MemoryProxy"
     for svc in MemoryCore MemoryPanel MemoryKnowledge; do
       if [[ ! -d "$MEMORY_ROOT/$svc/node_modules" || "$FORCE" == "1" ]]; then
         info "install $svc deps (pnpm)"
@@ -430,8 +569,8 @@ EOF
   if [[ -f "$MEMORY_DB" ]]; then
     ADMIN_EXISTS=$(sqlite3 "$MEMORY_DB" "SELECT COUNT(*) FROM meta_users WHERE user_type='system_admin';" 2>/dev/null || echo 0)
     if [[ "$ADMIN_EXISTS" == "0" ]]; then
-      # PROXY_USER_KEY is set in §3 only when .credentials.yaml was freshly
-      # generated; if the file already existed, read the key from it.
+      # §3 always leaves PROXY_USER_KEY set (existing file read back or freshly
+      # generated); re-read defensively in case the file changed since then.
       if [[ -z "${PROXY_USER_KEY:-}" ]]; then
         PROXY_USER_KEY="$(awk '/^[[:space:]]*PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
       fi

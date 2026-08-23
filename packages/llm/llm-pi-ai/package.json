@@ -44,7 +44,8 @@
   },
   "dependencies": {
     "@earendil-works/pi-ai": "^0.82.1",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-tdai-memory": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-attachment": "workspace:^",

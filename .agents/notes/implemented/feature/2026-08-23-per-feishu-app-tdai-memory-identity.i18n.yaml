@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-per-feishu-app-tdai-memory-identity.md
+2026-08-23-per-feishu-app-tdai-memory-identity.md: e953b1b0a9fd5fbf12cfd4a16ac375377e1ee538
+2026-08-23-per-feishu-app-tdai-memory-identity.zh.md: 19f32efa1fafc0b88d4e9c07e77cdbb0d8733ac4

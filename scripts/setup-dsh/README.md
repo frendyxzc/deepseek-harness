@@ -32,6 +32,43 @@ secrets fail loudly. A filled-in template lives at
 `scripts/setup-dsh/setup.env.example` — copy it to `~/.dsh/setup-dsh.env`
 (`chmod 600`), fill the values, and keep it out of git.
 
+## Upgrading an existing deployment
+
+After pulling a checkout that changes the plugin graph (e.g. adds a bundle
+dependency such as the per-bot TDAI memory identity), migrate in place without
+re-running the full, partly-destructive bootstrap:
+
+```sh
+./scripts/setup-dsh/setup.sh --upgrade
+```
+
+`--upgrade` is non-destructive and safe to re-run: it never prompts for or
+regenerates a secret, never overwrites a generated file, and never implies
+`--force`. It does three things:
+
+1. **Migrates the profile's `feishu-bot` patch** — appends one idempotent
+   config-override (keyed by a marker comment, so a re-run is a no-op) that
+   turns the flat single-app entry into the `bots` + `credentials` split, so the
+   Settings → Plugins → IM tab can map team/agent per bot. A flat deployment
+   keeps working until this runs (the flat fields stay backward compatible);
+   secrets stay in `FEISHU_APP_ID` / `FEISHU_APP_SECRET`.
+2. **Repairs a missing MemoryProxy binding** — verifies `better-sqlite3` is
+   loadable and reinstalls it when absent (a missing binding silently degrades
+   proxy storage `sqlite -> fs -> memory` and makes the memory bridge answer
+   `40101`).
+3. **Refreshes and rebuilds** — runs `pnpm install` + `pnpm run build` in the
+   checkout (links the newly added workspace package and rebuilds host libs,
+   client bundles, and the Web frontend), then `pnpm install` in the profile.
+
+Restart afterwards: `./scripts/setup-dsh/start-all.sh` is idempotent, or
+`pnpm dsh web --host 0.0.0.0 --port 3080` for just the Web UI.
+
+> `setup.sh --force` is not an upgrade path: it rewrites generated files and
+> used to be able to mint a new `PROXY_USER_KEY`, silently breaking the
+> MemoryCore admin binding. `--force` stays for a fresh redeploy from templates;
+> `--upgrade` is the in-place path (and it always keeps the existing
+> `PROXY_USER_KEY`).
+
 ## What it writes
 
 | Target | Source | Secret? |

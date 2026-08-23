@@ -95,6 +95,23 @@
     - id: llm-pi-ai
       name: '@deepseek-ai/dsh-llm-pi-ai'
 
+    # Optional TDAI MemoryProxy identity. Provides ctx.tdaiMemory: it reads each
+    # bot's teamId / agentId from the `feishu-bot` settings section (keyed by bot
+    # id), and exposes the TDAI core team/agent catalog as listTeams / listAgents
+    # Remotes. feishu-receive binds each per-chat session to the bot that received
+    # it; the llm-pi-ai and llm-deepseek adapters resolve that binding into
+    # x-team-id / x-agent-id / x-task-id, which the proxy's
+    # sessionInit.headerAutoSelect uses to auto-bind the session instead of
+    # prompting the asset form. The proxy registers directly only when team,
+    # agent, and task all resolve, and a single-agent team otherwise falls into
+    # its bypass path and never writes memory — so the default task is pinned
+    # here to the proxy's own sessionInit.defaultTaskId ("none"), overridable per
+    # deployment.
+    - id: tdai-memory
+      name: '@deepseek-ai/dsh-tdai-memory'
+      config:
+        defaultTaskId: 'none'
+
     - id: session-persistence-jsonl
       name: '@deepseek-ai/dsh-session-persistence-jsonl'
       config:

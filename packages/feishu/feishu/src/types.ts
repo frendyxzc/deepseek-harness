@@ -25,6 +25,8 @@ export interface FeishuSendRequest {
   readonly receiveId: string
   /** The recipient id type; defaults to `open_id` when omitted. */
   readonly receiveIdType?: FeishuReceiveIdType
+  /** Explicit provider id to route through; omitted uses the seam's selection (and per-chat routing). */
+  readonly providerId?: string
   /** Message content as a plain text string. */
   readonly content: string
   /**
@@ -44,6 +46,10 @@ export interface FeishuSendResult {
 export interface FeishuReceiveEvent {
   /** The event type (e.g. `im.message.receive_v1`). */
   readonly eventType: string
+  /** The Feishu App ID that received this event, when the provider knows it. */
+  readonly appId?: string
+  /** The provider registry id that received this event, when the provider knows it. */
+  readonly providerId?: string
   /** The sender's id. */
   readonly senderId: string
   /** The sender id type. */

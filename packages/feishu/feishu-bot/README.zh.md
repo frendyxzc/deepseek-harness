@@ -2,11 +2,11 @@
 
 [English](README.md) | 中文
 
-`ctx.feishu` 的飞书 Bot API 提供方。通过飞书开放平台发送并更新消息，并通过同一条飞书官方长连接客户端接收消息与卡片按钮动作。
+`ctx.feishu` 的飞书 Bot API 提供方。通过飞书开放平台发送并更新消息，并通过每个提供方各自的一条飞书官方长连接客户端接收消息与卡片按钮动作。用平铺凭据字段配置单个应用，或通过 `bots` 配置多个应用——每项注册自己的提供方，使人站群聊能路由回到接收它的应用。
 
 ## 用途
 
-把 `FeishuBotProvider` 以 id `feishu-bot` 注册到 `ctx.feishu`。通过飞书 `/auth/v3/tenant_access_token/internal` 端点鉴权，通过 `/im/v1/messages` 发送消息，通过 `PATCH /im/v1/messages/:message_id` 更新已发送的消息，通过 `GET /im/v1/messages/:message_id` 按 id 读取一条消息，并通过 `@larksuiteoapi/node-sdk` 接收 `im.message.receive_v1` 事件与 `card.action.trigger` 卡片回调。
+为每个已配置应用把一个 `FeishuBotProvider` 注册到 `ctx.feishu`（平铺单应用的 id 为 `feishu-bot`），各自使用自己的 provider id。通过飞书 `/auth/v3/tenant_access_token/internal` 端点鉴权，通过 `/im/v1/messages` 发送消息，通过 `PATCH /im/v1/messages/:message_id` 更新已发送的消息，通过 `GET /im/v1/messages/:message_id` 按 id 读取一条消息，并通过 `@larksuiteoapi/node-sdk` 接收 `im.message.receive_v1` 事件与 `card.action.trigger` 卡片回调。
 
 ## 配置
 
@@ -17,6 +17,12 @@
 | `appIdEnv` | `string` | `FEISHU_APP_ID` | 每次操作解析的凭据引用 |
 | `appSecretEnv` | `string` | `FEISHU_APP_SECRET` | 每次操作解析的凭据引用 |
 | `baseURL` | `string` | `https://open.feishu.cn/open-apis` | 飞书开放平台 base URL |
+| `bots` | `array` | — | bot 应用（设置可编辑）：每项 `{ id, appId?, teamId?, agentId? }` 以一个自己的 `id` 注册一个提供方；非空时取代平铺单应用 |
+| `credentials` | `array` | — | 每个 bot 的秘密（仅组合期）：每项 `{ id, appSecret?, appSecretEnv?, appIdEnv?, baseURL? }` 提供 `bots` 项永不携带的秘密 |
+
+## 多应用
+
+当 `bots` 非空时，每项以一个自己的 `id` 成为一个提供方，平铺的 `appId` / `appSecret` 字段作为回退凭据。秘密刻意放在 `credentials`（仅组合期）而非 `bots`：设置 UI 读取 `bots` 但无法回传被脱敏的 `role('secret')` 值，分开存放意味着编辑 bot 的 `teamId` / `agentId` 绝不会覆盖其秘密。入站事件同时携带解析后的 `appId` 与提供方 `id`，飞书 seam 会把对某群聊的回复路由回接收它的那个提供方。
 
 ## 凭据
 

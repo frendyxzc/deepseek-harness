@@ -61,6 +61,7 @@ import { assertUsableApiKey, LlmError } from '@deepseek-ai/dsh-llm'
 import type { AdapterRegistrationHandle, DirectoryRegistrationHandle, LlmConfigurableProvider } from '@deepseek-ai/dsh-llm'
 import { deepEqualJson, installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { PiAiAdapter } from './adapter.ts'
+import type {} from '@deepseek-ai/dsh-tdai-memory'
 import { authContextFrom, credentialStoreFrom } from './auth.ts'
 import { catalogProviderIds } from './catalog.ts'
 import { assertServiceable, Config, resolveProfiles } from './config.ts'
@@ -197,6 +198,10 @@ export function apply(ctx: Context, config: Config): void {
     resolveApiKey,
     auth,
     resolveAttachments: () => ctx.get('attachments'),
+    resolveTdaiHeaders: (sessionId) => {
+      const tdai = ctx.get('tdaiMemory')
+      return sessionId === undefined || tdai === undefined ? {} : tdai.headersForSession(String(sessionId))
+    },
     onReplayDegrade: ({ provider, model, reason }) => {
       ctx.logger.warn(
         `llm-pi-ai: unusable replay state on assistant history for route "${provider}/${model}";`

@@ -1,7 +1,11 @@
 /**
- * `@deepseek-ai/dsh-feishu-bot`: registers the Feishu Bot API provider with
- * `ctx.feishu`. A function/namespace plugin (NOT a default-export service):
- * it registers INTO the seam's provider registry.
+ * `@deepseek-ai/dsh-feishu-bot`: registers Feishu Bot API provider(s) with
+ * `ctx.feishu`. A function plugin (NOT a default-export service): it registers
+ * INTO the seam's provider registry. Configure a single app with the flat
+ * credential fields, or several apps through `bots` (identity + team/agent,
+ * settings-editable) plus `credentials` (secrets, composition-only, keyed by
+ * bot id) — the split keeps secrets out of the settings UI, which cannot reply
+ * redacted `role('secret')` values and would otherwise overwrite them.
  *
  * @module @deepseek-ai/dsh-feishu-bot
  */
@@ -12,7 +16,8 @@ import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-feishu'
-import { FeishuBotProvider, FEISHU_DEFAULT_BASE_URL } from './provider.ts'
+import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import { FeishuBotProvider, FEISHU_BOT_PROVIDER_ID, FEISHU_DEFAULT_BASE_URL } from './provider.ts'
 import type { FeishuBotProviderOptions } from './provider.ts'
 
 export {
@@ -28,24 +33,72 @@ export const name = 'feishu-bot'
 /** The Feishu seam this provider registers into. */
 export const inject = ['feishu']
 
+/** Settings namespace carrying the per-bot identity/mapping (no secrets). */
+export const FEISHU_BOT_SETTINGS_NAMESPACE = settingsNamespace('feishu-bot')
+
 /** Default env var naming the Feishu App ID. */
 const DEFAULT_APP_ID_ENV = 'FEISHU_APP_ID'
 /** Default env var naming the Feishu App Secret. */
 const DEFAULT_APP_SECRET_ENV = 'FEISHU_APP_SECRET'
 
-/** Plugin config (all optional — `apply` fills env-var and constant defaults). */
-export interface Config {
-  /** Literal Feishu App ID; prefer {@link appIdEnv} so no secret enters configuration files. */
+/** One bot's settings-editable identity and mapping; secrets stay OUT of here. */
+export interface FeishuBotEntry {
+  /** Stable provider id (unique within the seam) used to route replies back to this app. */
+  id: string
+  /** Literal Feishu App ID; when absent, the credential's `appIdEnv` resolves it. */
   appId?: string
+  /** TDAI team id this bot sends as `x-team-id`. */
+  teamId?: string
+  /** TDAI agent id this bot sends as `x-agent-id`. */
+  agentId?: string
+}
+
+/** One bot's secrets and endpoint, composition-only and keyed by {@link FeishuBotEntry.id}. */
+export interface FeishuBotCredential {
+  /** The bot id these credentials belong to. */
+  id: string
   /** Literal Feishu App Secret; prefer {@link appSecretEnv} so no secret enters configuration files. */
   appSecret?: string
-  /** Credential reference resolved for each operation; defaults to `FEISHU_APP_ID`. */
+  /** Credential reference resolving the App ID when the entry has no literal `appId`. */
   appIdEnv?: string
-  /** Credential reference resolved for each operation; defaults to `FEISHU_APP_SECRET`. */
+  /** Credential reference resolving the App Secret; defaults to `FEISHU_APP_SECRET`. */
   appSecretEnv?: string
   /** Feishu Open API base URL. */
   baseURL?: string
 }
+
+/** Plugin config: the flat single app, plus the multi-app `bots` + `credentials`. */
+export interface Config {
+  /** Literal Feishu App ID (flat single app). */
+  appId?: string
+  /** Literal Feishu App Secret (flat single app). */
+  appSecret?: string
+  /** Credential reference for the flat single app's App ID. */
+  appIdEnv?: string
+  /** Credential reference for the flat single app's App Secret. */
+  appSecretEnv?: string
+  /** Feishu Open API base URL (flat single app). */
+  baseURL?: string
+  /** Bot apps; when non-empty these replace the flat single-app fields. */
+  bots?: FeishuBotEntry[]
+  /** Secrets and endpoint per bot; composition-only, no settings exposure. */
+  credentials?: FeishuBotCredential[]
+}
+
+const botEntrySchema: z<FeishuBotEntry> = z.object({
+  id: z.string().required(),
+  appId: z.string(),
+  teamId: z.string(),
+  agentId: z.string(),
+})
+
+const credentialSchema: z<FeishuBotCredential> = z.object({
+  id: z.string().required(),
+  appSecret: z.string().role('secret'),
+  appIdEnv: z.string().role('credential-ref'),
+  appSecretEnv: z.string().role('credential-ref'),
+  baseURL: z.string(),
+})
 
 export const Config: z<Config> = z.object({
   appId: z.string().role('secret'),
@@ -53,24 +106,68 @@ export const Config: z<Config> = z.object({
   appIdEnv: z.string().role('credential-ref').default(DEFAULT_APP_ID_ENV),
   appSecretEnv: z.string().role('credential-ref').default(DEFAULT_APP_SECRET_ENV),
   baseURL: z.string(),
+  bots: z.array(botEntrySchema),
+  credentials: z.array(credentialSchema),
 })
 
+/** Settings-section shape: identity/mapping only, so the UI never writes secrets. */
+export interface FeishuBotSettings {
+  bots?: FeishuBotEntry[]
+}
+
+export const FeishuBotSettingsConfig: z<FeishuBotSettings> = z.object({
+  bots: z.array(botEntrySchema),
+})
+
+/** Credential-shaped fields shared by the flat config and per-bot credentials. */
+interface CredentialLike {
+  appSecret?: string
+  appIdEnv?: string
+  appSecretEnv?: string
+  baseURL?: string
+}
+
+/** One bot's merged registration inputs: identity plus its credential fields. */
+interface ResolvedEntry extends FeishuBotEntry {
+  credential: CredentialLike
+}
+
 /**
- * Project one resolved section into the options the provider serves its next
+ * Resolve the credential fields for one bot from the credentials list by id, or
+ * the flat single-app fields when there is no per-bot credential list.
+ * @param config - the currently authoritative composition config.
+ * @param botId - the bot id whose credentials to resolve.
+ * @returns the credential fields, possibly empty.
+ */
+function credentialFor(config: Config, botId: string): CredentialLike {
+  const match = config.credentials?.find(credential => credential.id === botId)
+  if (match !== undefined) return match
+  if (botId === FEISHU_BOT_PROVIDER_ID || config.credentials === undefined || config.credentials.length === 0) {
+    return {
+      ...(config.appSecret === undefined ? {} : { appSecret: config.appSecret }),
+      ...(config.appIdEnv === undefined ? {} : { appIdEnv: config.appIdEnv }),
+      ...(config.appSecretEnv === undefined ? {} : { appSecretEnv: config.appSecretEnv }),
+      ...(config.baseURL === undefined ? {} : { baseURL: config.baseURL }),
+    }
+  }
+  return {}
+}
+
+/**
+ * Project one merged bot entry into the options the provider serves its next
  * operation with. Credential resolution stays here rather than in the provider:
  * every value the provider reads is already fully defaulted.
  * @param ctx - plugin context supplying the credential and environment planes.
- * @param config - the currently authoritative section.
+ * @param entry - the bot entry plus its resolved credential fields.
  * @returns options for one operation.
  */
-function resolveOptions(ctx: Context, config: Config): FeishuBotProviderOptions {
-  const appIdEnv = credentialRef(config.appIdEnv ?? DEFAULT_APP_ID_ENV)
-  const appSecretEnv = credentialRef(config.appSecretEnv ?? DEFAULT_APP_SECRET_ENV)
-  const literalAppId = config.appId !== undefined && config.appId.length > 0 ? config.appId : undefined
-  const literalAppSecret = config.appSecret !== undefined && config.appSecret.length > 0 ? config.appSecret : undefined
+function resolveOptions(ctx: Context, entry: ResolvedEntry): FeishuBotProviderOptions {
+  const credential = entry.credential
+  const appIdEnv = credentialRef(credential.appIdEnv ?? DEFAULT_APP_ID_ENV)
+  const appSecretEnv = credentialRef(credential.appSecretEnv ?? DEFAULT_APP_SECRET_ENV)
+  const literalAppId = entry.appId !== undefined && entry.appId.length > 0 ? entry.appId : undefined
+  const literalAppSecret = credential.appSecret !== undefined && credential.appSecret.length > 0 ? credential.appSecret : undefined
 
-  // Resolve one credential per operation: the credentials service first, then
-  // the launch environment when no credentials seam is mounted.
   const resolveCredential = (ref: CredentialRef) => async (): Promise<string | undefined> => {
     const credentials = ctx.get('credentials')
     if (credentials !== undefined) return (await credentials.resolve(ref))?.value
@@ -85,12 +182,59 @@ function resolveOptions(ctx: Context, config: Config): FeishuBotProviderOptions 
     resolveAppSecret: resolveCredential(appSecretEnv),
     appIdEnv,
     appSecretEnv,
-    baseURL: config.baseURL ?? FEISHU_DEFAULT_BASE_URL,
+    baseURL: credential.baseURL ?? FEISHU_DEFAULT_BASE_URL,
     logger: ctx.logger,
   }
 }
 
-/** Register the Feishu Bot API provider with `ctx.feishu`. */
+/** One provider registration to reconcile against the resolved config. */
+interface Registration {
+  disposer: () => void
+}
+
+/**
+ * Register the Feishu Bot provider(s), re-registering live as the `feishu-bot`
+ * settings section changes. The composition entry stays usable without a
+ * settings provider; when one is mounted its user layer is read live.
+ */
 export function apply(ctx: Context, config: Config): void {
-  ctx.feishu.registerProvider(new FeishuBotProvider(() => resolveOptions(ctx, config)))
+  let currentSettings: () => FeishuBotSettings = () => ({ bots: config.bots ?? [] })
+  const registrations = new Map<string, Registration>()
+
+  const sync = (): void => {
+    const settings = currentSettings()
+    const bots = (settings.bots ?? []).length > 0 ? settings.bots : config.bots
+    const desired = new Map<string, ResolvedEntry>()
+    if (bots !== undefined && bots.length > 0) {
+      for (const bot of bots) {
+        desired.set(bot.id, { ...bot, credential: credentialFor(config, bot.id) })
+      }
+    } else {
+      desired.set(FEISHU_BOT_PROVIDER_ID, {
+        id: FEISHU_BOT_PROVIDER_ID,
+        ...(config.appId === undefined ? {} : { appId: config.appId }),
+        credential: credentialFor(config, FEISHU_BOT_PROVIDER_ID),
+      })
+    }
+    for (const [id, entry] of desired) {
+      if (registrations.has(id)) continue
+      const disposer = ctx.feishu.registerProvider(new FeishuBotProvider(() => resolveOptions(ctx, entry), id))
+      registrations.set(id, { disposer })
+    }
+    for (const [id, registration] of registrations) {
+      if (desired.has(id)) continue
+      registration.disposer()
+      registrations.delete(id)
+    }
+  }
+
+  installSettingsSection(ctx, FEISHU_BOT_SETTINGS_NAMESPACE, FeishuBotSettingsConfig, { bots: config.bots ?? [] }, {
+    setSource: (source) => {
+      currentSettings = source
+    },
+    onChange: sync,
+  })
+  // Register from the composition entry up front; the settings section, when
+  // mounted, re-syncs from its live user layer.
+  sync()
 }

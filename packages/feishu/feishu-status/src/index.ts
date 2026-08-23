@@ -5,7 +5,7 @@ import type {} from '@deepseek-ai/dsh-feishu'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
-import type { FeishuStatusView } from './types.ts'
+import type { FeishuBotStatusView, FeishuStatusView } from './types.ts'
 
 export type * from './types.ts'
 
@@ -31,6 +31,30 @@ export class FeishuStatusGateway extends TypertRemoteService {
       ...(status.providerStatus === undefined ? {} : { provider: status.providerStatus }),
       ...(status.selectionError === undefined ? {} : { selectionError: status.selectionError }),
     }
+  }
+
+  /**
+   * Project every registered bot's display-safe status, for the multi-bot
+   * configuration surface.
+   * @returns one entry per registered provider.
+   */
+  @Remote('list')
+  async list(): Promise<FeishuBotStatusView[]> {
+    return await Promise.all(this.ctx.feishu.listProviders().map(async (provider) => {
+      let status
+      try {
+        status = provider.status === undefined ? undefined : await provider.status()
+      } catch {
+        status = undefined
+      }
+      return {
+        id: provider.id,
+        ...(status?.appIdMasked === undefined ? {} : { maskedAppId: status.appIdMasked }),
+        state: status?.state ?? (provider.available() ? 'connected' : 'unavailable'),
+        receiveActive: status?.receiveActive ?? false,
+        ...(status?.lastError === undefined ? {} : { lastError: status.lastError }),
+      }
+    }))
   }
 }
 

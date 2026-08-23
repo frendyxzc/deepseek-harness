@@ -184,6 +184,30 @@ describe('DeepSeekAdapter against a mock server', () => {
     expect(server.headers[0]).not.toHaveProperty('x-deepseek-harness-compact')
   })
 
+  it('sends the pinned TDAI memory identity headers when a resolver returns them', async () => {
+    const server = await mockServer([{ kind: 'sse', events: textEvents }])
+    const adapter = new DeepSeekAdapter({
+      options: () => resolveAdapterOptions({ baseURL: server.url }),
+      resolveApiKey: () => Promise.resolve('k'),
+      resolveUserId: () => TEST_USER_ID,
+      resolveTdaiHeaders: () => ({ 'x-team-id': 'team-t', 'x-task-id': 'tsk-k' }),
+    })
+
+    await drain(adapter.stream({
+      provider: 'deepseek-official',
+      model: 'deepseek-v4-flash',
+      messages: [createUserMessage({
+        content: [{ type: 'text', text: 'hi' }],
+        source: { kind: 'plugin', plugin: 'test' },
+      })],
+    }))
+
+    expect(server.headers[0]?.['x-team-id']).toBe('team-t')
+    expect(server.headers[0]?.['x-task-id']).toBe('tsk-k')
+    // An absent id is not announced: no x-agent-id header was resolved.
+    expect(server.headers[0]).not.toHaveProperty('x-agent-id')
+  })
+
   it('uploads a durable image once and sends only its Files API id to the vision model', async () => {
     const server = await mockServer([{ kind: 'sse', events: textEvents }])
     const signalSeen: (AbortSignal | undefined)[] = []

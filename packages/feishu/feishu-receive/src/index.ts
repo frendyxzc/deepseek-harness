@@ -24,6 +24,7 @@ import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
+import type {} from '@deepseek-ai/dsh-tdai-memory'
 import z from '@deepseek-ai/schemastery'
 
 declare module '@deepseek-ai/cordis' {
@@ -197,7 +198,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     }
   }
 
-  const getOrCreate = (chatId: string): Promise<AgentHandle> => {
+  const getOrCreate = (chatId: string, providerId?: string): Promise<AgentHandle> => {
     const existing = handles.get(chatId)
     if (existing !== undefined) return existing
     let template: { presetId: string; agentOptions?: AgentOptions; cwd: string }
@@ -212,6 +213,11 @@ export function apply(ctx: Context, config: Config = {}): void {
     }
     const { presetId: preset, agentOptions: options, cwd: workingDir } = template
     const sessionId = SessionId(`${SESSION_ID_PREFIX}${randomUUID()}`)
+    // Pin the session to the bot that received it so the LLM adapters resolve
+    // this chat's per-bot team/agent identity on every request.
+    if (providerId !== undefined && providerId.length > 0) {
+      ctx.get('tdaiMemory')?.bindSession(String(sessionId), providerId)
+    }
 
     const setup = async (agentCtx: Context): Promise<void> => {
       await ctx.agentPresets.mount(agentCtx, preset)
@@ -262,7 +268,8 @@ export function apply(ctx: Context, config: Config = {}): void {
     /** Open the receive channel; false when no usable provider is registered yet. */
     const openReceiveChannel = (): boolean => {
       try {
-        disposeReceive = ctx.feishu.startReceiving((event) => {
+        if (ctx.feishu.listProviders().length === 0) return false
+        disposeReceive = ctx.feishu.startReceivingAll((event) => {
           const chatId = event.chatId
           if (chatId.length === 0) {
             ctx.logger.warn('feishu-receive: event without a chat id; dropped')
@@ -279,7 +286,7 @@ export function apply(ctx: Context, config: Config = {}): void {
                 ctx.logger.warn('feishu-receive: failed to acknowledge chat %s: %s', chatId, String(error))
               }
             }
-            const handle = await getOrCreate(chatId)
+            const handle = await getOrCreate(chatId, event.providerId)
             created.add(handle)
             const referenced = await resolveReferencedContent(ctx, event)
             const text = referenced.length > 0 ? `${referenced}\n\n${event.content}` : event.content

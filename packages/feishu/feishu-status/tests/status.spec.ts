@@ -32,7 +32,7 @@ async function harness(config: { provider?: string } = {}): Promise<{
 }
 
 describe('FeishuStatusGateway', () => {
-  it('publishes one direct status method under the feishuStatus namespace', async () => {
+  it('publishes the status and list methods under the feishuStatus namespace', async () => {
     const { gateway } = await harness()
     expect(gateway.typertRemote).toMatchObject({
       serviceKey: 'feishuStatus',
@@ -40,7 +40,21 @@ describe('FeishuStatusGateway', () => {
     })
     expect(remoteMethods(gateway)).toEqual([
       { method: 'status', invocation: { kind: 'direct' } },
+      { method: 'list', invocation: { kind: 'direct' } },
     ])
+  })
+
+  it('lists every registered bot status', async () => {
+    const { ctx, gateway } = await harness()
+    ctx.feishu.registerProvider(makeProvider({
+      id: 'bot-a',
+      status: async () => ({ state: 'connected', appSecretConfigured: true, receiveActive: true, appIdMasked: 'cli_a****' }),
+    }))
+    ctx.feishu.registerProvider(makeProvider({ id: 'bot-b' }))
+    const list = await gateway.list()
+    expect(list).toHaveLength(2)
+    expect(list[0]).toMatchObject({ id: 'bot-a', state: 'connected', receiveActive: true, maskedAppId: 'cli_a****' })
+    expect(list[1]).toMatchObject({ id: 'bot-b', state: 'connected', receiveActive: false })
   })
 
   it('projects the seam status for a provider without a status report', async () => {

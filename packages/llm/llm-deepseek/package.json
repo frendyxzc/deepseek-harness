@@ -47,7 +47,8 @@
   },
   "dependencies": {
     "eventsource-parser": "^3.1.0",
-    "@deepseek-ai/schemastery": "workspace:^"
+    "@deepseek-ai/schemastery": "workspace:^",
+    "@deepseek-ai/dsh-tdai-memory": "workspace:^"
   },
   "devDependencies": {
     "@deepseek-ai/dsh-attachment": "workspace:^",

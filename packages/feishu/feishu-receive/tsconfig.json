@@ -24,6 +24,9 @@
       "path": "../../llm/llm"
     },
     {
+      "path": "../../llm/tdai-memory"
+    },
+    {
       "path": "../../preset/agent-presets"
     },
     {

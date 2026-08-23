@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-23-feishu-default-task-memory-registration.md
+2026-08-23-feishu-default-task-memory-registration.md: c66c58f07ffe8b09b27bebb747490bd509df4642
+2026-08-23-feishu-default-task-memory-registration.zh.md: 0c38551d256106e45643d425271bb10e4d34df3c

@@ -132,7 +132,7 @@ export interface FeishuBotProviderOptions {
  * on expiry.
  */
 export class FeishuBotProvider implements FeishuProvider {
-  readonly id = FEISHU_BOT_PROVIDER_ID
+  readonly id: string
 
   private cachedToken: string | undefined
   private tokenExpiresAt = 0
@@ -148,8 +148,14 @@ export class FeishuBotProvider implements FeishuProvider {
   /**
    * @param resolveOptions - the options for the NEXT operation, snapshotted
    * once at each operation's entry so one send never mixes two credential sections.
+   * @param id - stable registry id for this provider (unique within the seam).
    */
-  constructor(private readonly resolveOptions: () => FeishuBotProviderOptions) {}
+  constructor(
+    private readonly resolveOptions: () => FeishuBotProviderOptions,
+    id: string = FEISHU_BOT_PROVIDER_ID,
+  ) {
+    this.id = id
+  }
 
   available(): boolean {
     const options = this.resolveOptions()
@@ -483,7 +489,7 @@ export class FeishuBotProvider implements FeishuProvider {
       dispatcher.register({
         'im.message.receive_v1': (data: unknown): void => {
           const inner = data as { message?: unknown; sender?: unknown } | null | undefined
-          const received = toReceiveEvent(inner?.message, inner?.sender, data)
+          const received = toReceiveEvent(inner?.message, inner?.sender, data, appId, this.id)
           if (received === undefined) return
           for (const messageHandler of state.messageHandlers) messageHandler(received)
         },
@@ -704,9 +710,17 @@ function extractSenderId(raw: unknown, senderIdType: FeishuReceiveIdType): strin
  * @param message - the event's message body.
  * @param sender - the event's sender body.
  * @param raw - the raw event payload, attached to the emitted event.
+ * @param appId - this provider's resolved Feishu App ID, stamped onto the event.
+ * @param providerId - this provider's registry id, stamped for reply routing.
  * @returns the receive event, or undefined when the payload should be dropped.
  */
-function toReceiveEvent(message: unknown, sender: unknown, raw: unknown): FeishuReceiveEvent | undefined {
+function toReceiveEvent(
+  message: unknown,
+  sender: unknown,
+  raw: unknown,
+  appId: string | undefined,
+  providerId: string | undefined,
+): FeishuReceiveEvent | undefined {
   const msg = message as Record<string, unknown> | undefined
   const snd = sender as Record<string, unknown> | undefined
   const senderIdType = normalizeSenderIdType(snd?.sender_type)
@@ -717,6 +731,8 @@ function toReceiveEvent(message: unknown, sender: unknown, raw: unknown): Feishu
   if (content.length === 0) return undefined
   return {
     eventType: 'im.message.receive_v1',
+    ...(appId === undefined ? {} : { appId }),
+    ...(providerId === undefined ? {} : { providerId }),
     senderId: extractSenderId(snd?.sender_id, senderIdType),
     senderIdType,
     chatId,

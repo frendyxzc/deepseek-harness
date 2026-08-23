@@ -50,6 +50,7 @@
     "@deepseek-ai/dsh-llm": "workspace:^",
     "@deepseek-ai/dsh-session": "workspace:^",
     "@deepseek-ai/dsh-system-prompt": "workspace:^",
+    "@deepseek-ai/dsh-tdai-memory": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
     "@deepseek-ai/cordis": "workspace:^"
   }

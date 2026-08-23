@@ -159,6 +159,28 @@ bootstrap_memory_admin
 start_service proxy 8096 "http://127.0.0.1:8096/health" 30 \
   "cd '$MEMORY_ROOT/MemoryProxy' && node --import tsx/esm src/index.ts --config '$DSH_HOME/tdai-stack/config/proxy-config.yaml'"
 
+# Proxy storage guard: MemoryProxy's sqlite storage is backed by better-sqlite3
+# (an optionalDependency upstream, so a missing native binding silently
+# degrades storage sqlite -> fs -> memory — dropping the session->identity
+# binding and making memory-bridge/skill-bridge answer 40101). Check the
+# *running* proxy (fresh start or an already-listening instance start_service
+# skipped) reports matching requested/effective storage, so a degraded stack
+# fails here instead of shipping broken memory. See setup.sh §6e for the
+# install-time verification this complements.
+guard_proxy_storage() {
+  local health requested effective
+  health="$(curl -sS --max-time 3 http://127.0.0.1:8096/health 2>/dev/null || true)"
+  requested="$(printf '%s' "$health" | sed -n 's/.*"requested":"\([^"]*\)".*/\1/p')"
+  effective="$(printf '%s' "$health" | sed -n 's/.*"effective":"\([^"]*\)".*/\1/p')"
+  if [[ -n "$requested" && "$requested" != "$effective" ]]; then
+    die "MemoryProxy storage degraded (requested=$requested, effective=${effective:-missing}) — run: cd '$MEMORY_ROOT/MemoryProxy' && npm install better-sqlite3"
+  fi
+  if [[ -z "$effective" ]]; then
+    warn "MemoryProxy /health reported no storage.effective — verify manually"
+  fi
+}
+guard_proxy_storage
+
 # 3. MemoryKnowledge :8421
 start_service knowledge 8421 "http://127.0.0.1:8421/health" 40 \
   "cd '$MEMORY_ROOT/MemoryKnowledge' && pnpm dev"

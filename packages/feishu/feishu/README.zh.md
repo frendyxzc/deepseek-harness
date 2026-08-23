@@ -28,8 +28,10 @@ DeepSeek Harness 的飞书（Feishu/Lark）聊天能力 seam（`ctx.feishu`）�
 - `ctx.feishu.registerProvider(provider)` —— 注册一个 `FeishuProvider` 实现。返回 disposer。
 - `feishu/provider-added` —— 提供方提交进注册表时发出；抛出异常的监听器会回滚该注册。卡片动作应答器等加载期消费方订阅此事件，因为 Cordis 可能并发加载同级插件，配置顺序不能证明注册顺序。
 - `feishu/provider-removed` —— 注册的 disposer 运行时（注册它的 fiber 已卸载）以提供方 id 发出。
-- `ctx.feishu.sendMessage(request, signal?)` —— 通过选定提供方发送一条消息。
+- `ctx.feishu.listProviders()` —— 按注册顺序返回所有已注册提供方。
+- `ctx.feishu.sendMessage(request, signal?)` —— 发送一条消息。依次路由：请求显式的 `providerId` → 上次投递 `request.receiveId` 的提供方 → 选择规则；路由到的提供方未注册时抛 `FEISHU_PROVIDER_CONFIGURED_MISSING`。
 - `ctx.feishu.startReceiving(handler)` —— 启动选定提供方的接收通道；提供方会以每条 `FeishuReceiveEvent` 调用 `handler`。返回 disposer，对仅发送的提供方抛 `FEISHU_RECEIVE_UNSUPPORTED`。
+- `ctx.feishu.startReceivingAll(handler)` —— 启动每个可用且能接收的提供方；每条事件都盖上其 provider id 并按其 chat 记录，以便回复路由回同一个应用。返回关闭所有已打开通道的 disposer；当有可用提供方且都不能接收时抛 `FEISHU_RECEIVE_UNSUPPORTED`。
 - `ctx.feishu.startReceivingCardActions(handler)` —— 通过选定提供方的接收通道订阅卡片按钮动作（`FeishuCardActionEvent`）—— 与 `startReceiving` 打开的是同一条通道，绝不另开第二条。返回 disposer，对不支持卡片动作的提供方抛 `FEISHU_RECEIVE_UNSUPPORTED`。handler 必须快速完成处理；任何耗时操作都应放到 handler 之后。
 - `ctx.feishu.updateMessage(messageId, content, signal?)` —— 替换早先通过选定提供方发送的某条消息的内容（例如在按钮被消费后结算一张交互卡片）；对不支持更新的提供方抛 `FEISHU_UPDATE_UNSUPPORTED`。
 - `ctx.feishu.getMessage(messageId, signal?)` —— 通过选定提供方按 id 拉取一条消息，并把它提取为纯文本内容（例如读取入站 `FeishuReceiveEvent` 引用的引用/回复消息）；对不支持读取的提供方抛 `FEISHU_GET_UNSUPPORTED`。

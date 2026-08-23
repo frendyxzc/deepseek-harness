@@ -2,11 +2,11 @@
 
 English | [中文](README.zh.md)
 
-Feishu Bot API provider for `ctx.feishu`. Sends and updates messages through the Feishu Open API and receives messages and card button actions through ONE shared official long-connection client.
+Feishu Bot API provider for `ctx.feishu`. Sends and updates messages through the Feishu Open API and receives messages and card button actions through ONE shared official long-connection client per provider. Configure one app with the flat credential fields, or several apps through `bots` — each entry registers its own provider so inbound chats route back to the app that received them.
 
 ## Purpose
 
-Registers the `FeishuBotProvider` with `ctx.feishu` under the id `feishu-bot`. Authenticates with the Feishu `/auth/v3/tenant_access_token/internal` endpoint, sends messages through `/im/v1/messages`, updates a sent message through `PATCH /im/v1/messages/:message_id`, reads one message by id through `GET /im/v1/messages/:message_id`, and receives `im.message.receive_v1` events plus `card.action.trigger` card callbacks through `@larksuiteoapi/node-sdk`.
+Registers one `FeishuBotProvider` per configured app with `ctx.feishu` (the flat single-app id is `feishu-bot`), each under its own provider id. Authenticates with the Feishu `/auth/v3/tenant_access_token/internal` endpoint, sends messages through `/im/v1/messages`, updates a sent message through `PATCH /im/v1/messages/:message_id`, reads one message by id through `GET /im/v1/messages/:message_id`, and receives `im.message.receive_v1` events plus `card.action.trigger` card callbacks through `@larksuiteoapi/node-sdk`.
 
 ## Config
 
@@ -17,6 +17,12 @@ Registers the `FeishuBotProvider` with `ctx.feishu` under the id `feishu-bot`. A
 | `appIdEnv` | `string` | `FEISHU_APP_ID` | Credential reference resolved for each operation |
 | `appSecretEnv` | `string` | `FEISHU_APP_SECRET` | Credential reference resolved for each operation |
 | `baseURL` | `string` | `https://open.feishu.cn/open-apis` | Feishu Open API base URL |
+| `bots` | `array` | — | Bot apps (settings-editable): each `{ id, appId?, teamId?, agentId? }` registers one provider under its own `id`; non-empty replaces the flat single app |
+| `credentials` | `array` | — | Secrets per bot (composition-only): each `{ id, appSecret?, appSecretEnv?, appIdEnv?, baseURL? }` supplies the secrets a `bots` entry never carries |
+
+## Multiple apps
+
+When `bots` is non-empty, each entry becomes one provider under its own `id`, and the flat `appId` / `appSecret` fields serve as the fallback credentials. Secrets intentionally live in `credentials` (composition-only), not `bots`: the settings UI reads `bots` but cannot reply a redacted `role('secret')` value, so keeping them separate means editing a bot's `teamId` / `agentId` can never overwrite its secret. Inbound events carry both the resolved `appId` and the provider `id`, and the Feishu seam routes a reply to a chat back through the provider that received it.
 
 ## Credentials
 

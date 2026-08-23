@@ -15,3 +15,21 @@ export interface FeishuStatusView {
   /** Why the seam could not select a provider, when it could not. */
   readonly selectionError?: string
 }
+
+/**
+ * One bot's display-safe status, for the multi-bot configuration surface.
+ * Masked on purpose: the App ID is display-only and never enough to route, and
+ * secrets stay booleans.
+ */
+export interface FeishuBotStatusView {
+  /** The bot's registry id (the mapping key). */
+  readonly id: string
+  /** Display-safe App ID, when the provider knows one. */
+  readonly maskedAppId?: string
+  /** The bot's connection state. */
+  readonly state: FeishuConnectionState
+  /** Whether this bot currently has an open receive channel. */
+  readonly receiveActive: boolean
+  /** The most recent failure, when recorded. */
+  readonly lastError?: string
+}

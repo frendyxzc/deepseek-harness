@@ -94,6 +94,13 @@ export interface PiAiAdapterOptions {
   /** Resolve the optional durable attachment service at request time. */
   resolveAttachments?: () => AttachmentStore | undefined
   /**
+   * Resolve the optional TDAI memory identity headers (`x-team-id` /
+   * `x-agent-id` / `x-task-id`) the deploying MemoryProxy reads to auto-bind
+   * the session; `sessionId` is the session the loop stamped on the request,
+   * and the resolver returns empty when that session has no bound app.
+   */
+  resolveTdaiHeaders?: (sessionId?: string) => Record<string, string>
+  /**
    * Observe one assistant history message degrading to provider-neutral
    * conversion because its stored replay state is unusable by this build.
    */
@@ -202,16 +209,19 @@ function reasoningInfo(
 function requestHeaders(
   headers: Readonly<Record<string, string>> | undefined,
   options: GenerateOptions,
+  tdaiHeaders: Readonly<Record<string, string>> = {},
 ): Record<string, string> {
   const attribution = attributionHeaders()
-  const reserved = new Set(Object.keys(attribution).map(name => name.toLowerCase()))
+  const reserved = new Set(
+    [...Object.keys(attribution), ...Object.keys(tdaiHeaders)].map(name => name.toLowerCase()),
+  )
   return {
     ...Object.fromEntries(Object.entries(headers ?? {}).filter(([name]) => !reserved.has(name.toLowerCase()))),
     ...attribution,
-    // Harness session identity must ride this OAI-compatible transport so a
-    // dsh-aware proxy (e.g. the TDAI MemoryProxy) can bind the session exactly
-    // as it binds the llm-deepseek adapter's direct-fetch requests. Spread after
-    // the deployment headers so the Harness-owned names win collisions.
+    // Harness-owned identity headers: the TDAI memory identity, then the
+    // session id a dsh-aware proxy (e.g. the TDAI MemoryProxy) binds. Spread
+    // after the deployment headers so the Harness-owned names win collisions.
+    ...tdaiHeaders,
     ...options.sessionId === undefined
       ? {}
       : { 'x-deepseek-harness-session-id': String(options.sessionId) },
@@ -383,7 +393,7 @@ export class PiAiAdapter extends LlmAdapter {
         signal: watchdog.signal,
         // Profile headers are deployment-owned; attribution and session-identity
         // names are Harness-owned and therefore win collisions.
-        headers: requestHeaders(profile.headers, options),
+        headers: requestHeaders(profile.headers, options, this.config.resolveTdaiHeaders?.(options.sessionId) ?? {}),
       })
       const iterator = toStreamChunks(events, model.contextWindow)[Symbol.asyncIterator]()
       let exhausted = false

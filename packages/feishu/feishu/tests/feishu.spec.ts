@@ -306,6 +306,28 @@ describe('FeishuRuntime getMessage', () => {
   })
 })
 
+describe('FeishuRuntime multi-provider receive routing', () => {
+  it('routes a reply to a chat back through the provider that received it', async () => {
+    let aHandler: ((event: FeishuReceiveEvent) => void) | undefined
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot-a', available, req => Promise.resolve(sendResult(`a:${req.content}`)), (h) => { aHandler = h; return () => {} }))
+    feishu.registerProvider(makeProvider('bot-b', available, req => Promise.resolve(sendResult(`b:${req.content}`)), () => () => {}))
+    const stop = feishu.startReceivingAll(() => {})
+
+    aHandler!({ eventType: 'im.message.receive_v1', senderId: 'u1', senderIdType: 'open_id', chatId: 'chat-1', content: 'hi', providerId: 'bot-a', raw: {} })
+    await expect(feishu.sendMessage({ receiveId: 'chat-1', content: 'reply' })).resolves.toMatchObject({ messageId: 'a:reply' })
+    stop()
+  })
+
+  it('routes a send carrying an explicit providerId', async () => {
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot-a', available, req => Promise.resolve(sendResult(`a:${req.content}`))))
+    feishu.registerProvider(makeProvider('bot-b', available, req => Promise.resolve(sendResult(`b:${req.content}`))))
+    await expect(feishu.sendMessage({ receiveId: 'u1', content: 'hi', providerId: 'bot-a' })).resolves.toMatchObject({ messageId: 'a:hi' })
+    await expect(feishu.sendMessage({ receiveId: 'u1', content: 'hi', providerId: 'bot-b' })).resolves.toMatchObject({ messageId: 'b:hi' })
+  })
+})
+
 describe('FeishuError', () => {
   it('is a HarnessError carrying its code', () => {
     const error = new FeishuError('boom', 'FEISHU_PROVIDER_ERROR')

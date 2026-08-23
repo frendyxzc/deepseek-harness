@@ -14,7 +14,7 @@ usePinnedBrowserLanguages('zh-CN')
 afterEach(cleanup)
 
 type StatusResult =
-  | { readonly ok: true; readonly value: { readonly state: 'connected' } }
+  | { readonly ok: true; readonly value: Array<{ readonly id: string; readonly state: string; readonly receiveActive: boolean }> }
   | { readonly ok: false; readonly error: { readonly code: string; readonly message: string } }
 
 async function bench() {
@@ -29,8 +29,17 @@ async function bench() {
   }
   new RemoteService(ctx)
   const status = vi.fn<() => Promise<StatusResult>>()
-    .mockResolvedValue({ ok: true, value: { state: 'connected' } })
-  ctx.provide('remote.feishuStatus', { status })
+    .mockResolvedValue({ ok: true, value: [{ id: 'bot', state: 'connected', receiveActive: false }] })
+  ctx.provide('remote.feishuStatus', { list: status })
+  ctx.provide('remote.tdaiMemory', { listTeams: async () => [], listAgents: async () => [] })
+  ctx.provide('settingsScope', {
+    bind: () => ({
+      getSnapshot: () => ({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'memory' }),
+      subscribe: () => () => {},
+      set: async () => {},
+      unset: async () => {},
+    }),
+  })
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, status }
 }
 
@@ -43,7 +52,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-im browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.feishuStatus'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'settingsScope'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {
@@ -59,10 +68,10 @@ describe('ui-settings-im browser plugin', () => {
     expect(b.status).not.toHaveBeenCalled()
 
     const injected = (entry.inject as unknown as () => FeishuStatusTabInjected)()
-    await expect(injected.fetch()).resolves.toEqual({ state: 'connected' })
+    await expect(injected.listStatus()).resolves.toEqual([{ id: 'bot', state: 'connected', receiveActive: false }])
     expect(b.status).toHaveBeenCalledOnce()
     b.status.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
-    await expect(injected.fetch()).rejects.toThrow('feishuStatus.status failed: REMOTE_ERROR: unavailable')
+    await expect(injected.listStatus()).resolves.toEqual([])
     await b.ctx.fiber.dispose()
   })
 

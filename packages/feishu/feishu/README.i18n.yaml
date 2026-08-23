@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/feishu/README.md
-README.md: 54123ce11c2d38886ba7607e6686645f2db4dbad
-README.zh.md: d70d9d7614aa255784e5c8861e3b5c0e06086f82
+README.md: be70f1b67ed7cc1d5881be804af26bc182fb81c2
+README.zh.md: 34d40196a25d37ddcfb4548665781d8b06fc53a0
