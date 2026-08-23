@@ -379,11 +379,13 @@ else
 allowBuilds:
   better-sqlite3: true
   esbuild: true
+  protobufjs: true
 EOF
     else
       sed -e 's/set this to true or false/false/g' \
           -e 's/^  better-sqlite3: false$/  better-sqlite3: true/' \
           -e 's/^  esbuild: false$/  esbuild: true/' \
+          -e 's/^  protobufjs: false$/  protobufjs: true/' \
         "$yaml" > "$yaml.tmp"
       mv "$yaml.tmp" "$yaml"
     fi
@@ -431,7 +433,7 @@ EOF
       # PROXY_USER_KEY is set in §3 only when .credentials.yaml was freshly
       # generated; if the file already existed, read the key from it.
       if [[ -z "${PROXY_USER_KEY:-}" ]]; then
-        PROXY_USER_KEY="$(awk '/^PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
+        PROXY_USER_KEY="$(awk '/^[[:space:]]*PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
       fi
       if [[ -n "$PROXY_USER_KEY" ]]; then
         USER_ID="usr-$(openssl rand -hex 5)"

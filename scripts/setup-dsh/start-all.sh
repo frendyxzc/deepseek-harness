@@ -28,9 +28,12 @@ source "$SCRIPT_DIR/lib.sh"
 
 # The TencentDB memory stack pins Node v22; the bundled node22 (installed by
 # setup.sh) takes precedence when present so every service starts on it.
+# Fall back to Homebrew node@22 when the bundled one is missing.
 NODE22_BIN="$DSH_HOME/tdai-stack/node22/bin"
 if [[ -x "$NODE22_BIN/node" ]]; then
   PATH="$NODE22_BIN:$PATH"
+elif [[ -x "/opt/homebrew/opt/node@22/bin/node" ]]; then
+  PATH="/opt/homebrew/opt/node@22/bin:$PATH"
 fi
 
 WORKSPACE="${DSH_WORKSPACE:-$REPO_ROOT}"
@@ -98,6 +101,57 @@ start_service() {
 # 1. MemoryCore :8420
 start_service core 8420 "http://127.0.0.1:8420/health" 40 \
   "cd '$MEMORY_ROOT/MemoryCore' && set -a && . ./.env.local && set +a && node --import tsx src/gateway/server.ts"
+
+# 1b. Bootstrap the MemoryCore admin user. The core builds its metadata
+#     database lazily (first /v3/meta request), so on a fresh deployment the
+#     database does not exist while setup.sh runs and its admin bootstrap is
+#     skipped. Probing auth/verify forces the schema into existence, then the
+#     admin user is inserted keyed with PROXY_USER_KEY — same SQL as setup.sh
+#     §6f, and idempotent: an existing admin user is left alone.
+bootstrap_memory_admin() {
+  local data_dir="${DSH_MEMORY_DATA_DIR:-$HOME/.memory-tencentdb/memory-tdai}"
+  local db="$data_dir/metadata/tdai_metadata_default/metadata.db"
+  local i admin_exists key user_id key_id now
+
+  # The probe key is deliberately invalid; the verify response is irrelevant,
+  # what matters is that the request path builds the metadata schema.
+  curl -sS -o /dev/null --max-time 5 -X POST \
+    -H "content-type: application/json" \
+    -H "x-tdai-service-id: default" \
+    -d '{"user_key":"startup-probe"}' \
+    "http://127.0.0.1:8420/v3/meta/auth/verify" 2>/dev/null || true
+  for i in 1 2 3 4 5; do
+    [[ -f "$db" ]] && break
+    sleep 1
+  done
+  if [[ ! -f "$db" ]]; then
+    warn "memory metadata db not created by probe — run setup.sh after the first chat to bootstrap the admin user"
+    return 0
+  fi
+
+  admin_exists="$(sqlite3 "$db" "SELECT COUNT(*) FROM meta_users WHERE user_type='system_admin';" 2>/dev/null || echo 0)"
+  if [[ "$admin_exists" != "0" ]]; then
+    ok "memory admin user already present — skipping bootstrap"
+    return 0
+  fi
+
+  key="$(awk '/^[[:space:]]*PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
+  if [[ -z "$key" ]]; then
+    warn "metadata db exists but PROXY_USER_KEY is not set; cannot bootstrap admin user"
+    return 0
+  fi
+
+  user_id="usr-$(openssl rand -hex 5)"
+  key_id="uky-$(openssl rand -hex 5)"
+  now="$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")"
+  sqlite3 "$db" "
+    INSERT INTO meta_users (user_id, auth_provider, external_id, username, status, user_type, created_at, updated_at, metadata_json)
+    VALUES ('$user_id', 'local', '$user_id', 'admin', 'active', 'system_admin', '$now', '$now', '{}');
+    INSERT INTO meta_user_keys (key_id, user_id, key_value, status, is_default, created_at, metadata_json)
+    VALUES ('$key_id', '$user_id', '$key', 'active', 1, '$now', '{}');
+  " && ok "memory admin user bootstrapped with PROXY_USER_KEY"
+}
+bootstrap_memory_admin
 
 # 2. MemoryProxy :8096 — config is passed explicitly: the generated one lives
 #    at $DSH_HOME/tdai-stack/config/proxy-config.yaml (the upstream repo's own

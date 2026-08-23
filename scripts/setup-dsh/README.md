@@ -93,6 +93,12 @@ listening on their port are skipped, so it is safe to re-run. `stop-all.sh` kill
 only the process trees recorded in those pidfiles — services you started by hand
 are left alone.
 
+Once MemoryCore is healthy, `start-all.sh` also bootstraps the admin user keyed
+with `PROXY_USER_KEY` (the core builds its metadata database lazily, so on a
+fresh deployment setup.sh's bootstrap is skipped because the database does not
+exist yet; a probe request forces the schema into existence, then a missing
+`system_admin` row is inserted, or an existing one is left alone).
+
 Order and endpoints:
 
 1. MemoryCore `:8420` (`/health`)

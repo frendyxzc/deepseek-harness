@@ -62,6 +62,8 @@
 
 `start-all.sh` 把五个服务分别守护化，日志写到 `~/.dsh/run/logs/`、pidfile 写到 `~/.dsh/run/pids/`，并在启动下一个前等待每个服务的 `/health`（dsh Web UI：`/`）。已在监听端口上运行的服务会被跳过，因此重复运行是安全的。`stop-all.sh` 只杀掉 pidfile 中记录的进程树——手工启动的服务不受影响。
 
+MemoryCore 就绪后，`start-all.sh` 还会用 `PROXY_USER_KEY` 自动引导 admin 用户（core 的元数据库是懒建库，首次部署时 setup.sh 的引导会因库不存在而跳过；探针请求建库后若 `meta_users` 里没有 `system_admin` 就补插，已存在则跳过）。
+
 顺序与端点：
 
 1. MemoryCore `:8420`（`/health`）
