@@ -14,6 +14,7 @@ import { FEISHU_RECEIVE_ID_TYPES, FeishuError } from '@deepseek-ai/dsh-feishu'
 import type {
   FeishuCardActionEvent,
   FeishuCardActionHandler,
+  FeishuMessage,
   FeishuProvider,
   FeishuProviderStatus,
   FeishuReceiveEvent,
@@ -54,6 +55,26 @@ interface SendMessageResponse {
 interface UpdateMessageResponse {
   code: number
   msg?: string
+}
+
+/** One message item from the get-message endpoint's `data.items`. */
+interface GetMessageItem {
+  message_id?: string
+  parent_id?: string
+  root_id?: string
+  msg_type?: string
+  body?: {
+    content?: string
+  }
+}
+
+/** Response shape from the get message endpoint. */
+interface GetMessageResponse {
+  code: number
+  msg?: string
+  data?: {
+    items?: GetMessageItem[]
+  }
 }
 
 /**
@@ -327,6 +348,71 @@ export class FeishuBotProvider implements FeishuProvider {
       )
     }
     this.lastError = undefined
+  }
+
+  /**
+   * Fetch one message by id from the Feishu `/im/v1/messages/:message_id`
+   * endpoint and extract its content as plain text. Used to read a quoted or
+   * replied-to message so a reply's full context is available.
+   * @param messageId - the Feishu message id.
+   * @param signal - abort signal for the surrounding operation.
+   */
+  async getMessage(messageId: string, signal?: AbortSignal): Promise<FeishuMessage> {
+    const options = this.resolveOptions()
+    throwIfAborted(signal)
+
+    const token = await this.getAccessToken(options, signal)
+    throwIfAborted(signal)
+
+    const url = `${options.baseURL}/im/v1/messages/${encodeURIComponent(messageId)}`
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        redirect: 'error',
+        headers: {
+          'authorization': `Bearer ${token}`,
+          'content-type': 'application/json; charset=utf-8',
+          'user-agent': USER_AGENT,
+        },
+        ...signal !== undefined ? { signal } : {},
+      })
+    } catch (error: unknown) {
+      if (signal?.aborted === true || isAbortError(error)) throw sendAborted(signal, error)
+      throw this.fail(
+        `Feishu get message request failed: ${String(error)}`,
+        'FEISHU_PROVIDER_ERROR',
+        error,
+      )
+    }
+
+    const body = await response.json() as GetMessageResponse
+    if (body.code !== 0) {
+      throw this.fail(
+        `Feishu API error (code ${body.code}): ${body.msg ?? 'unknown error'}`,
+        'FEISHU_PROVIDER_ERROR',
+      )
+    }
+
+    const item = body.data?.items?.[0]
+    if (item === undefined) {
+      throw this.fail(
+        'Feishu get message returned no message',
+        'FEISHU_PROVIDER_ERROR',
+      )
+    }
+
+    const msgType = typeof item.msg_type === 'string' ? item.msg_type : ''
+    this.lastError = undefined
+    return {
+      messageId: typeof item.message_id === 'string' ? item.message_id : messageId,
+      msgType,
+      content: extractMessageContent(msgType, item.body?.content),
+      ...(typeof item.parent_id === 'string' ? { parentId: item.parent_id } : {}),
+      ...(typeof item.root_id === 'string' ? { rootId: item.root_id } : {}),
+      raw: item,
+    }
   }
 
   /**
@@ -610,8 +696,11 @@ function extractSenderId(raw: unknown, senderIdType: FeishuReceiveIdType): strin
 /**
  * Convert one `im.message.receive_v1` payload — the inner `message` / `sender`
  * shape delivered by the long-connection client — into a
- * {@link FeishuReceiveEvent}. Returns undefined for non-text or empty content,
- * which the caller drops.
+ * {@link FeishuReceiveEvent}. Returns undefined for unsupported or empty
+ * content, which the caller drops. Text, rich-text (`post`), and interactive
+ * card (`interactive`) messages are all reduced to their plain-text reading;
+ * the received message id and any quoted / replied-to parent or thread root
+ * ids ride along so consumers can resolve the referenced message.
  * @param message - the event's message body.
  * @param sender - the event's sender body.
  * @param raw - the raw event payload, attached to the emitted event.
@@ -622,23 +711,197 @@ function toReceiveEvent(message: unknown, sender: unknown, raw: unknown): Feishu
   const snd = sender as Record<string, unknown> | undefined
   const senderIdType = normalizeSenderIdType(snd?.sender_type)
   const chatId = typeof msg?.chat_id === 'string' ? msg.chat_id : ''
-  if ((msg?.message_type ?? msg?.msg_type) !== 'text') return undefined
-  let content = ''
-  try {
-    const parsed = JSON.parse(typeof msg?.content === 'string' ? msg.content : '{}') as Record<string, unknown>
-    content = typeof parsed.text === 'string' ? parsed.text : ''
-  } catch {
-    content = ''
-  }
+  const rawMsgType = msg === undefined ? undefined : (msg.message_type ?? msg.msg_type)
+  const msgType = typeof rawMsgType === 'string' ? rawMsgType : ''
+  const content = extractMessageContent(msgType, msg?.content)
   if (content.length === 0) return undefined
   return {
     eventType: 'im.message.receive_v1',
     senderId: extractSenderId(snd?.sender_id, senderIdType),
     senderIdType,
     chatId,
+    ...(typeof msg?.message_id === 'string' ? { messageId: msg.message_id } : {}),
+    ...(typeof msg?.parent_id === 'string' ? { parentId: msg.parent_id } : {}),
+    ...(typeof msg?.root_id === 'string' ? { rootId: msg.root_id } : {}),
     content,
     raw,
   }
+}
+
+/** Message content types the receive path reduces to plain text. */
+const SUPPORTED_RECEIVE_TYPES = new Set(['text', 'post', 'interactive'])
+
+/**
+ * Reduce one Feishu message content string to its plain-text reading for the
+ * given message type. Returns '' for unsupported types or unparsable content.
+ * @param msgType - the Feishu message content type.
+ * @param rawContent - the `content` JSON string from the message body.
+ * @returns the extracted text, or '' when nothing readable was found.
+ */
+function extractMessageContent(msgType: string, rawContent: unknown): string {
+  if (!SUPPORTED_RECEIVE_TYPES.has(msgType)) return ''
+  const parsed = safeParseJson(typeof rawContent === 'string' ? rawContent : undefined)
+  if (parsed === undefined) return ''
+  switch (msgType) {
+    case 'text':
+      return typeof parsed.text === 'string' ? parsed.text : ''
+    case 'post':
+      return extractPostText(parsed)
+    case 'interactive':
+      return extractCardText(parsed)
+    default:
+      return ''
+  }
+}
+
+/** Parse a JSON string into a record view, tolerating malformed input. */
+function safeParseJson(raw: string | undefined): Record<string, unknown> | undefined {
+  if (raw === undefined) return undefined
+  try {
+    const value = JSON.parse(raw) as unknown
+    return isRecord(value) ? value : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/** Locale keys a `post` body may be wrapped in, in resolution priority. */
+const POST_LOCALE_PRIORITY = ['zh_cn', 'en_us', 'ja_jp'] as const
+
+/**
+ * Resolve the actual `{ title, content }` body of a `post`, unwrapping the
+ * locale wrapper Feishu uses when the post declares per-locale variants.
+ */
+function unwrapPostLocale(parsed: Record<string, unknown>): Record<string, unknown> | undefined {
+  if ('title' in parsed || 'content' in parsed) return parsed
+  for (const locale of POST_LOCALE_PRIORITY) {
+    const hit = parsed[locale]
+    if (isRecord(hit)) return hit
+  }
+  for (const value of Object.values(parsed)) {
+    if (isRecord(value)) return value
+  }
+  return undefined
+}
+
+/**
+ * Extract plain text from a Feishu `post` (rich-text) content body: the title
+ * line followed by each paragraph, with inline links, @-mentions, and images
+ * rendered as readable text.
+ */
+function extractPostText(parsed: Record<string, unknown>): string {
+  const body = unwrapPostLocale(parsed)
+  if (body === undefined) return ''
+  const title = typeof body.title === 'string' ? body.title : ''
+  const paragraphs = Array.isArray(body.content) ? body.content : []
+  return renderPostBody(title, paragraphs)
+}
+
+/**
+ * Render a post-shaped body — a title line followed by an array of paragraphs,
+ * each an array of inline `text` / `a` / `at` / `img` elements — as plain text.
+ * Shared by native `post` messages and by interactive cards, which the
+ * get-message endpoint returns in this same flattened form under `elements`.
+ */
+function renderPostBody(title: string, paragraphs: unknown[]): string {
+  const lines: string[] = []
+  if (title.length > 0) lines.push(title)
+  for (const paragraph of paragraphs) {
+    if (!Array.isArray(paragraph)) continue
+    const parts: string[] = []
+    for (const el of paragraph) {
+      if (isRecord(el)) parts.push(renderPostElement(el))
+    }
+    const line = parts.join('')
+    if (line.length > 0) lines.push(line)
+  }
+  return lines.join('\n')
+}
+
+/** Render one inline `post` element (text, link, mention, image) as readable text. */
+function renderPostElement(element: Record<string, unknown>): string {
+  const tag = typeof element.tag === 'string' ? element.tag : ''
+  switch (tag) {
+    case 'text':
+      return typeof element.text === 'string' ? element.text : ''
+    case 'a': {
+      const href = typeof element.href === 'string' ? element.href : ''
+      const label = typeof element.text === 'string' && element.text.length > 0 ? element.text : href
+      return href.length > 0 ? `[${label}](${href})` : label
+    }
+    case 'at': {
+      const userId = typeof element.user_id === 'string' ? element.user_id : ''
+      if (userId === 'all' || userId === 'all_members') return '@all'
+      const name = typeof element.user_name === 'string' ? element.user_name : ''
+      return name.length > 0 ? `@${name}` : (userId.length > 0 ? `@${userId}` : '')
+    }
+    case 'img':
+      return typeof element.image_key === 'string' && element.image_key.length > 0 ? '[图片]' : ''
+    default:
+      return typeof element.text === 'string' ? element.text : ''
+  }
+}
+
+/**
+ * Extract human-readable text from a Feishu interactive card, walking header
+ * titles and subtitles, plain-text / markdown elements, button labels, notes,
+ * form labels, image captions, and nested containers. Adjacent duplicate pieces
+ * are collapsed preserving order.
+ */
+function extractCardText(parsed: Record<string, unknown>): string {
+  // The get-message endpoint returns interactive cards in post-shaped form —
+  // `{ title, elements: [[{tag: "text"|"a"|"at"|"img", …}, …], …] }` — instead
+  // of the card-authoring schema. Route that body through the post renderer so
+  // a referenced card resolves to readable text rather than ''.
+  if (Array.isArray(parsed.elements) && parsed.elements.every(paragraph => Array.isArray(paragraph))) {
+    return renderPostBody(typeof parsed.title === 'string' ? parsed.title : '', parsed.elements)
+  }
+  const pieces: string[] = []
+  visitCard(parsed, pieces)
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const piece of pieces) {
+    if (typeof piece !== 'string') continue
+    const trimmed = piece.trim()
+    if (trimmed.length === 0 || seen.has(trimmed)) continue
+    seen.add(trimmed)
+    out.push(trimmed)
+  }
+  return out.join('\n')
+}
+
+/** Recursively collect readable text strings from a card node tree. */
+function visitCard(node: unknown, out: string[]): void {
+  if (node === null || node === undefined) return
+  if (typeof node === 'string' || typeof node === 'number' || typeof node === 'boolean') return
+  if (Array.isArray(node)) {
+    for (const child of node) visitCard(child, out)
+    return
+  }
+  if (typeof node !== 'object') return
+  const obj = node as Record<string, unknown>
+  const tag = typeof obj.tag === 'string' ? obj.tag : ''
+  if (tag === 'plain_text' || tag === 'lark_md' || tag === 'markdown') {
+    if (typeof obj.content === 'string') out.push(obj.content)
+    return
+  }
+  if (tag === 'img') {
+    if (obj.alt !== undefined) visitCard(obj.alt, out)
+    if (obj.title !== undefined) visitCard(obj.title, out)
+    if (obj.alt === undefined && obj.title === undefined) out.push('[图片]')
+    return
+  }
+  if (isRecord(obj.header)) {
+    visitCard(obj.header.title, out)
+    visitCard(obj.header.subtitle, out)
+  }
+  for (const key of ['text', 'label', 'placeholder'] as const) {
+    if (obj[key] !== undefined) visitCard(obj[key], out)
+  }
+  for (const key of ['options', 'elements', 'fields', 'actions', 'columns'] as const) {
+    if (Array.isArray(obj[key])) visitCard(obj[key], out)
+  }
+  if (obj.body !== undefined) visitCard(obj.body, out)
 }
 
 /** True for a plain object (not null, not an array) used as a record view. */

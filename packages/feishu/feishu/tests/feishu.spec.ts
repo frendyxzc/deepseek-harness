@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import FeishuRuntime, {
   FeishuError,
   type FeishuCardActionEvent,
+  type FeishuMessage,
   type FeishuProvider,
   type FeishuProviderStatus,
   type FeishuReceiveEvent,
@@ -18,6 +19,7 @@ function makeProvider(
   status?: () => Promise<FeishuProviderStatus>,
   startReceivingCardActions?: (handler: (event: FeishuCardActionEvent) => void) => () => void,
   updateMessage?: (messageId: string, content: string) => Promise<void>,
+  getMessage?: (messageId: string) => Promise<FeishuMessage>,
 ): FeishuProvider {
   return {
     id,
@@ -27,6 +29,7 @@ function makeProvider(
     ...(status !== undefined ? { status } : {}),
     ...(startReceivingCardActions !== undefined ? { startReceivingCardActions } : {}),
     ...(updateMessage !== undefined ? { updateMessage } : {}),
+    ...(getMessage !== undefined ? { getMessage } : {}),
   }
 }
 
@@ -275,6 +278,31 @@ describe('FeishuRuntime updateMessage', () => {
   it('throws FEISHU_PROVIDER_UNAVAILABLE for update when nothing is registered', async () => {
     const { feishu } = await mountFeishu()
     await expect(feishu.updateMessage('m1', '{}')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
+  })
+})
+
+describe('FeishuRuntime getMessage', () => {
+  it('delegates getMessage to the selected provider', async () => {
+    const { feishu } = await mountFeishu()
+    const fetched: string[] = []
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1')),
+      undefined, undefined, undefined, undefined, async (messageId) => {
+        fetched.push(messageId)
+        return { messageId, msgType: 'text', content: 'quoted', raw: {} }
+      }))
+    await expect(feishu.getMessage('om_1')).resolves.toMatchObject({ messageId: 'om_1', content: 'quoted' })
+    expect(fetched).toEqual(['om_1'])
+  })
+
+  it('throws FEISHU_GET_UNSUPPORTED when the provider has no getMessage', async () => {
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1'))))
+    await expect(feishu.getMessage('om_1')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_GET_UNSUPPORTED' }))
+  })
+
+  it('throws FEISHU_PROVIDER_UNAVAILABLE for get when nothing is registered', async () => {
+    const { feishu } = await mountFeishu()
+    await expect(feishu.getMessage('om_1')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
   })
 })
 

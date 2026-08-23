@@ -10,6 +10,7 @@ import { Context, Service } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {
   FeishuCardActionHandler,
+  FeishuMessage,
   FeishuProvider,
   FeishuReceiveHandler,
   FeishuRuntimeStatus,
@@ -28,6 +29,7 @@ export type {
   FeishuCardActionEvent,
   FeishuCardActionHandler,
   FeishuConnectionState,
+  FeishuMessage,
   FeishuMsgType,
   FeishuProvider,
   FeishuProviderStatus,
@@ -213,6 +215,28 @@ export class FeishuRuntime extends Service {
       )
     }
     return provider.updateMessage(messageId, content, signal)
+  }
+
+  /**
+   * Fetch one message by id through the selected provider — e.g. to read a
+   * quoted or replied-to message referenced by an inbound event. Resolves the
+   * provider at call time with the selection rules above; throws
+   * {@link FeishuError} `FEISHU_GET_UNSUPPORTED` when the provider has no
+   * `getMessage`, or the provider's own failure when the fetch does not
+   * succeed.
+   * @param messageId - the Feishu message id.
+   * @param signal - optional cancellation signal forwarded to the provider.
+   * @returns the fetched message with its content extracted as plain text.
+   */
+  async getMessage(messageId: string, signal?: AbortSignal): Promise<FeishuMessage> {
+    const provider = this.resolveProvider()
+    if (provider.getMessage === undefined) {
+      throw new FeishuError(
+        `Feishu provider "${provider.id}" does not support reading messages`,
+        'FEISHU_GET_UNSUPPORTED',
+      )
+    }
+    return provider.getMessage(messageId, signal)
   }
 
   /**

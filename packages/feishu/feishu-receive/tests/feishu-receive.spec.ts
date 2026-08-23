@@ -29,6 +29,8 @@ interface MountOptions {
   presetOfRoot?: string
   defaultId?: string
   config?: { cwd?: string; ack?: boolean }
+  /** Scripted referenced-message content keyed by the requested message id. */
+  getMessage?: (messageId: string) => Promise<{ content: string }>
 }
 
 /** One acknowledgement (or any message) the scripted provider sent. */
@@ -72,6 +74,7 @@ function mountReceive(options: MountOptions = {}): Promise<{
   systemPrompt: ReturnType<typeof mockSystemPrompt>
   sends: SentMessage[]
   controls: { failSend: boolean }
+  gets: string[]
 }> {
   return (async () => {
     const ctx = new Context()
@@ -79,6 +82,7 @@ function mountReceive(options: MountOptions = {}): Promise<{
 
     let handler: ((event: FeishuReceiveEvent) => void) | undefined
     const sends: SentMessage[] = []
+    const gets: string[] = []
     const controls = { failSend: false }
     ctx.feishu.registerProvider({
       id: 'scripted',
@@ -93,6 +97,13 @@ function mountReceive(options: MountOptions = {}): Promise<{
         return { messageId: 'm' }
       },
       startReceiving: (h) => { handler = h; return () => {} },
+      ...(options.getMessage !== undefined ? {
+        getMessage: async (messageId: string) => {
+          gets.push(messageId)
+          const fetched = await options.getMessage!(messageId)
+          return { messageId, msgType: 'text', content: fetched.content, raw: {} }
+        },
+      } : {}),
     })
 
     const systemPrompt = mockSystemPrompt()
@@ -122,7 +133,7 @@ function mountReceive(options: MountOptions = {}): Promise<{
     } as never)
 
     const fiber = await ctx.plugin(FeishuReceive, options.config ?? {})
-    return { ctx, handler: handler!, fiber, create, agents, systemPrompt, sends, controls }
+    return { ctx, handler: handler!, fiber, create, agents, systemPrompt, sends, controls, gets }
   })()
 }
 
@@ -191,8 +202,8 @@ function mountReceiveDeferred(
   })()
 }
 
-function event(text: string, chatId = 'oc_1'): FeishuReceiveEvent {
-  return { eventType: 'im.message.receive_v1', senderId: 'ou_1', senderIdType: 'open_id', chatId, content: text, raw: {} }
+function event(text: string, chatId = 'oc_1', extra: Partial<FeishuReceiveEvent> = {}): FeishuReceiveEvent {
+  return { eventType: 'im.message.receive_v1', senderId: 'ou_1', senderIdType: 'open_id', chatId, content: text, raw: {}, ...extra }
 }
 
 describe('feishu-receive', () => {
@@ -480,6 +491,52 @@ describe('feishu-receive', () => {
     expect(() => { handler(event('hello')) }).not.toThrow()
 
     await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('prepends the referenced (quoted) message content when the event carries a parent id', async () => {
+    const { ctx, handler, fiber, agents, gets } = await mountReceive({
+      onRoots: () => [root()],
+      getMessage: async messageId => ({ content: `quoted ${messageId}` }),
+    })
+
+    handler(event('reply text', 'oc_1', { parentId: 'om_quoted' }))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([{ type: 'text', text: '[引用消息]\nquoted om_quoted\n\nreply text' }])
+    expect(gets).toEqual(['om_quoted'])
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('delivers the message unchanged when the event has no reference', async () => {
+    const { ctx, handler, fiber, agents, gets } = await mountReceive({
+      onRoots: () => [root()],
+      getMessage: async messageId => ({ content: `quoted ${messageId}` }),
+    })
+
+    handler(event('plain text'))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([{ type: 'text', text: 'plain text' }])
+    expect(gets).toEqual([])
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('delivers the message unchanged when reading the reference is unsupported', async () => {
+    const { ctx, handler, fiber, agents } = await mountReceive({ onRoots: () => [root()] })
+
+    // No getMessage on the scripted provider: FEISHU_GET_UNSUPPORTED is
+    // swallowed and the original message still reaches the agent.
+    handler(event('solo reply', 'oc_1', { parentId: 'om_missing' }))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([{ type: 'text', text: 'solo reply' }])
     await ctx.fiber.dispose()
     await fiber.dispose()
   })

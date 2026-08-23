@@ -6,7 +6,7 @@
 
 ## 用途
 
-把 `FeishuBotProvider` 以 id `feishu-bot` 注册到 `ctx.feishu`。通过飞书 `/auth/v3/tenant_access_token/internal` 端点鉴权，通过 `/im/v1/messages` 发送消息，通过 `PATCH /im/v1/messages/:message_id` 更新已发送的消息，并通过 `@larksuiteoapi/node-sdk` 接收 `im.message.receive_v1` 事件与 `card.action.trigger` 卡片回调。
+把 `FeishuBotProvider` 以 id `feishu-bot` 注册到 `ctx.feishu`。通过飞书 `/auth/v3/tenant_access_token/internal` 端点鉴权，通过 `/im/v1/messages` 发送消息，通过 `PATCH /im/v1/messages/:message_id` 更新已发送的消息，通过 `GET /im/v1/messages/:message_id` 按 id 读取一条消息，并通过 `@larksuiteoapi/node-sdk` 接收 `im.message.receive_v1` 事件与 `card.action.trigger` 卡片回调。
 
 ## 配置
 
@@ -28,7 +28,11 @@
 
 ## 接收
 
-`startReceiving(handler)` 与 `startReceivingCardActions(handler)` 共享同一个长连接客户端（`@larksuiteoapi/node-sdk`），主动连出飞书，无需公网回调 URL。第一个订阅者——无论是消息还是卡片动作——打开连接；最后一个 disposer 关闭连接，因此消息订阅者与卡片动作订阅者绝不会打开两条连接。`startReceiving` 分发每个 `im.message.receive_v1` 事件，只提取内容解码后非空的文本消息，忽略其他类型与空内容。`startReceivingCardActions` 把每个 `card.action.trigger` 回调分发为 `FeishuCardActionEvent`（operator open id、chat id、message id，以及被点击按钮的 `value` 载荷原样透传、不校验——由消费方对照自身可信状态校验）。启动是异步的：连接或凭据失败通过提供方 `status()` 的 error 状态与插件 logger 暴露。
+`startReceiving(handler)` 与 `startReceivingCardActions(handler)` 共享同一个长连接客户端（`@larksuiteoapi/node-sdk`），主动连出飞书，无需公网回调 URL。第一个订阅者——无论是消息还是卡片动作——打开连接；最后一个 disposer 关闭连接，因此消息订阅者与卡片动作订阅者绝不会打开两条连接。`startReceiving` 分发每个 `im.message.receive_v1` 事件，把文本、富文本（`post`）与交互卡片（`interactive`）内容约简为纯文本，丢弃没有可读内容的消息（其他类型与空内容）。每条发出的 `FeishuReceiveEvent` 还会携带收到的 `messageId`，以及存在时的引用/回复 `parentId` 与话题根 `rootId`，以便消费方解析被引用的消息。`startReceivingCardActions` 把每个 `card.action.trigger` 回调分发为 `FeishuCardActionEvent`（operator open id、chat id、message id，以及被点击按钮的 `value` 载荷原样透传、不校验——由消费方对照自身可信状态校验）。启动是异步的：连接或凭据失败通过提供方 `status()` 的 error 状态与插件 logger 暴露。
+
+## 读取被引用的消息
+
+`getMessage(messageId, signal?)` 通过 `GET /im/v1/messages/:message_id` 按 id 拉取一条消息，并以 `FeishuMessage` 返回——内容提取为纯文本，存在时附带其 `parentId` / `rootId`。提取采用与 `startReceiving` 相同的 `text` / `post` / `interactive` 约简，因此被引用或回复的消息（包括富文本或卡片消息）与入站消息以相同方式读取。
 
 ## 更新已发送的消息
 

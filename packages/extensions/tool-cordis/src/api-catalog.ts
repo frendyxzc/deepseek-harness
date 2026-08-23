@@ -749,6 +749,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         parameters: [{ name: 'messageId', description: 'the provider message id returned by an earlier send.' }, { name: 'content', description: 'the replacement content.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
       },
       {
+        signature: 'async getMessage(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>',
+        description: 'Fetch one message by id through the selected provider — e.g. to read a quoted or replied-to message referenced by an inbound event. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_GET_UNSUPPORTED` when the provider has no `getMessage`, or the provider\'s own failure when the fetch does not succeed.',
+        parameters: [{ name: 'messageId', description: 'the Feishu message id.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the fetched message with its content extracted as plain text.',
+      },
+      {
         signature: 'async describeStatus(): Promise<FeishuRuntimeStatus>',
         description: 'Project the effective connection state of this capability for status surfaces. Applies the same selection rules as sendMessage without throwing; selection failures surface as `state: \'error\'` with FeishuRuntimeStatus.selectionError. Providers without a `status` method project from `available()`.',
         parameters: [],
@@ -3416,12 +3422,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type FeishuConnectionState = (typeof FEISHU_CONNECTION_STATES)[number];',
   },
   {
+    name: 'FeishuMessage',
+    declaration: 'export interface FeishuMessage {\n    readonly messageId: string;\n    readonly msgType: string;\n    readonly content: string;\n    readonly parentId?: string;\n    readonly rootId?: string;\n    readonly raw: unknown;\n}',
+  },
+  {
     name: 'FeishuMsgType',
     declaration: 'export type FeishuMsgType = (typeof FEISHU_MSG_TYPES)[number];',
   },
   {
     name: 'FeishuProvider',
-    declaration: 'export interface FeishuProvider {\n    readonly id: string;\n    available(): boolean;\n    sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>;\n    startReceiving?(handler: FeishuReceiveHandler): () => void;\n    startReceivingCardActions?(handler: FeishuCardActionHandler): () => void;\n    updateMessage?(messageId: string, content: string, signal?: AbortSignal): Promise<void>;\n    status?(): Promise<FeishuProviderStatus>;\n}',
+    declaration: 'export interface FeishuProvider {\n    readonly id: string;\n    available(): boolean;\n    sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>;\n    startReceiving?(handler: FeishuReceiveHandler): () => void;\n    startReceivingCardActions?(handler: FeishuCardActionHandler): () => void;\n    updateMessage?(messageId: string, content: string, signal?: AbortSignal): Promise<void>;\n    getMessage?(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>;\n    status?(): Promise<FeishuProviderStatus>;\n}',
   },
   {
     name: 'FeishuProviderStatus',
@@ -3429,7 +3439,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'FeishuReceiveEvent',
-    declaration: 'export interface FeishuReceiveEvent {\n    readonly eventType: string;\n    readonly senderId: string;\n    readonly senderIdType: FeishuReceiveIdType;\n    readonly chatId: string;\n    readonly content: string;\n    readonly raw: unknown;\n}',
+    declaration: 'export interface FeishuReceiveEvent {\n    readonly eventType: string;\n    readonly senderId: string;\n    readonly senderIdType: FeishuReceiveIdType;\n    readonly chatId: string;\n    readonly messageId?: string;\n    readonly parentId?: string;\n    readonly rootId?: string;\n    readonly content: string;\n    readonly raw: unknown;\n}',
   },
   {
     name: 'FeishuReceiveHandler',

@@ -320,6 +320,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   FeishuCardActionHandler: 'feishu.md',
   FeishuConnectionState: 'feishu.md',
   FeishuError: 'feishu.md',
+  FeishuMessage: 'feishu.md',
   FeishuMsgType: 'feishu.md',
   FeishuProvider: 'feishu.md',
   FeishuProviderStatus: 'feishu.md',

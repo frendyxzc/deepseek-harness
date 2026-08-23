@@ -10,6 +10,8 @@ Starts the `ctx.feishu` receive channel — opening on a registered Feishu provi
 
 Every incoming chat message also gets a short acknowledgement ("已收到，正在处理…") sent to the chat before the per-chat agent starts, so the user gets immediate feedback that the message arrived. A failed acknowledgement is logged and never blocks delivery.
 
+When an incoming message quotes or replies to another (its `parentId` / `rootId`), the consumer reads that referenced message through `ctx.feishu.getMessage` and prepends its text as a `[引用消息]` block ahead of the reply, so the agent sees the full context. A provider without `getMessage`, or a referenced message with no readable content, leaves the reply unchanged and never blocks delivery.
+
 ### Configuration
 
 | Field | Type | Default | Description |

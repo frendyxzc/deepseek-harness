@@ -40,7 +40,7 @@ interface FeishuSendResult {
 
 ## Receive event
 
-Incoming Feishu events, delivered over the official long-connection client ([`@larksuiteoapi/node-sdk`](../../packages/feishu/feishu-bot)), normalize to one event shape before reaching a receive handler. The client dials OUT to Feishu, so no public callback URL is required. The provider extracts only text messages whose content decoded to non-empty; other message kinds are ignored.
+Incoming Feishu events, delivered over the official long-connection client ([`@larksuiteoapi/node-sdk`](../../packages/feishu/feishu-bot)), normalize to one event shape before reaching a receive handler. The client dials OUT to Feishu, so no public callback URL is required. The provider reduces text, rich-text (`post`), and interactive card (`interactive`) content to plain text and drops messages with no readable content; the received message id and any quoted / replied-to parent or thread-root ids ride along so a consumer can resolve the referenced message.
 
 ```ts type-equiv
 /** One message received from Feishu. */
@@ -53,9 +53,37 @@ interface FeishuReceiveEvent {
   readonly senderIdType: FeishuReceiveIdType
   /** The chat or user id where the message was received. */
   readonly chatId: string
+  /** The received message's id, when the event carries one. */
+  readonly messageId?: string
+  /** The immediately referenced (quoted / replied-to) message id, when present. */
+  readonly parentId?: string
+  /** The thread root message id, when the message is part of a reply thread. */
+  readonly rootId?: string
   /** The message content as plain text (extracted from the event body). */
   readonly content: string
   /** The raw event payload for provider-specific handling. */
+  readonly raw: unknown
+}
+```
+
+## Reading a referenced message
+
+`getMessage(messageId, signal?)` fetches one message by id through the selected provider and returns it as a `FeishuMessage` with its content extracted as plain text, so a consumer can read a quoted or replied-to message referenced by an incoming event. A provider without read support raises `FEISHU_GET_UNSUPPORTED`. The extraction uses the same text / post / interactive reduction as the receive path.
+
+```ts type-equiv
+/** One message fetched by id from a Feishu/Lark backend. */
+interface FeishuMessage {
+  /** The message's id. */
+  readonly messageId: string
+  /** The message content type (e.g. `text`, `post`, `interactive`). */
+  readonly msgType: string
+  /** The readable plain text extracted from the message content. */
+  readonly content: string
+  /** The immediately referenced (quoted / replied-to) message id, when present. */
+  readonly parentId?: string
+  /** The thread root message id, when the message is part of a reply thread. */
+  readonly rootId?: string
+  /** The raw payload for provider-specific handling. */
   readonly raw: unknown
 }
 ```
@@ -108,11 +136,11 @@ Selection never depends on registration, config, or HMR order: a capability has 
 
 ## Errors
 
-`FeishuError extends HarnessError` ([core.md](core.md) error taxonomy) with a `code: string` (open, like every other seam's error — `LlmError`, `SubagentError`), not a closed union: a provider may raise its own codes without editing `dsh-feishu`, and consumers must tolerate an unknown code. Seam-neutral codes are raised by the shared `FeishuRuntime` contract: `FEISHU_PROVIDER_UNAVAILABLE`, `FEISHU_PROVIDER_CONFIGURED_MISSING`, `FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`, `FEISHU_PROVIDER_AMBIGUOUS`, `FEISHU_DUPLICATE_PROVIDER` (a registration-time programming error), `FEISHU_RECEIVE_UNSUPPORTED` (message or card-action receive), `FEISHU_UPDATE_UNSUPPORTED`, and `FEISHU_PROVIDER_ERROR` (the catch-all for a provider's own failure surfaced through the seam). Provider-owned codes raised by `dsh-feishu-bot` include `FEISHU_PROVIDER_AUTH_FAILED`, `FEISHU_PROVIDER_CREDENTIAL_MISSING`, and `FEISHU_ABORTED`.
+`FeishuError extends HarnessError` ([core.md](core.md) error taxonomy) with a `code: string` (open, like every other seam's error — `LlmError`, `SubagentError`), not a closed union: a provider may raise its own codes without editing `dsh-feishu`, and consumers must tolerate an unknown code. Seam-neutral codes are raised by the shared `FeishuRuntime` contract: `FEISHU_PROVIDER_UNAVAILABLE`, `FEISHU_PROVIDER_CONFIGURED_MISSING`, `FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`, `FEISHU_PROVIDER_AMBIGUOUS`, `FEISHU_DUPLICATE_PROVIDER` (a registration-time programming error), `FEISHU_RECEIVE_UNSUPPORTED` (message or card-action receive), `FEISHU_UPDATE_UNSUPPORTED`, `FEISHU_GET_UNSUPPORTED`, and `FEISHU_PROVIDER_ERROR` (the catch-all for a provider's own failure surfaced through the seam). Provider-owned codes raised by `dsh-feishu-bot` include `FEISHU_PROVIDER_AUTH_FAILED`, `FEISHU_PROVIDER_CREDENTIAL_MISSING`, and `FEISHU_ABORTED`.
 
 ## The service
 
-`FeishuRuntime` registers providers, rejects duplicate ids with `FEISHU_DUPLICATE_PROVIDER`, resolves providers at execution time with structured selection errors, sends and updates messages through the selected provider, starts the selected provider's receive channel for messages and card button actions (throwing `FEISHU_RECEIVE_UNSUPPORTED` for a provider without the matching capability), and projects a display-safe status through `status()`.
+`FeishuRuntime` registers providers, rejects duplicate ids with `FEISHU_DUPLICATE_PROVIDER`, resolves providers at execution time with structured selection errors, sends, updates, and reads messages through the selected provider, starts the selected provider's receive channel for messages and card button actions (throwing `FEISHU_RECEIVE_UNSUPPORTED` for a provider without the matching capability), and projects a display-safe status through `status()`.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -191,6 +219,19 @@ startReceivingCardActions(handler: FeishuCardActionHandler): () => void
  * @param signal - optional cancellation signal forwarded to the provider.
  */
 async updateMessage(messageId: string, content: string, signal?: AbortSignal): Promise<void>
+
+/**
+ * Fetch one message by id through the selected provider — e.g. to read a
+ * quoted or replied-to message referenced by an inbound event. Resolves the
+ * provider at call time with the selection rules above; throws
+ * {@link FeishuError} `FEISHU_GET_UNSUPPORTED` when the provider has no
+ * `getMessage`, or the provider's own failure when the fetch does not
+ * succeed.
+ * @param messageId - the Feishu message id.
+ * @param signal - optional cancellation signal forwarded to the provider.
+ * @returns the fetched message with its content extracted as plain text.
+ */
+async getMessage(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>
 
 /**
  * Project the effective connection state of this capability for status

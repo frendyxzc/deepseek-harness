@@ -221,6 +221,136 @@ describe('FeishuBotProvider.startReceiving', () => {
     expect(received).toHaveLength(1)
   })
 
+  it('extracts post (rich-text) content and carries message/quote ids', async () => {
+    const received: FeishuReceiveEvent[] = []
+    const provider = new FeishuBotProvider(options())
+    provider.startReceiving(event => received.push(event))
+    await flush()
+    const onMessage = sdkMock.dispatchers[0]!.handles['im.message.receive_v1']!
+
+    onMessage({
+      sender: { sender_id: { open_id: 'ou_1' }, sender_type: 'open_id' },
+      message: {
+        message_id: 'om_9',
+        parent_id: 'om_8',
+        root_id: 'om_7',
+        chat_id: 'oc_1',
+        message_type: 'post',
+        content: JSON.stringify({
+          title: 'a title',
+          content: [
+            [{ tag: 'text', text: 'hello ' }, { tag: 'a', text: 'Feishu', href: 'https://feishu.cn' }],
+            [{ tag: 'at', user_id: 'ou_2', user_name: 'Alice' }],
+          ],
+        }),
+      },
+    })
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({
+      chatId: 'oc_1',
+      messageId: 'om_9',
+      parentId: 'om_8',
+      rootId: 'om_7',
+      content: 'a title\nhello [Feishu](https://feishu.cn)\n@Alice',
+    })
+  })
+
+  it('extracts interactive card content into text', async () => {
+    const received: FeishuReceiveEvent[] = []
+    const provider = new FeishuBotProvider(options())
+    provider.startReceiving(event => received.push(event))
+    await flush()
+    const onMessage = sdkMock.dispatchers[0]!.handles['im.message.receive_v1']!
+
+    onMessage({
+      sender: { sender_id: { open_id: 'ou_1' }, sender_type: 'open_id' },
+      message: {
+        message_id: 'om_c',
+        chat_id: 'oc_1',
+        message_type: 'interactive',
+        content: JSON.stringify({
+          header: { title: { tag: 'plain_text', content: 'Approval' } },
+          elements: [
+            { tag: 'div', text: { tag: 'lark_md', content: 'Release **v1.0**?' } },
+            { tag: 'button', text: { tag: 'plain_text', content: 'Approve' } },
+          ],
+        }),
+      },
+    })
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({
+      chatId: 'oc_1',
+      messageId: 'om_c',
+      content: 'Approval\nRelease **v1.0**?\nApprove',
+    })
+  })
+
+  it('extracts a v2 (cubed) card header subtitle and nested body', async () => {
+    const received: FeishuReceiveEvent[] = []
+    const provider = new FeishuBotProvider(options())
+    provider.startReceiving(event => received.push(event))
+    await flush()
+    const onMessage = sdkMock.dispatchers[0]!.handles['im.message.receive_v1']!
+
+    onMessage({
+      sender: { sender_id: { open_id: 'ou_1' }, sender_type: 'open_id' },
+      message: {
+        message_id: 'om_c2',
+        chat_id: 'oc_1',
+        message_type: 'interactive',
+        content: JSON.stringify({
+          schema: '2.0',
+          header: {
+            title: { tag: 'plain_text', content: 'Title' },
+            subtitle: { tag: 'plain_text', content: 'Subtitle' },
+          },
+          body: {
+            elements: [
+              { tag: 'column_set', columns: [{ tag: 'column', elements: [
+                { tag: 'div', text: { tag: 'lark_md', content: 'Body' } },
+              ] }] },
+            ],
+          },
+        }),
+      },
+    })
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({
+      chatId: 'oc_1',
+      messageId: 'om_c2',
+      content: 'Title\nSubtitle\nBody',
+    })
+  })
+
+  it('renders a card image caption and a placeholder for uncaptioned images', async () => {
+    const received: FeishuReceiveEvent[] = []
+    const provider = new FeishuBotProvider(options())
+    provider.startReceiving(event => received.push(event))
+    await flush()
+    const onMessage = sdkMock.dispatchers[0]!.handles['im.message.receive_v1']!
+
+    onMessage({
+      sender: { sender_id: { open_id: 'ou_1' }, sender_type: 'open_id' },
+      message: {
+        message_id: 'om_c3',
+        chat_id: 'oc_1',
+        message_type: 'interactive',
+        content: JSON.stringify({
+          elements: [
+            { tag: 'img', img_key: 'img_1', alt: { tag: 'plain_text', content: 'a chart' } },
+            { tag: 'img', img_key: 'img_2' },
+          ],
+        }),
+      },
+    })
+    expect(received).toHaveLength(1)
+    expect(received[0]).toMatchObject({
+      chatId: 'oc_1',
+      messageId: 'om_c3',
+      content: 'a chart\n[图片]',
+    })
+  })
+
   it('closes the connection and marks receive inactive on disposal', async () => {
     const provider = new FeishuBotProvider(options())
     const dispose = provider.startReceiving(() => {})
@@ -399,6 +529,122 @@ describe('FeishuBotProvider.updateMessage', () => {
     const controller = new AbortController()
     controller.abort()
     await expect(provider.updateMessage('om_1', '{}', controller.signal)).rejects.toThrow(
+      expect.objectContaining({ code: 'FEISHU_ABORTED' }),
+    )
+  })
+})
+
+describe('FeishuBotProvider.getMessage', () => {
+  it('fetches a token then GETs the message and extracts its content', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, tenant_access_token: 'tok', expire: 7200 }))
+      .mockResolvedValueOnce(jsonResponse({
+        code: 0,
+        data: {
+          items: [{
+            message_id: 'om_1',
+            parent_id: 'om_0',
+            root_id: 'om_0',
+            msg_type: 'text',
+            body: { content: JSON.stringify({ text: 'quoted text' }) },
+          }],
+        },
+      })))
+    const provider = new FeishuBotProvider(options())
+    const result = await provider.getMessage('om_1')
+    expect(result).toEqual({
+      messageId: 'om_1',
+      msgType: 'text',
+      content: 'quoted text',
+      parentId: 'om_0',
+      rootId: 'om_0',
+      raw: expect.objectContaining({ message_id: 'om_1' }),
+    })
+    expectFetchUrls([
+      'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
+      'https://open.feishu.cn/open-apis/im/v1/messages/om_1',
+    ])
+    const getCall = vi.mocked(fetch).mock.calls[1]!
+    expect(getCall[1]).toMatchObject({ method: 'GET' })
+  })
+
+  it('extracts a referenced interactive card returned in post-shaped form', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, tenant_access_token: 'tok', expire: 7200 }))
+      .mockResolvedValueOnce(jsonResponse({
+        code: 0,
+        data: {
+          items: [{
+            message_id: 'om_card',
+            msg_type: 'interactive',
+            body: {
+              content: JSON.stringify({
+                title: null,
+                elements: [
+                  [
+                    { tag: 'text', text: '✅ Answered\n' },
+                    { tag: 'text', text: 'The agent has a question' },
+                    { tag: 'a', text: 'help', href: 'https://feishu.cn/help' },
+                    { tag: 'text', text: '\n是,关联团队资产' },
+                  ],
+                ],
+              }),
+            },
+          }],
+        },
+      })))
+    const provider = new FeishuBotProvider(options())
+    const result = await provider.getMessage('om_card')
+    expect(result).toEqual({
+      messageId: 'om_card',
+      msgType: 'interactive',
+      content: '✅ Answered\nThe agent has a question[help](https://feishu.cn/help)\n是,关联团队资产',
+      raw: expect.objectContaining({ message_id: 'om_card' }),
+    })
+  })
+
+  it('returns empty content and no references for a message without them', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, tenant_access_token: 'tok', expire: 7200 }))
+      .mockResolvedValueOnce(jsonResponse({
+        code: 0,
+        data: { items: [{ message_id: 'om_2', msg_type: 'image', body: { content: '{"image_key":"img_1"}' } }] },
+      })))
+    const provider = new FeishuBotProvider(options())
+    const result = await provider.getMessage('om_2')
+    expect(result).toEqual({
+      messageId: 'om_2',
+      msgType: 'image',
+      content: '',
+      raw: expect.objectContaining({ message_id: 'om_2' }),
+    })
+  })
+
+  it('throws FEISHU_PROVIDER_ERROR when the endpoint returns no message', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, tenant_access_token: 'tok', expire: 7200 }))
+      .mockResolvedValueOnce(jsonResponse({ code: 0, data: { items: [] } })))
+    const provider = new FeishuBotProvider(options())
+    await expect(provider.getMessage('om_3')).rejects.toThrow(
+      expect.objectContaining({ code: 'FEISHU_PROVIDER_ERROR' }),
+    )
+  })
+
+  it('throws FEISHU_PROVIDER_ERROR on an API error', async () => {
+    vi.stubGlobal('fetch', vi.fn()
+      .mockResolvedValueOnce(jsonResponse({ code: 0, tenant_access_token: 'tok', expire: 7200 }))
+      .mockResolvedValueOnce(jsonResponse({ code: 99991663, msg: 'not found' })))
+    const provider = new FeishuBotProvider(options())
+    await expect(provider.getMessage('om_4')).rejects.toThrow(
+      expect.objectContaining({ code: 'FEISHU_PROVIDER_ERROR' }),
+    )
+  })
+
+  it('throws FEISHU_ABORTED for a pre-aborted signal', async () => {
+    const provider = new FeishuBotProvider(options())
+    const controller = new AbortController()
+    controller.abort()
+    await expect(provider.getMessage('om_1', controller.signal)).rejects.toThrow(
       expect.objectContaining({ code: 'FEISHU_ABORTED' }),
     )
   })

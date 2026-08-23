@@ -19,6 +19,7 @@ import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import { FeishuError } from '@deepseek-ai/dsh-feishu'
+import type { FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
@@ -82,6 +83,60 @@ interface ResolvedConfig extends Config {
 
 /** The acknowledgement text sent back to the chat before the agent starts. */
 const ACK_MESSAGE = '已收到，正在处理…'
+
+/** Prefix marking content resolved from a quoted / replied-to message. */
+const REFERENCED_LABEL = '[引用消息]'
+
+/**
+ * Resolve the message an inbound event references (its quoted / replied-to
+ * parent) into readable text, so the agent sees the full context rather than
+ * just the reply. Returns '' when there is no reference, the provider cannot
+ * read messages, or the referenced message has no readable content; a fetch
+ * failure is logged and never blocks delivery.
+ * @param ctx - the plugin context, supplying the Feishu seam and logger.
+ * @param event - the inbound message event.
+ * @returns the label-wrapped referenced content, or ''.
+ */
+async function resolveReferencedContent(ctx: Context, event: FeishuReceiveEvent): Promise<string> {
+  const referencedId = event.parentId ?? event.rootId
+  if (referencedId === undefined || referencedId.length === 0) return ''
+  try {
+    const message = await ctx.feishu.getMessage(referencedId)
+    const content = message.content.trim()
+    // console, not ctx.logger: the default logger buffers in memory, so the
+    // read outcome must print here to be visible in dsh-web.log. Record the
+    // fetched type and content length so an empty extraction is distinguishable
+    // from a resolved reference.
+    console.log(`feishu-receive: referenced ${referencedId} → msgType=${message.msgType} contentLen=${content.length}`)
+    if (content.length === 0) return ''
+    return `${REFERENCED_LABEL}\n${content}`
+  } catch (error: unknown) {
+    // A provider without getMessage is a capability gap, not a delivery
+    // failure; any other failure is logged but must not block the reply.
+    if (!(error instanceof FeishuError && error.code === 'FEISHU_GET_UNSUPPORTED')) {
+      ctx.logger.warn('feishu-receive: failed to read referenced message %s: %s', referencedId, String(error))
+    }
+    console.log(`feishu-receive: referenced ${referencedId} read failed: ${String(error)}`)
+    return ''
+  }
+}
+
+/**
+ * Summarize an inbound event's raw payload for diagnostics: the source message
+ * type (text / post / interactive) and its raw `content` length, before any
+ * text extraction. The length — not the raw content itself — keeps the
+ * delivery log readable while still distinguishing a rich payload from an
+ * empty one.
+ * @param raw - the raw receive event payload.
+ * @returns a single-line `msgType=… contentLen=…` summary.
+ */
+function summarizeRawMessage(raw: unknown): string {
+  const inner = raw as { message?: Record<string, unknown> } | null | undefined
+  const rawMsgType = inner?.message?.message_type ?? inner?.message?.msg_type
+  const msgType = typeof rawMsgType === 'string' ? rawMsgType : '?'
+  const content = typeof inner?.message?.content === 'string' ? inner.message.content : ''
+  return `msgType=${msgType} contentLen=${content.length}`
+}
 
 /**
  * Prefix of each per-chat agent's session id. The suffix is a fresh UUID so a
@@ -226,8 +281,20 @@ export function apply(ctx: Context, config: Config = {}): void {
             }
             const handle = await getOrCreate(chatId)
             created.add(handle)
+            const referenced = await resolveReferencedContent(ctx, event)
+            const text = referenced.length > 0 ? `${referenced}\n\n${event.content}` : event.content
+            // console, not ctx.logger: the default logger buffers in memory and is not
+            // exported to the process log, so the delivery diagnostic must print here
+            // to be visible in dsh-web.log. parent/root show whether the inbound event
+            // carried a quoted / replied-to reference at all, so an absent `[引用消息]`
+            // can be attributed to a missing reference rather than a failed read; the
+            // delivered length replaces the raw payload so the line stays concise.
+            console.log(
+              `feishu-receive: ${summarizeRawMessage(event.raw)} parent=${event.parentId ?? '-'} `
+              + `root=${event.rootId ?? '-'} → deliveredLen=${text.length}`,
+            )
             handle.agent.followup(createUserMessage({
-              content: [{ type: 'text', text: event.content }],
+              content: [{ type: 'text', text }],
               source: { kind: 'user' },
             }))
             ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)

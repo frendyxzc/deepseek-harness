@@ -50,9 +50,31 @@ export interface FeishuReceiveEvent {
   readonly senderIdType: FeishuReceiveIdType
   /** The chat or user id where the message was received. */
   readonly chatId: string
+  /** The received message's id, when the event carries one. */
+  readonly messageId?: string
+  /** The immediately referenced (quoted / replied-to) message id, when present. */
+  readonly parentId?: string
+  /** The thread root message id, when the message is part of a reply thread. */
+  readonly rootId?: string
   /** The message content as plain text (extracted from the event body). */
   readonly content: string
   /** The raw event payload for provider-specific handling. */
+  readonly raw: unknown
+}
+
+/** One message fetched by id from a Feishu/Lark backend. */
+export interface FeishuMessage {
+  /** The message's id. */
+  readonly messageId: string
+  /** The message content type (e.g. `text`, `post`, `interactive`). */
+  readonly msgType: string
+  /** The readable plain text extracted from the message content. */
+  readonly content: string
+  /** The immediately referenced (quoted / replied-to) message id, when present. */
+  readonly parentId?: string
+  /** The thread root message id, when the message is part of a reply thread. */
+  readonly rootId?: string
+  /** The raw payload for provider-specific handling. */
   readonly raw: unknown
 }
 
@@ -172,6 +194,15 @@ export interface FeishuProvider {
    * @param signal - optional cancellation signal.
    */
   updateMessage?(messageId: string, content: string, signal?: AbortSignal): Promise<void>
+  /**
+   * Fetch one message by id from the backend — e.g. to read a quoted or
+   * replied-to message so a reply's full context is available. Honor
+   * `signal` for cancellation.
+   * @param messageId - the Feishu message id.
+   * @param signal - optional cancellation signal.
+   * @returns the fetched message with its content extracted as plain text.
+   */
+  getMessage?(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>
   /**
    * Project this provider's connection state and display-safe configuration
    * for status surfaces. May resolve credentials; must not throw. Providers
