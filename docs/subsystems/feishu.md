@@ -20,6 +20,8 @@ interface FeishuSendRequest {
   readonly receiveId: string
   /** The recipient id type; defaults to `open_id` when omitted. */
   readonly receiveIdType?: FeishuReceiveIdType
+  /** Explicit provider id to route through; omitted uses the seam's selection (and per-chat routing). */
+  readonly providerId?: string
   /** Message content as a plain text string. */
   readonly content: string
   /**
@@ -38,15 +40,43 @@ interface FeishuSendResult {
 }
 ```
 
+## Message images
+
+A message's embedded images are extracted from its content as `FeishuMessageImage` references, and a consumer fetches one image's bytes as a `FeishuMessageResource` through `getMessageResource`.
+
+```ts type-equiv
+/**
+ * One image discovered in Feishu message content. The enclosing message's id
+ * is the download scope: a consumer combines this `fileKey` with the event or
+ * fetched message's `messageId` to fetch the image bytes.
+ */
+interface FeishuMessageImage {
+  /** The Feishu image key used as the download file key. */
+  readonly fileKey: string
+}
+```
+
+```ts type-equiv
+/** One binary image resource fetched from a Feishu/Lark message. */
+interface FeishuMessageResource {
+  /** Raw image bytes. */
+  readonly data: Uint8Array
+}
+```
+
 ## Receive event
 
-Incoming Feishu events, delivered over the official long-connection client ([`@larksuiteoapi/node-sdk`](../../packages/feishu/feishu-bot)), normalize to one event shape before reaching a receive handler. The client dials OUT to Feishu, so no public callback URL is required. The provider reduces text, rich-text (`post`), and interactive card (`interactive`) content to plain text and drops messages with no readable content; the received message id and any quoted / replied-to parent or thread-root ids ride along so a consumer can resolve the referenced message.
+Incoming Feishu events, delivered over the official long-connection client ([`@larksuiteoapi/node-sdk`](../../packages/feishu/feishu-bot)), normalize to one event shape before reaching a receive handler. The client dials OUT to Feishu, so no public callback URL is required. The provider reduces text, rich-text (`post`), interactive card (`interactive`), and image content to plain text and attaches any image keys as `images`; a message with no readable text and no images is dropped. The received message id and any quoted / replied-to parent or thread-root ids ride along so a consumer can resolve the referenced message.
 
 ```ts type-equiv
 /** One message received from Feishu. */
 interface FeishuReceiveEvent {
   /** The event type (e.g. `im.message.receive_v1`). */
   readonly eventType: string
+  /** The Feishu App ID that received this event, when the provider knows it. */
+  readonly appId?: string
+  /** The provider registry id that received this event, when the provider knows it. */
+  readonly providerId?: string
   /** The sender's id. */
   readonly senderId: string
   /** The sender id type. */
@@ -61,6 +91,8 @@ interface FeishuReceiveEvent {
   readonly rootId?: string
   /** The message content as plain text (extracted from the event body). */
   readonly content: string
+  /** Images discovered in the message content, scoped to this event's message id. */
+  readonly images?: readonly FeishuMessageImage[]
   /** The raw event payload for provider-specific handling. */
   readonly raw: unknown
 }
@@ -68,7 +100,9 @@ interface FeishuReceiveEvent {
 
 ## Reading a referenced message
 
-`getMessage(messageId, signal?)` fetches one message by id through the selected provider and returns it as a `FeishuMessage` with its content extracted as plain text, so a consumer can read a quoted or replied-to message referenced by an incoming event. A provider without read support raises `FEISHU_GET_UNSUPPORTED`. The extraction uses the same text / post / interactive reduction as the receive path.
+`getMessage(messageId, signal?)` fetches one message by id through the selected provider and returns it as a `FeishuMessage` with its content extracted as plain text and any image keys in `images`, so a consumer can read a quoted or replied-to message referenced by an incoming event. Interactive cards resolve to their original card JSON, so a markdown card component is read as its text rather than a preview placeholder. A provider without read support raises `FEISHU_GET_UNSUPPORTED`. The extraction uses the same text / post / interactive / image reduction as the receive path.
+
+`getMessageResource(messageId, fileKey, signal?)` fetches the raw bytes of one image attached to a message by its file key, so a multimodal model can read it. A provider without resource read support raises `FEISHU_RESOURCE_UNSUPPORTED`.
 
 ```ts type-equiv
 /** One message fetched by id from a Feishu/Lark backend. */
@@ -79,6 +113,8 @@ interface FeishuMessage {
   readonly msgType: string
   /** The readable plain text extracted from the message content. */
   readonly content: string
+  /** Images discovered in the message content, scoped to this message's id. */
+  readonly images?: readonly FeishuMessageImage[]
   /** The immediately referenced (quoted / replied-to) message id, when present. */
   readonly parentId?: string
   /** The thread root message id, when the message is part of a reply thread. */
@@ -136,11 +172,11 @@ Selection never depends on registration, config, or HMR order: a capability has 
 
 ## Errors
 
-`FeishuError extends HarnessError` ([core.md](core.md) error taxonomy) with a `code: string` (open, like every other seam's error — `LlmError`, `SubagentError`), not a closed union: a provider may raise its own codes without editing `dsh-feishu`, and consumers must tolerate an unknown code. Seam-neutral codes are raised by the shared `FeishuRuntime` contract: `FEISHU_PROVIDER_UNAVAILABLE`, `FEISHU_PROVIDER_CONFIGURED_MISSING`, `FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`, `FEISHU_PROVIDER_AMBIGUOUS`, `FEISHU_DUPLICATE_PROVIDER` (a registration-time programming error), `FEISHU_RECEIVE_UNSUPPORTED` (message or card-action receive), `FEISHU_UPDATE_UNSUPPORTED`, `FEISHU_GET_UNSUPPORTED`, and `FEISHU_PROVIDER_ERROR` (the catch-all for a provider's own failure surfaced through the seam). Provider-owned codes raised by `dsh-feishu-bot` include `FEISHU_PROVIDER_AUTH_FAILED`, `FEISHU_PROVIDER_CREDENTIAL_MISSING`, and `FEISHU_ABORTED`.
+`FeishuError extends HarnessError` ([core.md](core.md) error taxonomy) with a `code: string` (open, like every other seam's error — `LlmError`, `SubagentError`), not a closed union: a provider may raise its own codes without editing `dsh-feishu`, and consumers must tolerate an unknown code. Seam-neutral codes are raised by the shared `FeishuRuntime` contract: `FEISHU_PROVIDER_UNAVAILABLE`, `FEISHU_PROVIDER_CONFIGURED_MISSING`, `FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`, `FEISHU_PROVIDER_AMBIGUOUS`, `FEISHU_DUPLICATE_PROVIDER` (a registration-time programming error), `FEISHU_RECEIVE_UNSUPPORTED` (message or card-action receive), `FEISHU_UPDATE_UNSUPPORTED`, `FEISHU_GET_UNSUPPORTED`, `FEISHU_RESOURCE_UNSUPPORTED` (message resource read), and `FEISHU_PROVIDER_ERROR` (the catch-all for a provider's own failure surfaced through the seam). Provider-owned codes raised by `dsh-feishu-bot` include `FEISHU_PROVIDER_AUTH_FAILED`, `FEISHU_PROVIDER_CREDENTIAL_MISSING`, and `FEISHU_ABORTED`.
 
 ## The service
 
-`FeishuRuntime` registers providers, rejects duplicate ids with `FEISHU_DUPLICATE_PROVIDER`, resolves providers at execution time with structured selection errors, sends, updates, and reads messages through the selected provider, starts the selected provider's receive channel for messages and card button actions (throwing `FEISHU_RECEIVE_UNSUPPORTED` for a provider without the matching capability), and projects a display-safe status through `status()`.
+`FeishuRuntime` registers providers, rejects duplicate ids with `FEISHU_DUPLICATE_PROVIDER`, resolves providers at execution time with structured selection errors, sends, updates, and reads messages, fetches message image resources, starts the selected provider's receive channel for messages and card button actions (throwing `FEISHU_RECEIVE_UNSUPPORTED` for a provider without the matching capability), and projects a display-safe status through `status()`.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

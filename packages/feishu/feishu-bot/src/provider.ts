@@ -15,6 +15,7 @@ import type {
   FeishuCardActionEvent,
   FeishuCardActionHandler,
   FeishuMessage,
+  FeishuMessageResource,
   FeishuProvider,
   FeishuProviderStatus,
   FeishuReceiveEvent,
@@ -360,6 +361,12 @@ export class FeishuBotProvider implements FeishuProvider {
    * Fetch one message by id from the Feishu `/im/v1/messages/:message_id`
    * endpoint and extract its content as plain text. Used to read a quoted or
    * replied-to message so a reply's full context is available.
+   *
+   * The request sends `card_msg_content_type=user_card_content` so interactive
+   * card messages resolve to their original card JSON (schema 1.0 or 2.0)
+   * rather than the flattened preview form. Without it Feishu returns a card
+   * that uses newer components (e.g. `tag: "markdown"`) as an image placeholder
+   * plus "请升级至最新版本客户端", which loses the message's text entirely.
    * @param messageId - the Feishu message id.
    * @param signal - abort signal for the surrounding operation.
    */
@@ -370,7 +377,7 @@ export class FeishuBotProvider implements FeishuProvider {
     const token = await this.getAccessToken(options, signal)
     throwIfAborted(signal)
 
-    const url = `${options.baseURL}/im/v1/messages/${encodeURIComponent(messageId)}`
+    const url = `${options.baseURL}/im/v1/messages/${encodeURIComponent(messageId)}?card_msg_content_type=user_card_content`
 
     let response: Response
     try {
@@ -410,15 +417,68 @@ export class FeishuBotProvider implements FeishuProvider {
     }
 
     const msgType = typeof item.msg_type === 'string' ? item.msg_type : ''
+    const { text: content, images } = extractMessageContent(msgType, item.body?.content)
     this.lastError = undefined
     return {
       messageId: typeof item.message_id === 'string' ? item.message_id : messageId,
       msgType,
-      content: extractMessageContent(msgType, item.body?.content),
+      content,
+      ...(images.length > 0 ? { images: images.map(fileKey => ({ fileKey })) } : {}),
       ...(typeof item.parent_id === 'string' ? { parentId: item.parent_id } : {}),
       ...(typeof item.root_id === 'string' ? { rootId: item.root_id } : {}),
       raw: item,
     }
+  }
+
+  /**
+   * Fetch one image attached to a message by its file key from the Feishu
+   * `/im/v1/messages/:message_id/resources/:file_key?type=image` endpoint. Used
+   * to read the image a user posted so a multimodal model can see it. Feishu
+   * returns the raw image bytes on success and a JSON error envelope on a
+   * non-2xx status (e.g. the resource was deleted).
+   * @param messageId - the Feishu message id the image belongs to.
+   * @param fileKey - the image's file key from the message content.
+   * @param signal - abort signal for the surrounding operation.
+   */
+  async getMessageResource(messageId: string, fileKey: string, signal?: AbortSignal): Promise<FeishuMessageResource> {
+    const options = this.resolveOptions()
+    throwIfAborted(signal)
+
+    const token = await this.getAccessToken(options, signal)
+    throwIfAborted(signal)
+
+    const url = `${options.baseURL}/im/v1/messages/${encodeURIComponent(messageId)}/resources/${encodeURIComponent(fileKey)}?type=image`
+
+    let response: Response
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        redirect: 'error',
+        headers: {
+          'authorization': `Bearer ${token}`,
+          'user-agent': USER_AGENT,
+        },
+        ...signal !== undefined ? { signal } : {},
+      })
+    } catch (error: unknown) {
+      if (signal?.aborted === true || isAbortError(error)) throw sendAborted(signal, error)
+      throw this.fail(
+        `Feishu get message resource request failed: ${String(error)}`,
+        'FEISHU_PROVIDER_ERROR',
+        error,
+      )
+    }
+
+    if (!response.ok) {
+      const detail = await readErrorDetail(response)
+      throw this.fail(
+        `Feishu message resource download failed (code ${String(detail.code)}): ${detail.msg ?? 'unknown error'}`,
+        'FEISHU_PROVIDER_ERROR',
+      )
+    }
+
+    this.lastError = undefined
+    return { data: new Uint8Array(await response.arrayBuffer()) }
   }
 
   /**
@@ -668,6 +728,16 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === 'AbortError'
 }
 
+/** Best-effort read of the JSON error envelope Feishu returns on non-2xx responses. */
+async function readErrorDetail(response: Response): Promise<{ code: unknown; msg?: string }> {
+  try {
+    const body = await response.json() as { code?: unknown; msg?: unknown }
+    return { code: body.code ?? response.status, ...(typeof body.msg === 'string' ? { msg: body.msg } : {}) }
+  } catch {
+    return { code: response.status }
+  }
+}
+
 /**
  * Mask an App ID for display: first and last four characters with the middle
  * redacted; short ids keep only their first and last characters.
@@ -703,10 +773,11 @@ function extractSenderId(raw: unknown, senderIdType: FeishuReceiveIdType): strin
  * Convert one `im.message.receive_v1` payload — the inner `message` / `sender`
  * shape delivered by the long-connection client — into a
  * {@link FeishuReceiveEvent}. Returns undefined for unsupported or empty
- * content, which the caller drops. Text, rich-text (`post`), and interactive
- * card (`interactive`) messages are all reduced to their plain-text reading;
- * the received message id and any quoted / replied-to parent or thread root
- * ids ride along so consumers can resolve the referenced message.
+ * content, which the caller drops. Text, rich-text (`post`), interactive card
+ * (`interactive`), and image messages are reduced to their plain-text reading,
+ * with any image keys attached as {@link FeishuReceiveEvent.images}; the
+ * received message id and any quoted / replied-to parent or thread root ids
+ * ride along so consumers can resolve the referenced message.
  * @param message - the event's message body.
  * @param sender - the event's sender body.
  * @param raw - the raw event payload, attached to the emitted event.
@@ -727,8 +798,8 @@ function toReceiveEvent(
   const chatId = typeof msg?.chat_id === 'string' ? msg.chat_id : ''
   const rawMsgType = msg === undefined ? undefined : (msg.message_type ?? msg.msg_type)
   const msgType = typeof rawMsgType === 'string' ? rawMsgType : ''
-  const content = extractMessageContent(msgType, msg?.content)
-  if (content.length === 0) return undefined
+  const { text: content, images } = extractMessageContent(msgType, msg?.content)
+  if (content.length === 0 && images.length === 0) return undefined
   return {
     eventType: 'im.message.receive_v1',
     ...(appId === undefined ? {} : { appId }),
@@ -740,34 +811,83 @@ function toReceiveEvent(
     ...(typeof msg?.parent_id === 'string' ? { parentId: msg.parent_id } : {}),
     ...(typeof msg?.root_id === 'string' ? { rootId: msg.root_id } : {}),
     content,
+    ...(images.length > 0 ? { images: images.map(fileKey => ({ fileKey })) } : {}),
     raw,
   }
 }
 
-/** Message content types the receive path reduces to plain text. */
-const SUPPORTED_RECEIVE_TYPES = new Set(['text', 'post', 'interactive'])
+/** Message content types the receive path reduces to readable text or images. */
+const SUPPORTED_RECEIVE_TYPES = new Set(['text', 'post', 'interactive', 'image'])
+
+/** Extraction product for one Feishu message content: readable text plus discovered image keys. */
+interface ExtractedContent {
+  /** The readable text, or '' when nothing readable was found. */
+  readonly text: string
+  /** Image keys discovered in the content, in document order with duplicates removed. */
+  readonly images: readonly string[]
+}
 
 /**
- * Reduce one Feishu message content string to its plain-text reading for the
- * given message type. Returns '' for unsupported types or unparsable content.
+ * Reduce one Feishu message content string to its plain-text reading and its
+ * image keys. Returns empty text and no images for unsupported types or
+ * unparsable content.
  * @param msgType - the Feishu message content type.
  * @param rawContent - the `content` JSON string from the message body.
- * @returns the extracted text, or '' when nothing readable was found.
+ * @returns the extracted text and image keys.
  */
-function extractMessageContent(msgType: string, rawContent: unknown): string {
-  if (!SUPPORTED_RECEIVE_TYPES.has(msgType)) return ''
+function extractMessageContent(msgType: string, rawContent: unknown): ExtractedContent {
   const parsed = safeParseJson(typeof rawContent === 'string' ? rawContent : undefined)
-  if (parsed === undefined) return ''
+  if (!SUPPORTED_RECEIVE_TYPES.has(msgType) || parsed === undefined) return { text: '', images: [] }
+  const images = extractImageKeys(parsed)
   switch (msgType) {
     case 'text':
-      return typeof parsed.text === 'string' ? parsed.text : ''
+      return { text: typeof parsed.text === 'string' ? parsed.text : '', images }
+    case 'image':
+      return { text: images.length > 0 ? '[图片]' : '', images }
     case 'post':
-      return extractPostText(parsed)
+      return { text: extractPostText(parsed), images }
     case 'interactive':
-      return extractCardText(parsed)
+      return { text: extractCardText(parsed), images }
     default:
-      return ''
+      return { text: '', images }
   }
+}
+
+/**
+ * Collect image keys from one parsed message content in document order: the
+ * direct `image_key` of an image message, plus every `img` element's key (post
+ * inline images, card-schema images, and the flattened get-message card form).
+ * @param parsed - the parsed message content.
+ * @returns de-duplicated image keys.
+ */
+function extractImageKeys(parsed: Record<string, unknown>): string[] {
+  const keys: string[] = []
+  const direct = typeof parsed.image_key === 'string' ? parsed.image_key : ''
+  if (direct.length > 0) keys.push(direct)
+  visitImageKeys(parsed, keys)
+  const seen = new Set<string>()
+  return keys.filter((key) => {
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+/** Walk a parsed content tree, appending the file key of every `img` element. */
+function visitImageKeys(node: unknown, out: string[]): void {
+  if (node === null || node === undefined) return
+  if (Array.isArray(node)) {
+    for (const child of node) visitImageKeys(child, out)
+    return
+  }
+  if (typeof node !== 'object') return
+  const obj = node as Record<string, unknown>
+  if (obj.tag === 'img') {
+    const key = firstString(obj.image_key, obj.img_key)
+    if (key.length > 0) out.push(key)
+    return
+  }
+  for (const value of Object.values(obj)) visitImageKeys(value, out)
 }
 
 /** Parse a JSON string into a record view, tolerating malformed input. */
@@ -865,10 +985,11 @@ function renderPostElement(element: Record<string, unknown>): string {
  * are collapsed preserving order.
  */
 function extractCardText(parsed: Record<string, unknown>): string {
-  // The get-message endpoint returns interactive cards in post-shaped form —
-  // `{ title, elements: [[{tag: "text"|"a"|"at"|"img", …}, …], …] }` — instead
-  // of the card-authoring schema. Route that body through the post renderer so
-  // a referenced card resolves to readable text rather than ''.
+  // Some card content arrives in post-shaped form — `{ title, elements:
+  // [[{tag: "text"|"a"|"at"|"img", …}, …], …] }` — instead of the card-authoring
+  // schema (e.g. the flat preview Feishu returns when the original card JSON was
+  // not requested, or a receive event's flattened body). Route that through the
+  // post renderer so the paragraphs resolve to readable text rather than ''.
   if (Array.isArray(parsed.elements) && parsed.elements.every(paragraph => Array.isArray(paragraph))) {
     return renderPostBody(typeof parsed.title === 'string' ? parsed.title : '', parsed.elements)
   }

@@ -6,7 +6,7 @@
 
 ## 用途
 
-为每个已配置应用把一个 `FeishuBotProvider` 注册到 `ctx.feishu`（平铺单应用的 id 为 `feishu-bot`），各自使用自己的 provider id。通过飞书 `/auth/v3/tenant_access_token/internal` 端点鉴权，通过 `/im/v1/messages` 发送消息，通过 `PATCH /im/v1/messages/:message_id` 更新已发送的消息，通过 `GET /im/v1/messages/:message_id` 按 id 读取一条消息，并通过 `@larksuiteoapi/node-sdk` 接收 `im.message.receive_v1` 事件与 `card.action.trigger` 卡片回调。
+为每个已配置应用把一个 `FeishuBotProvider` 注册到 `ctx.feishu`（平铺单应用的 id 为 `feishu-bot`），各自使用自己的 provider id。通过飞书 `/auth/v3/tenant_access_token/internal` 端点鉴权，通过 `/im/v1/messages` 发送消息，通过 `PATCH /im/v1/messages/:message_id` 更新已发送的消息，通过 `GET /im/v1/messages/:message_id` 按 id 读取一条消息，通过 `GET /im/v1/messages/:message_id/resources/:file_key?type=image` 按文件 key 拉取某张消息图片，并通过 `@larksuiteoapi/node-sdk` 接收 `im.message.receive_v1` 事件与 `card.action.trigger` 卡片回调。
 
 ## 配置
 
@@ -34,11 +34,13 @@
 
 ## 接收
 
-`startReceiving(handler)` 与 `startReceivingCardActions(handler)` 共享同一个长连接客户端（`@larksuiteoapi/node-sdk`），主动连出飞书，无需公网回调 URL。第一个订阅者——无论是消息还是卡片动作——打开连接；最后一个 disposer 关闭连接，因此消息订阅者与卡片动作订阅者绝不会打开两条连接。`startReceiving` 分发每个 `im.message.receive_v1` 事件，把文本、富文本（`post`）与交互卡片（`interactive`）内容约简为纯文本，丢弃没有可读内容的消息（其他类型与空内容）。每条发出的 `FeishuReceiveEvent` 还会携带收到的 `messageId`，以及存在时的引用/回复 `parentId` 与话题根 `rootId`，以便消费方解析被引用的消息。`startReceivingCardActions` 把每个 `card.action.trigger` 回调分发为 `FeishuCardActionEvent`（operator open id、chat id、message id，以及被点击按钮的 `value` 载荷原样透传、不校验——由消费方对照自身可信状态校验）。启动是异步的：连接或凭据失败通过提供方 `status()` 的 error 状态与插件 logger 暴露。
+`startReceiving(handler)` 与 `startReceivingCardActions(handler)` 共享同一个长连接客户端（`@larksuiteoapi/node-sdk`），主动连出飞书，无需公网回调 URL。第一个订阅者——无论是消息还是卡片动作——打开连接；最后一个 disposer 关闭连接，因此消息订阅者与卡片动作订阅者绝不会打开两条连接。`startReceiving` 分发每个 `im.message.receive_v1` 事件，把文本、富文本（`post`）、交互卡片（`interactive`）与图片（`image`）内容约简为纯文本，丢弃没有可读文本、也没有图片的消息（其他类型与空内容）。每条发出的 `FeishuReceiveEvent` 还会携带收到的 `messageId`、内容中的图片 key（`images`），以及存在时的引用/回复 `parentId` 与话题根 `rootId`，以便消费方解析被引用的消息。`startReceivingCardActions` 把每个 `card.action.trigger` 回调分发为 `FeishuCardActionEvent`（operator open id、chat id、message id，以及被点击按钮的 `value` 载荷原样透传、不校验——由消费方对照自身可信状态校验）。启动是异步的：连接或凭据失败通过提供方 `status()` 的 error 状态与插件 logger 暴露。
 
 ## 读取被引用的消息
 
-`getMessage(messageId, signal?)` 通过 `GET /im/v1/messages/:message_id` 按 id 拉取一条消息，并以 `FeishuMessage` 返回——内容提取为纯文本，存在时附带其 `parentId` / `rootId`。提取采用与 `startReceiving` 相同的 `text` / `post` / `interactive` 约简，因此被引用或回复的消息（包括富文本或卡片消息）与入站消息以相同方式读取。
+`getMessage(messageId, signal?)` 通过 `GET /im/v1/messages/:message_id?card_msg_content_type=user_card_content` 按 id 拉取一条消息，并以 `FeishuMessage` 返回——内容提取为纯文本、图片 key 放在 `images`，存在时附带其 `parentId` / `rootId`。`card_msg_content_type=user_card_content` 查询会把交互卡片解析为发送时的原始卡片 JSON（1.0 或 2.0 版）而非扁平化预览，因此由 `tag: "markdown"` 组件构成的卡片会按 markdown 文本读取，而不是飞书默认返回的图片占位（请升级至最新版本客户端）。提取采用与 `startReceiving` 相同的 `text` / `post` / `interactive` / `image` 约简，因此被引用或回复的消息（包括富文本、卡片或图片消息）与入站消息以相同方式读取。
+
+`getMessageResource(messageId, fileKey, signal?)` 通过 `GET /im/v1/messages/:message_id/resources/:file_key?type=image` 拉取消息中某张图片的原始字节。非 2xx 响应——飞书以此报告资源已被删除——以 `FEISHU_PROVIDER_ERROR` 呈现，其消息携带上报的 `code` 与 `msg`。
 
 ## 更新已发送的消息
 

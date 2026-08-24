@@ -35,6 +35,7 @@ DeepSeek Harness 的飞书（Feishu/Lark）聊天能力 seam（`ctx.feishu`）�
 - `ctx.feishu.startReceivingCardActions(handler)` —— 通过选定提供方的接收通道订阅卡片按钮动作（`FeishuCardActionEvent`）—— 与 `startReceiving` 打开的是同一条通道，绝不另开第二条。返回 disposer，对不支持卡片动作的提供方抛 `FEISHU_RECEIVE_UNSUPPORTED`。handler 必须快速完成处理；任何耗时操作都应放到 handler 之后。
 - `ctx.feishu.updateMessage(messageId, content, signal?)` —— 替换早先通过选定提供方发送的某条消息的内容（例如在按钮被消费后结算一张交互卡片）；对不支持更新的提供方抛 `FEISHU_UPDATE_UNSUPPORTED`。
 - `ctx.feishu.getMessage(messageId, signal?)` —— 通过选定提供方按 id 拉取一条消息，并把它提取为纯文本内容（例如读取入站 `FeishuReceiveEvent` 引用的引用/回复消息）；对不支持读取的提供方抛 `FEISHU_GET_UNSUPPORTED`。
+- `ctx.feishu.getMessageResource(messageId, fileKey, signal?)` —— 按文件 key（`FeishuMessageImage.fileKey`）拉取消息中某张图片的原始字节，使多模态模型能够读取它；对不支持资源读取的提供方抛 `FEISHU_RESOURCE_UNSUPPORTED`。
 - `ctx.feishu.describeStatus()` —— 为状态界面投影有效的连接状态（`FeishuRuntimeStatus`），套用相同的选择规则但不抛错；选择失败以 `state: 'error'` 与 `selectionError` 呈现。提供方可实现异步的 `status(): FeishuProviderStatus` 投影（脱敏 App ID、密钥布尔值、接收活跃度、最近失败）；未实现时由 `available()` 决定 `connected`/`unavailable`。
 
 ## 模型体验

@@ -42,6 +42,22 @@ export interface FeishuSendResult {
   readonly messageId: string
 }
 
+/**
+ * One image discovered in Feishu message content. The enclosing message's id
+ * is the download scope: a consumer combines this `fileKey` with the event or
+ * fetched message's `messageId` to fetch the image bytes.
+ */
+export interface FeishuMessageImage {
+  /** The Feishu image key used as the download file key. */
+  readonly fileKey: string
+}
+
+/** One binary image resource fetched from a Feishu/Lark message. */
+export interface FeishuMessageResource {
+  /** Raw image bytes. */
+  readonly data: Uint8Array
+}
+
 /** One message received from Feishu. */
 export interface FeishuReceiveEvent {
   /** The event type (e.g. `im.message.receive_v1`). */
@@ -64,6 +80,8 @@ export interface FeishuReceiveEvent {
   readonly rootId?: string
   /** The message content as plain text (extracted from the event body). */
   readonly content: string
+  /** Images discovered in the message content, scoped to this event's message id. */
+  readonly images?: readonly FeishuMessageImage[]
   /** The raw event payload for provider-specific handling. */
   readonly raw: unknown
 }
@@ -76,6 +94,8 @@ export interface FeishuMessage {
   readonly msgType: string
   /** The readable plain text extracted from the message content. */
   readonly content: string
+  /** Images discovered in the message content, scoped to this message's id. */
+  readonly images?: readonly FeishuMessageImage[]
   /** The immediately referenced (quoted / replied-to) message id, when present. */
   readonly parentId?: string
   /** The thread root message id, when the message is part of a reply thread. */
@@ -209,6 +229,17 @@ export interface FeishuProvider {
    * @returns the fetched message with its content extracted as plain text.
    */
   getMessage?(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>
+  /**
+   * Fetch one binary image attached to a message — e.g. the image a user
+   * posted, so a multimodal model can read it. `fileKey` is the image key
+   * from the message content (an {@link FeishuMessageImage.fileKey}). Honor
+   * `signal` for cancellation.
+   * @param messageId - the Feishu message id the image belongs to.
+   * @param fileKey - the image's file key from the message content.
+   * @param signal - optional cancellation signal.
+   * @returns the raw image bytes.
+   */
+  getMessageResource?(messageId: string, fileKey: string, signal?: AbortSignal): Promise<FeishuMessageResource>
   /**
    * Project this provider's connection state and display-safe configuration
    * for status surfaces. May resolve credentials; must not throw. Providers

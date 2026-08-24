@@ -321,6 +321,8 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   FeishuConnectionState: 'feishu.md',
   FeishuError: 'feishu.md',
   FeishuMessage: 'feishu.md',
+  FeishuMessageImage: 'feishu.md',
+  FeishuMessageResource: 'feishu.md',
   FeishuMsgType: 'feishu.md',
   FeishuProvider: 'feishu.md',
   FeishuProviderStatus: 'feishu.md',

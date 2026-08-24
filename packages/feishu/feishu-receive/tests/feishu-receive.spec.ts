@@ -30,7 +30,11 @@ interface MountOptions {
   defaultId?: string
   config?: { cwd?: string; ack?: boolean }
   /** Scripted referenced-message content keyed by the requested message id. */
-  getMessage?: (messageId: string) => Promise<{ content: string }>
+  getMessage?: (messageId: string) => Promise<{ content: string; images?: Array<{ fileKey: string }> }>
+  /** Scripted image-resource bytes keyed by (messageId, fileKey). */
+  getMessageResource?: (messageId: string, fileKey: string) => Promise<{ data: Uint8Array }>
+  /** Scripted attachment-store saveImage; returns durable refs for the test's assertions. */
+  saveImage?: ReturnType<typeof vi.fn>
 }
 
 /** One acknowledgement (or any message) the scripted provider sent. */
@@ -101,13 +105,25 @@ function mountReceive(options: MountOptions = {}): Promise<{
         getMessage: async (messageId: string) => {
           gets.push(messageId)
           const fetched = await options.getMessage!(messageId)
-          return { messageId, msgType: 'text', content: fetched.content, raw: {} }
+          return {
+            messageId,
+            msgType: 'text',
+            content: fetched.content,
+            ...(fetched.images !== undefined ? { images: fetched.images } : {}),
+            raw: {},
+          }
         },
+      } : {}),
+      ...(options.getMessageResource !== undefined ? {
+        getMessageResource: async (messageId: string, fileKey: string) => options.getMessageResource!(messageId, fileKey),
       } : {}),
     })
 
     const systemPrompt = mockSystemPrompt()
     ctx.provide('systemPrompt', systemPrompt as never)
+    if (options.saveImage !== undefined) {
+      ctx.provide('attachments', { saveImage: options.saveImage } as never)
+    }
 
     const agents: CreatedAgent[] = []
     const create = vi.fn(async (opts: CreatedOptions) => {
@@ -537,6 +553,83 @@ describe('feishu-receive', () => {
     await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
     const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
     expect(message.content).toEqual([{ type: 'text', text: 'solo reply' }])
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('attaches images carried by the inbound event as image content blocks', async () => {
+    const saveImage = vi.fn(async () => ({ attachmentId: 'sha256:abc', mediaType: 'image/jpeg', bytes: 4, width: 1, height: 1 }))
+    const { ctx, handler, fiber, agents } = await mountReceive({
+      onRoots: () => [root()],
+      getMessageResource: async () => ({ data: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]) }),
+      saveImage,
+    })
+
+    handler(event('[图片]', 'oc_1', { messageId: 'om_1', images: [{ fileKey: 'img_1' }] }))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([
+      { type: 'text', text: '[图片]' },
+      { type: 'image', attachment: { attachmentId: 'sha256:abc', mediaType: 'image/jpeg', bytes: 4, width: 1, height: 1 } },
+    ])
+    expect(saveImage).toHaveBeenCalledWith({ data: new Uint8Array([0xff, 0xd8, 0xff, 0xd9]), mediaType: 'image/jpeg' })
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('attaches images from the quoted message alongside the referenced text', async () => {
+    const saveImage = vi.fn(async () => ({ attachmentId: 'sha256:def', mediaType: 'image/png', bytes: 8, width: 2, height: 2 }))
+    const { ctx, handler, fiber, agents } = await mountReceive({
+      onRoots: () => [root()],
+      getMessage: async messageId => ({ content: '[图片]', images: [{ fileKey: `ref_${messageId}` }] }),
+      getMessageResource: async () => ({ data: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) }),
+      saveImage,
+    })
+
+    handler(event('reply', 'oc_1', { parentId: 'om_quoted' }))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([
+      { type: 'text', text: '[引用消息]\n[图片]\n\nreply' },
+      { type: 'image', attachment: { attachmentId: 'sha256:def', mediaType: 'image/png', bytes: 8, width: 2, height: 2 } },
+    ])
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('still delivers text when an image has an unrecognized format', async () => {
+    const saveImage = vi.fn(async () => ({ attachmentId: 'sha256:x' }))
+    const { ctx, handler, fiber, agents } = await mountReceive({
+      onRoots: () => [root()],
+      getMessageResource: async () => ({ data: new Uint8Array([0x00, 0x01, 0x02]) }),
+      saveImage,
+    })
+
+    handler(event('see attached', 'oc_1', { messageId: 'om_1', images: [{ fileKey: 'img_1' }] }))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([{ type: 'text', text: 'see attached' }])
+    expect(saveImage).not.toHaveBeenCalled()
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('still delivers text when the image download fails', async () => {
+    const saveImage = vi.fn(async () => ({ attachmentId: 'sha256:x' }))
+    const { ctx, handler, fiber, agents } = await mountReceive({
+      onRoots: () => [root()],
+      getMessageResource: async () => { throw new FeishuError('Resource Has Been Deleted', 'FEISHU_PROVIDER_ERROR') },
+      saveImage,
+    })
+
+    handler(event('see attached', 'oc_1', { messageId: 'om_1', images: [{ fileKey: 'img_1' }] }))
+
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    const message = agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }
+    expect(message.content).toEqual([{ type: 'text', text: 'see attached' }])
     await ctx.fiber.dispose()
     await fiber.dispose()
   })

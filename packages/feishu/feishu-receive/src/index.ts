@@ -18,10 +18,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
+import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { FeishuError } from '@deepseek-ai/dsh-feishu'
 import type { FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tdai-memory'
@@ -88,29 +90,122 @@ const ACK_MESSAGE = '已收到，正在处理…'
 /** Prefix marking content resolved from a quoted / replied-to message. */
 const REFERENCED_LABEL = '[引用消息]'
 
+/** Feishu client placeholder shown when a message's content needs a newer client than the reader has. */
+const UNSUPPORTED_CONTENT_PLACEHOLDER = '请升级至最新版本客户端，以查看内容'
+
+/** One image to download and attach, scoped to its owning message id. */
+interface DownloadImage {
+  readonly messageId: string
+  readonly fileKey: string
+}
+
+/** Result of resolving the message an inbound event references. */
+interface ReferencedResolution {
+  /** Label-wrapped plain text of the referenced message, or '' when there is none. */
+  readonly text: string
+  /** Images in the referenced message, scoped to the referenced message id. */
+  readonly images: readonly DownloadImage[]
+}
+
+/**
+ * Remove Feishu's client-version placeholder from extracted text. The real
+ * content is an image (or a newer format): once the image is attached, the
+ * placeholder would be misleading, so only the image marker remains.
+ * @param text - the extracted text that may carry the placeholder.
+ * @returns the text without the placeholder.
+ */
+function stripUnsupportedPlaceholder(text: string): string {
+  if (!text.includes(UNSUPPORTED_CONTENT_PLACEHOLDER)) return text
+  return text.split(UNSUPPORTED_CONTENT_PLACEHOLDER).join('').trim()
+}
+
+/** Sniff one downloaded image's raster format from its magic bytes. */
+function sniffImageMediaType(data: Uint8Array): ImageMediaType | undefined {
+  if (data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff) return 'image/jpeg'
+  if (data.length >= 8 && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e && data[3] === 0x47) return 'image/png'
+  if (data.length >= 12 && data[0] === 0x52 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x46
+    && data[8] === 0x57 && data[9] === 0x45 && data[10] === 0x42 && data[11] === 0x50) return 'image/webp'
+  if (data.length >= 6 && data[0] === 0x47 && data[1] === 0x49 && data[2] === 0x46 && data[3] === 0x38) return 'image/gif'
+  return undefined
+}
+
+/**
+ * Download and durably attach the given message images, returning their
+ * model-facing image blocks. A deleted or unrecognized image is skipped and
+ * logged — reading an image must never block message delivery, and a text-only
+ * fallback still names the image marker from the extracted content.
+ * @param ctx - the plugin context supplying the Feishu seam and attachment store.
+ * @param images - images to fetch, each scoped to its owning message id.
+ * @returns image blocks in input order for every successfully attached image.
+ */
+async function collectImageBlocks(ctx: Context, images: readonly DownloadImage[]): Promise<ContentBlock[]> {
+  if (images.length === 0) return []
+  const attachments = ctx.get('attachments')
+  if (attachments === undefined) {
+    ctx.logger.warn('feishu-receive: cannot attach images — no attachments service is mounted')
+    return []
+  }
+  const blocks: ContentBlock[] = []
+  for (const image of images) {
+    try {
+      const resource = await ctx.feishu.getMessageResource(image.messageId, image.fileKey)
+      const mediaType = sniffImageMediaType(resource.data)
+      if (mediaType === undefined) {
+        ctx.logger.warn('feishu-receive: image %s has an unrecognized format; skipped', image.fileKey)
+        continue
+      }
+      const ref = await attachments.saveImage({ data: resource.data, mediaType })
+      blocks.push({ type: 'image', attachment: ref })
+    } catch (error: unknown) {
+      // A provider without getMessageResource is a capability gap, not a failure.
+      if (error instanceof FeishuError && error.code === 'FEISHU_RESOURCE_UNSUPPORTED') continue
+      ctx.logger.warn('feishu-receive: failed to read image %s from message %s: %s', image.fileKey, image.messageId, String(error))
+    }
+  }
+  return blocks
+}
+
 /**
  * Resolve the message an inbound event references (its quoted / replied-to
- * parent) into readable text, so the agent sees the full context rather than
- * just the reply. Returns '' when there is no reference, the provider cannot
- * read messages, or the referenced message has no readable content; a fetch
- * failure is logged and never blocks delivery.
+ * parent) into readable text and its images, so the agent sees the full context
+ * rather than just the reply. Returns empty text and no images when there is no
+ * reference, the provider cannot read messages, or the referenced message has no
+ * readable content; a fetch failure is logged and never blocks delivery.
  * @param ctx - the plugin context, supplying the Feishu seam and logger.
  * @param event - the inbound message event.
- * @returns the label-wrapped referenced content, or ''.
+ * @returns the resolved referenced text and images.
  */
-async function resolveReferencedContent(ctx: Context, event: FeishuReceiveEvent): Promise<string> {
+async function resolveReferencedContent(ctx: Context, event: FeishuReceiveEvent): Promise<ReferencedResolution> {
   const referencedId = event.parentId ?? event.rootId
-  if (referencedId === undefined || referencedId.length === 0) return ''
+  if (referencedId === undefined || referencedId.length === 0) return { text: '', images: [] }
   try {
     const message = await ctx.feishu.getMessage(referencedId)
-    const content = message.content.trim()
+    const rawContent = message.content.trim()
     // console, not ctx.logger: the default logger buffers in memory, so the
     // read outcome must print here to be visible in dsh-web.log. Record the
     // fetched type and content length so an empty extraction is distinguishable
     // from a resolved reference.
-    console.log(`feishu-receive: referenced ${referencedId} → msgType=${message.msgType} contentLen=${content.length}`)
-    if (content.length === 0) return ''
-    return `${REFERENCED_LABEL}\n${content}`
+    console.log(`feishu-receive: referenced ${referencedId} → msgType=${message.msgType} contentLen=${rawContent.length}`)
+    if (rawContent.includes(UNSUPPORTED_CONTENT_PLACEHOLDER)) {
+      // The referenced message resolved to Feishu's "client too old" placeholder;
+      // dump the raw get-message item's msg_type and body.content so the
+      // underlying type (media / merge_forward) remains identifiable even now
+      // that the message's image keys are extracted and attached.
+      const item = message.raw as { msg_type?: unknown; body?: { content?: unknown } } | null | undefined
+      const rawMsgType = item !== null && item !== undefined && typeof item.msg_type === 'string' ? item.msg_type : ''
+      const rawContentItem = item !== null && item !== undefined ? item.body?.content : undefined
+      const renderedContent = typeof rawContentItem === 'string' ? rawContentItem : JSON.stringify(rawContentItem ?? null)
+      console.log(
+        `feishu-receive: referenced ${referencedId} placeholder → msg_type=${rawMsgType} body.content=${renderedContent}`,
+      )
+    }
+    const content = stripUnsupportedPlaceholder(rawContent)
+    const images = (message.images ?? []).map(image => ({ messageId: message.messageId, fileKey: image.fileKey }))
+    if (content.length === 0 && images.length === 0) return { text: '', images: [] }
+    return {
+      text: content.length === 0 ? '' : `${REFERENCED_LABEL}\n${content}`,
+      images,
+    }
   } catch (error: unknown) {
     // A provider without getMessage is a capability gap, not a delivery
     // failure; any other failure is logged but must not block the reply.
@@ -118,7 +213,7 @@ async function resolveReferencedContent(ctx: Context, event: FeishuReceiveEvent)
       ctx.logger.warn('feishu-receive: failed to read referenced message %s: %s', referencedId, String(error))
     }
     console.log(`feishu-receive: referenced ${referencedId} read failed: ${String(error)}`)
-    return ''
+    return { text: '', images: [] }
   }
 }
 
@@ -289,7 +384,12 @@ export function apply(ctx: Context, config: Config = {}): void {
             const handle = await getOrCreate(chatId, event.providerId)
             created.add(handle)
             const referenced = await resolveReferencedContent(ctx, event)
-            const text = referenced.length > 0 ? `${referenced}\n\n${event.content}` : event.content
+            const text = referenced.text.length > 0 ? `${referenced.text}\n\n${event.content}` : event.content
+            const eventMessageId = event.messageId
+            const eventImages: DownloadImage[] = eventMessageId !== undefined && event.images !== undefined
+              ? event.images.map(image => ({ messageId: eventMessageId, fileKey: image.fileKey }))
+              : []
+            const imageBlocks = await collectImageBlocks(ctx, [...eventImages, ...referenced.images])
             // console, not ctx.logger: the default logger buffers in memory and is not
             // exported to the process log, so the delivery diagnostic must print here
             // to be visible in dsh-web.log. parent/root show whether the inbound event
@@ -298,10 +398,13 @@ export function apply(ctx: Context, config: Config = {}): void {
             // delivered length replaces the raw payload so the line stays concise.
             console.log(
               `feishu-receive: ${summarizeRawMessage(event.raw)} parent=${event.parentId ?? '-'} `
-              + `root=${event.rootId ?? '-'} → deliveredLen=${text.length}`,
+              + `root=${event.rootId ?? '-'} → deliveredLen=${text.length} images=${imageBlocks.length}`,
             )
+            const content: ContentBlock[] = []
+            if (text.length > 0) content.push({ type: 'text', text })
+            content.push(...imageBlocks)
             handle.agent.followup(createUserMessage({
-              content: [{ type: 'text', text }],
+              content,
               source: { kind: 'user' },
             }))
             ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)

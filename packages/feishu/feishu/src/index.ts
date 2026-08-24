@@ -11,6 +11,7 @@ import z from '@deepseek-ai/schemastery'
 import type {
   FeishuCardActionHandler,
   FeishuMessage,
+  FeishuMessageResource,
   FeishuProvider,
   FeishuReceiveHandler,
   FeishuRuntimeStatus,
@@ -30,6 +31,8 @@ export type {
   FeishuCardActionHandler,
   FeishuConnectionState,
   FeishuMessage,
+  FeishuMessageImage,
+  FeishuMessageResource,
   FeishuMsgType,
   FeishuProvider,
   FeishuProviderStatus,
@@ -113,7 +116,10 @@ export class FeishuRuntime extends Service {
     this.providerId = config.provider ?? process.env.DSH_FEISHU_PROVIDER
   }
 
-  /** Every registered provider, in registration order. */
+  /**
+   * Every registered provider, in registration order.
+   * @returns the registered providers.
+   */
   listProviders(): readonly FeishuProvider[] {
     return [...this.providers.values()]
   }
@@ -280,6 +286,29 @@ export class FeishuRuntime extends Service {
       )
     }
     return provider.getMessage(messageId, signal)
+  }
+
+  /**
+   * Fetch one binary image attached to a message through the selected provider —
+   * e.g. the image a user posted so a multimodal model can read it. Resolves
+   * the provider at call time with the selection rules above; throws
+   * {@link FeishuError} `FEISHU_RESOURCE_UNSUPPORTED` when the provider has no
+   * `getMessageResource`, or the provider's own failure when the fetch does not
+   * succeed.
+   * @param messageId - the Feishu message id the image belongs to.
+   * @param fileKey - the image's file key from the message content.
+   * @param signal - optional cancellation signal forwarded to the provider.
+   * @returns the raw image bytes.
+   */
+  async getMessageResource(messageId: string, fileKey: string, signal?: AbortSignal): Promise<FeishuMessageResource> {
+    const provider = this.resolveProvider()
+    if (provider.getMessageResource === undefined) {
+      throw new FeishuError(
+        `Feishu provider "${provider.id}" does not support reading message resources`,
+        'FEISHU_RESOURCE_UNSUPPORTED',
+      )
+    }
+    return provider.getMessageResource(messageId, fileKey, signal)
   }
 
   /**

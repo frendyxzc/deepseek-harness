@@ -20,6 +20,8 @@ interface FeishuSendRequest {
   readonly receiveId: string
   /** The recipient id type; defaults to `open_id` when omitted. */
   readonly receiveIdType?: FeishuReceiveIdType
+  /** Explicit provider id to route through; omitted uses the seam's selection (and per-chat routing). */
+  readonly providerId?: string
   /** Message content as a plain text string. */
   readonly content: string
   /**
@@ -38,15 +40,43 @@ interface FeishuSendResult {
 }
 ```
 
+## 消息图片
+
+消息中内嵌的图片会从其内容里提取为 `FeishuMessageImage` 引用，消费方通过 `getMessageResource` 把某张图片的字节拉取为 `FeishuMessageResource`。
+
+```ts type-equiv
+/**
+ * One image discovered in Feishu message content. The enclosing message's id
+ * is the download scope: a consumer combines this `fileKey` with the event or
+ * fetched message's `messageId` to fetch the image bytes.
+ */
+interface FeishuMessageImage {
+  /** The Feishu image key used as the download file key. */
+  readonly fileKey: string
+}
+```
+
+```ts type-equiv
+/** One binary image resource fetched from a Feishu/Lark message. */
+interface FeishuMessageResource {
+  /** Raw image bytes. */
+  readonly data: Uint8Array
+}
+```
+
 ## 接收事件
 
-收到的飞书事件，经官方长连接客户端（[`@larksuiteoapi/node-sdk`](../../packages/feishu/feishu-bot)）投递，在到达接收处理器之前，会被归一化为同一种事件形状。客户端主动连出飞书，因此无需公网回调 URL。提供方把文本、富文本（`post`）与交互卡片（`interactive`）内容约简为纯文本，丢弃没有可读内容的消息；收到的消息 id 与任何引用/回复的 parent 或话题根 id 会随之携带，以便消费方解析被引用的消息。
+收到的飞书事件，经官方长连接客户端（[`@larksuiteoapi/node-sdk`](../../packages/feishu/feishu-bot)）投递，在到达接收处理器之前，会被归一化为同一种事件形状。客户端主动连出飞书，因此无需公网回调 URL。提供方把文本、富文本（`post`）、交互卡片（`interactive`）与图片内容约简为纯文本，并把图片 key 作为 `images` 附加；没有可读文本、也没有图片的消息会被丢弃。收到的消息 id 与任何引用/回复的 parent 或话题根 id 会随之携带，以便消费方解析被引用的消息。
 
 ```ts type-equiv
 /** One message received from Feishu. */
 interface FeishuReceiveEvent {
   /** The event type (e.g. `im.message.receive_v1`). */
   readonly eventType: string
+  /** The Feishu App ID that received this event, when the provider knows it. */
+  readonly appId?: string
+  /** The provider registry id that received this event, when the provider knows it. */
+  readonly providerId?: string
   /** The sender's id. */
   readonly senderId: string
   /** The sender id type. */
@@ -61,6 +91,8 @@ interface FeishuReceiveEvent {
   readonly rootId?: string
   /** The message content as plain text (extracted from the event body). */
   readonly content: string
+  /** Images discovered in the message content, scoped to this event's message id. */
+  readonly images?: readonly FeishuMessageImage[]
   /** The raw event payload for provider-specific handling. */
   readonly raw: unknown
 }
@@ -68,7 +100,9 @@ interface FeishuReceiveEvent {
 
 ## 读取被引用的消息
 
-`getMessage(messageId, signal?)` 通过选定提供方按 id 拉取一条消息，并以 `FeishuMessage` 返回——内容提取为纯文本——使消费方能读取入站事件引用的引用/回复消息。不支持读取的提供方抛 `FEISHU_GET_UNSUPPORTED`。提取采用与接收路径相同的 text / post / interactive 约简。
+`getMessage(messageId, signal?)` 通过选定提供方按 id 拉取一条消息，并以 `FeishuMessage` 返回——内容提取为纯文本、图片 key 放在 `images`——使消费方能读取入站事件引用的引用/回复消息。交互卡片解析为发送时的原始卡片 JSON，因此 markdown 卡片组件按其文本读取而非预览占位。不支持读取的提供方抛 `FEISHU_GET_UNSUPPORTED`。提取采用与接收路径相同的 text / post / interactive / image 约简。
+
+`getMessageResource(messageId, fileKey, signal?)` 按文件 key 拉取消息中某张图片的原始字节，使多模态模型能够读取它。不支持资源读取的提供方抛 `FEISHU_RESOURCE_UNSUPPORTED`。
 
 ```ts type-equiv
 /** One message fetched by id from a Feishu/Lark backend. */
@@ -79,6 +113,8 @@ interface FeishuMessage {
   readonly msgType: string
   /** The readable plain text extracted from the message content. */
   readonly content: string
+  /** Images discovered in the message content, scoped to this message's id. */
+  readonly images?: readonly FeishuMessageImage[]
   /** The immediately referenced (quoted / replied-to) message id, when present. */
   readonly parentId?: string
   /** The thread root message id, when the message is part of a reply thread. */
@@ -136,11 +172,11 @@ interface FeishuCardActionEvent {
 
 ## 错误
 
-`FeishuError extends HarnessError`（[core.md](core.zh.md) 错误分类），带 `code: string`（开放，如同其他所有 seam 的错误——`LlmError`、`SubagentError`），而非封闭联合：提供方可以在不改动 `dsh-feishu` 的情况下抛出自己的 code，消费方必须容忍未知 code。seam 中立的 code 由共享的 `FeishuRuntime` 契约抛出：`FEISHU_PROVIDER_UNAVAILABLE`、`FEISHU_PROVIDER_CONFIGURED_MISSING`、`FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`、`FEISHU_PROVIDER_AMBIGUOUS`、`FEISHU_DUPLICATE_PROVIDER`（注册期的编程错误）、`FEISHU_RECEIVE_UNSUPPORTED`（消息或卡片动作接收）、`FEISHU_UPDATE_UNSUPPORTED`、`FEISHU_GET_UNSUPPORTED` 以及 `FEISHU_PROVIDER_ERROR`（提供方自身失败经 seam 浮现时的兜底）。由 `dsh-feishu-bot` 抛出的提供方 code 包括 `FEISHU_PROVIDER_AUTH_FAILED`、`FEISHU_PROVIDER_CREDENTIAL_MISSING` 和 `FEISHU_ABORTED`。
+`FeishuError extends HarnessError`（[core.md](core.zh.md) 错误分类），带 `code: string`（开放，如同其他所有 seam 的错误——`LlmError`、`SubagentError`），而非封闭联合：提供方可以在不改动 `dsh-feishu` 的情况下抛出自己的 code，消费方必须容忍未知 code。seam 中立的 code 由共享的 `FeishuRuntime` 契约抛出：`FEISHU_PROVIDER_UNAVAILABLE`、`FEISHU_PROVIDER_CONFIGURED_MISSING`、`FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`、`FEISHU_PROVIDER_AMBIGUOUS`、`FEISHU_DUPLICATE_PROVIDER`（注册期的编程错误）、`FEISHU_RECEIVE_UNSUPPORTED`（消息或卡片动作接收）、`FEISHU_UPDATE_UNSUPPORTED`、`FEISHU_GET_UNSUPPORTED`、`FEISHU_RESOURCE_UNSUPPORTED`（消息资源读取）以及 `FEISHU_PROVIDER_ERROR`（提供方自身失败经 seam 浮现时的兜底）。由 `dsh-feishu-bot` 抛出的提供方 code 包括 `FEISHU_PROVIDER_AUTH_FAILED`、`FEISHU_PROVIDER_CREDENTIAL_MISSING` 和 `FEISHU_ABORTED`。
 
 ## 服务
 
-`FeishuRuntime` 注册提供方，以 `FEISHU_DUPLICATE_PROVIDER` 拒绝重复 id，在执行期用结构化选择错误解析提供方，通过选定提供方发送、更新并读取消息，启动选定提供方用于消息与卡片按钮动作的接收通道（对缺少相应能力的提供方抛出 `FEISHU_RECEIVE_UNSUPPORTED`），并通过 `status()` 投射一个展示安全的状态。
+`FeishuRuntime` 注册提供方，以 `FEISHU_DUPLICATE_PROVIDER` 拒绝重复 id，在执行期用结构化选择错误解析提供方，通过选定提供方发送、更新并读取消息，拉取消息图片资源，启动选定提供方用于消息与卡片按钮动作的接收通道（对缺少相应能力的提供方抛出 `FEISHU_RECEIVE_UNSUPPORTED`），并通过 `status()` 投射一个展示安全的状态。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

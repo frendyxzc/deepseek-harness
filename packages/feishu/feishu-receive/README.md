@@ -12,6 +12,8 @@ Every incoming chat message also gets a short acknowledgement ("已收到，正�
 
 When an incoming message quotes or replies to another (its `parentId` / `rootId`), the consumer reads that referenced message through `ctx.feishu.getMessage` and prepends its text as a `[引用消息]` block ahead of the reply, so the agent sees the full context. A provider without `getMessage`, or a referenced message with no readable content, leaves the reply unchanged and never blocks delivery.
 
+Images in an inbound or referenced message (its `images`) are downloaded through `ctx.feishu.getMessageResource`, saved to the mounted `ctx.attachments`, and attached as model-facing `image` content blocks after the text. A deleted or unrecognized image is skipped with a log line — reading an image never blocks delivery, and the text-only fallback still names the image marker.
+
 ### Configuration
 
 | Field | Type | Default | Description |
@@ -35,3 +37,4 @@ No direct invalidation; injected messages follow the session log's append-only s
 
 - **Process-local routing map** — the chat → session pin is in-memory and rebuilt on each start, and each session id is a fresh UUID, so a restart begins each chat with a new conversation (no cross-restart history).
 - **No sender attribution** — the injected message carries only the text content, not which member sent it; per-sender attribution inside a group chat is deferred.
+- **Image availability depends on Feishu retention** — a message image can be deleted on Feishu's side before it is read again; the consumer then falls back to the text-only marker instead of the image.

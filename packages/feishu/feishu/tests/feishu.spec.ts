@@ -4,6 +4,7 @@ import FeishuRuntime, {
   FeishuError,
   type FeishuCardActionEvent,
   type FeishuMessage,
+  type FeishuMessageResource,
   type FeishuProvider,
   type FeishuProviderStatus,
   type FeishuReceiveEvent,
@@ -20,6 +21,7 @@ function makeProvider(
   startReceivingCardActions?: (handler: (event: FeishuCardActionEvent) => void) => () => void,
   updateMessage?: (messageId: string, content: string) => Promise<void>,
   getMessage?: (messageId: string) => Promise<FeishuMessage>,
+  getMessageResource?: (messageId: string, fileKey: string) => Promise<FeishuMessageResource>,
 ): FeishuProvider {
   return {
     id,
@@ -30,6 +32,7 @@ function makeProvider(
     ...(startReceivingCardActions !== undefined ? { startReceivingCardActions } : {}),
     ...(updateMessage !== undefined ? { updateMessage } : {}),
     ...(getMessage !== undefined ? { getMessage } : {}),
+    ...(getMessageResource !== undefined ? { getMessageResource } : {}),
   }
 }
 
@@ -303,6 +306,31 @@ describe('FeishuRuntime getMessage', () => {
   it('throws FEISHU_PROVIDER_UNAVAILABLE for get when nothing is registered', async () => {
     const { feishu } = await mountFeishu()
     await expect(feishu.getMessage('om_1')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
+  })
+})
+
+describe('FeishuRuntime getMessageResource', () => {
+  it('delegates getMessageResource to the selected provider', async () => {
+    const { feishu } = await mountFeishu()
+    const fetched: Array<{ messageId: string; fileKey: string }> = []
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1')),
+      undefined, undefined, undefined, undefined, undefined, async (messageId, fileKey) => {
+        fetched.push({ messageId, fileKey })
+        return { data: new Uint8Array([0xff, 0xd8]) }
+      }))
+    await expect(feishu.getMessageResource('om_1', 'img_1')).resolves.toMatchObject({ data: new Uint8Array([0xff, 0xd8]) })
+    expect(fetched).toEqual([{ messageId: 'om_1', fileKey: 'img_1' }])
+  })
+
+  it('throws FEISHU_RESOURCE_UNSUPPORTED when the provider has no getMessageResource', async () => {
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot', available, () => Promise.resolve(sendResult('m1'))))
+    await expect(feishu.getMessageResource('om_1', 'img_1')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_RESOURCE_UNSUPPORTED' }))
+  })
+
+  it('throws FEISHU_PROVIDER_UNAVAILABLE for resource get when nothing is registered', async () => {
+    const { feishu } = await mountFeishu()
+    await expect(feishu.getMessageResource('om_1', 'img_1')).rejects.toThrow(expect.objectContaining({ code: 'FEISHU_PROVIDER_UNAVAILABLE' }))
   })
 })
 
