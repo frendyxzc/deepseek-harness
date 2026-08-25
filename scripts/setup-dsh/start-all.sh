@@ -26,14 +26,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # shellcheck source=lib.sh
 source "$SCRIPT_DIR/lib.sh"
 
-# The TencentDB memory stack pins Node v22; the bundled node22 (installed by
-# setup.sh) takes precedence when present so every service starts on it.
-# Fall back to Homebrew node@22 when the bundled one is missing.
-NODE22_BIN="$DSH_HOME/tdai-stack/node22/bin"
-if [[ -x "$NODE22_BIN/node" ]]; then
-  PATH="$NODE22_BIN:$PATH"
-elif [[ -x "/opt/homebrew/opt/node@22/bin/node" ]]; then
-  PATH="/opt/homebrew/opt/node@22/bin:$PATH"
+# The TencentDB memory stack pins Node v22; stack_node_bin resolves the bin
+# dir (bundled node22 first, then Homebrew node@22, else the ambient node) so
+# every service starts on it. setup.sh installs under the same resolution, so
+# native bindings always match the runtime Node.
+if node_dir="$(stack_node_bin)"; then
+  PATH="$node_dir:$PATH"
 fi
 
 WORKSPACE="${DSH_WORKSPACE:-$REPO_ROOT}"
@@ -173,7 +171,7 @@ guard_proxy_storage() {
   requested="$(printf '%s' "$health" | sed -n 's/.*"requested":"\([^"]*\)".*/\1/p')"
   effective="$(printf '%s' "$health" | sed -n 's/.*"effective":"\([^"]*\)".*/\1/p')"
   if [[ -n "$requested" && "$requested" != "$effective" ]]; then
-    die "MemoryProxy storage degraded (requested=$requested, effective=${effective:-missing}) — run: cd '$MEMORY_ROOT/MemoryProxy' && npm install better-sqlite3"
+    die "MemoryProxy storage degraded (requested=$requested, effective=${effective:-missing}) — run: ./scripts/setup-dsh/setup.sh --upgrade (it reinstalls better-sqlite3 under the stack Node)"
   fi
   if [[ -z "$effective" ]]; then
     warn "MemoryProxy /health reported no storage.effective — verify manually"

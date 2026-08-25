@@ -56,6 +56,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 TEMPLATES="$SCRIPT_DIR/templates"
 
+# Shared with start-all.sh: stack_node_bin resolves the Node the memory stack
+# runs on, so installs below target the same ABI the services start with.
+# (Sourced before this script's own info/ok/warn/die, which override lib.sh's
+# [stack]-prefixed versions.)
+# shellcheck source=lib.sh
+source "$SCRIPT_DIR/lib.sh"
+
 MEMORY_REPO_URL="${DSH_MEMORY_REPO_URL:-https://github.com/frendyxzc/TencentDB-Agent-Memory.git}"
 MEMORY_BRANCH="${DSH_MEMORY_BRANCH:-feat/server_team}"
 
@@ -171,12 +178,40 @@ write_if_absent() {
 # overwrites a generated file (no --force), so it is safe to run repeatedly
 # and after every `git pull`.
 
+# ensure_proxy_npm_approvals <memory-proxy-dir> — record npm install-script
+# approvals in MemoryProxy/package.json (idempotent, like the pnpm-workspace.yaml
+# patches above). npm 11 blocks dependency install scripts unless the package.json
+# `allowScripts` field names them; a blocked script makes npm silently omit
+# better-sqlite3 — an optionalDependency — from node_modules entirely, so the
+# package is never even present to repair. The approved set mirrors the proxy's
+# upstream pnpm-workspace.yaml allowBuilds; npm 10 ignores the field, so the
+# patch is inert under the pinned Node 22 toolchain and only matters when the
+# ambient Node's npm is >= 11.
+ensure_proxy_npm_approvals() {
+  local dir="$1"
+  (cd "$dir" && node -e '
+    const fs = require("node:fs");
+    const file = "package.json";
+    const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+    const allow = (pkg.allowScripts ??= {});
+    let changed = false;
+    for (const name of ["better-sqlite3", "esbuild", "node-pty", "protobufjs"]) {
+      if (allow[name] !== true) { allow[name] = true; changed = true; }
+    }
+    if (changed) fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+  ') || die "failed to write npm script approvals in $dir/package.json"
+  ok "npm build approvals -> $dir/package.json (allowScripts)"
+}
+
 # ensure_proxy_sqlite <memory-proxy-dir> — verify the better-sqlite3 native
-# binding is loadable and (re)install it when absent. better-sqlite3 is an
-# optionalDependency upstream, so a failed native build is silently skipped by
-# npm while node_modules still exists — the surrounding `! -d node_modules`
-# guard never retries it. Missing, proxy storage degrades sqlite -> fs -> memory
-# (the session->identity binding is dropped and memory-bridge answers 40101).
+# binding is loadable and (re)install it when absent. Must run with the stack
+# Node first in PATH (ensure_memory_deps does): the services start on Node v22
+# (see start-all.sh), and under any other Node the check and the repair both
+# lie — npm 11 blocks install scripts and silently omits better-sqlite3 (an
+# optionalDependency) while still reporting the tree up to date, and a binding
+# built under a different ABI fails to load with ERR_DLOPEN_FAILED. Missing,
+# proxy storage degrades sqlite -> fs -> memory (the session->identity binding
+# is dropped and memory-bridge answers 40101).
 ensure_proxy_sqlite() {
   local dir="$1"
   if (cd "$dir" && node -e "require('better-sqlite3')" >/dev/null 2>&1); then
@@ -204,11 +239,14 @@ ensure_proxy_sqlite() {
 # "set this to true or false"，pnpm 视为未批准，所以这里逐条决定：放行本栈真正
 # 需要的脚本（better-sqlite3 native 绑定、esbuild 二进制），显式拒绝其余（列入
 # deny 不触发硬错误）；没有 workspace yaml 的服务生成最小批准文件。
-# MemoryProxy 的 better-sqlite3 每次运行都验证-修复（ensure_proxy_sqlite）：
-# 它是 proxy 的 sqlite 存储后端，缺失时 proxy 静默降级 sqlite -> fs -> memory，
-# memory-bridge 应答 40101。
+# MemoryProxy 用 npm，批准走 package.json 的 allowScripts（ensure_proxy_npm_approvals，
+# 同样幂等且 --skip-install 时也执行）。所有安装都在栈的 Node（stack_node_bin，
+# start-all.sh 用它启动服务）下运行：native 绑定按 ABI 区分，装错 Node 服务
+# 启动时 ERR_DLOPEN_FAILED；MemoryProxy 的 better-sqlite3 每次运行都验证-修复
+# （ensure_proxy_sqlite）：它是 proxy 的 sqlite 存储后端，缺失时 proxy 静默降级
+# sqlite -> fs -> memory，memory-bridge 应答 40101。
 ensure_memory_deps() {
-  local root="$1" force="$2" svc yaml
+  local root="$1" force="$2" svc yaml node_dir="" old_path="$PATH"
 
   for svc in MemoryCore MemoryPanel MemoryKnowledge; do
     yaml="$root/$svc/pnpm-workspace.yaml"
@@ -229,10 +267,19 @@ EOF
     fi
     ok "pnpm build approvals -> $yaml"
   done
+  ensure_proxy_npm_approvals "$root/MemoryProxy"
 
   if [[ "$SKIP_INSTALL" == "1" ]]; then
     warn "--skip-install: not installing memory service dependencies"
     return 0
+  fi
+
+  # Run every install under the Node the services start on (stack_node_bin,
+  # the same resolution start-all.sh uses): a native binding built under a
+  # different ABI fails to load, and npm 11 silently omits optional deps whose
+  # install scripts it blocks. PATH is restored at the end of this function.
+  if node_dir="$(stack_node_bin)"; then
+    PATH="$node_dir:$PATH"
   fi
 
   if [[ "$force" == "1" || ! -d "$root/MemoryProxy/node_modules" ]]; then
@@ -257,6 +304,7 @@ EOF
     (cd "$root/MemoryPanel/web" && npm ci && npm run build)
     ok "MemoryPanel web UI built -> $root/MemoryPanel/web/dist"
   fi
+  PATH="$old_path"
 }
 
 # upgrade_feishu_bot_config — migrate a flat single-app `feishu-bot` profile to

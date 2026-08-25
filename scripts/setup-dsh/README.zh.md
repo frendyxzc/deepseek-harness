@@ -31,7 +31,7 @@
 `--upgrade` 是非破坏性的、可安全重复运行：它从不提示或重新生成密钥，从不覆盖已生成文件，也绝不隐含 `--force`。它做三件事：
 
 1. **迁移 profile 的 `feishu-bot` 补丁** —— 追加一条幂等的 config-override（以 marker 注释为键，重跑即 no-op），把扁平单应用条目换成 `bots` + `credentials` 分离，使 Settings → Plugins → IM 选项卡能按 bot 映射 team/agent。扁平部署在本次运行前仍能正常工作（扁平字段保持向后兼容）；密钥仍留在 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
-2. **修复缺失的 MemoryProxy 绑定** —— 校验 `better-sqlite3` 可加载，缺失时重装（缺失绑定会让代理存储静默降级 `sqlite -> fs -> memory`，并使 memory bridge 返回 `40101`）。
+2. **修复缺失的 MemoryProxy 绑定** —— 校验 `better-sqlite3` 可加载，缺失时重装（缺失绑定会让代理存储静默降级 `sqlite -> fs -> memory`，并使 memory bridge 返回 `40101`）。内存栈钉在 Node v22 上，因此安装与校验都在 `start-all.sh` 启动服务所用的同一个 Node 下运行（捆绑的 node22，其次 Homebrew node@22，否则环境里的 Node）：换成别的 Node 时检查两头都会撒谎——npm 11 会静默省略安装脚本未获批准的 `better-sqlite3`（可选依赖），而不同 ABI 下构建的绑定无法加载。`MemoryProxy/package.json` 里幂等的 `allowScripts` 补丁覆盖 npm 11 回退场景。
 3. **刷新并重建** —— 在 checkout 里运行 `pnpm install` + `pnpm run build`（链接新增的工作区包，并重建 host libs、client bundles 与 Web 前端），随后在 profile 里运行 `pnpm install`。
 
 之后重启：`./scripts/setup-dsh/start-all.sh` 是幂等的，或仅重启 Web UI 用 `pnpm dsh web --host 0.0.0.0 --port 3080`。
@@ -53,7 +53,8 @@
 | `…/MemoryPanel/web/dist/` | 在 `MemoryPanel/web/` 中 `npm ci && npm run build`（上游只随仓库发布源码；没有这一步，面板对 `/` 返回 404） | 否 |
 | `…/MemoryKnowledge/.env` | `.env.example` | 否 |
 | `…/MemoryCore/.env.local` | 提示输入的 `TDAI_LLM_*`（把 `TDAI_GATEWAY_CONFIG` 指向 `tdai-stack/config/tdai-gateway.yaml`） | 是（0600） |
-| `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 构建审批：决定上游 `approve-builds` 占位符（`allowBuilds`：放行 better-sqlite3/esbuild，其余显式拒绝） | 否 |
+| `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 构建审批：决定上游 `approve-builds` 占位符（`allowBuilds`：放行 better-sqlite3/esbuild/protobufjs，其余显式拒绝） | 否 |
+| `…/MemoryProxy/package.json`（`allowScripts`） | npm 11 安装脚本审批，对齐该服务上游 `pnpm-workspace.yaml` 的 `allowBuilds`（npm 10 忽略该字段） | 否 |
 | `…/metadata.db` → `meta_users` + `meta_user_keys` | 数据库存在但没有 admin 用户时，用 `PROXY_USER_KEY` 引导 MemoryCore admin 用户（使 agent 能通过代理认证） | 是 |
 | `~/.dsh/skills/gitlab-mr-workflow/` | `gitlab-mr/gitlab-mr-workflow/*`（仓库）—— GitLab MR 工作流 skill | 否 |
 | `~/.dsh/profiles/web/cordis.patch.yml`（+`gitlab-mr` 条目） | `gitlab-mr/gitlab-mr-poller.mjs`（仓库）—— poller 插件挂载 | 否 |

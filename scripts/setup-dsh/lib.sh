@@ -12,6 +12,21 @@ PID_DIR="$RUN_DIR/pids"
 LOG_DIR="$RUN_DIR/logs"
 MEMORY_ROOT="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory"
 
+# stack_node_bin — the bin dir of the Node the TencentDB memory stack runs on.
+# The stack pins Node v22: the bundled node22 under $DSH_HOME takes precedence,
+# then Homebrew node@22, else the ambient node. start-all.sh starts every
+# service and setup.sh installs/verifies dependencies under this same Node:
+# a native binding built under a different Node ABI fails to load, and npm 11
+# silently omits optional dependencies whose install scripts it blocks. Prints
+# the dir; returns 1 when neither pinned Node exists (the ambient node applies).
+stack_node_bin() {
+  local dir
+  for dir in "$DSH_HOME/tdai-stack/node22/bin" "/opt/homebrew/opt/node@22/bin"; do
+    if [[ -x "$dir/node" ]]; then printf '%s\n' "$dir"; return 0; fi
+  done
+  return 1
+}
+
 info()  { printf '\033[1;34m[stack]\033[0m %s\n' "$*"; }
 ok()    { printf '\033[1;32m[stack]\033[0m %s\n' "$*"; }
 warn()  { printf '\033[1;33m[stack]\033[0m %s\n' "$*"; }

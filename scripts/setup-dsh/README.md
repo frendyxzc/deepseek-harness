@@ -55,7 +55,13 @@ regenerates a secret, never overwrites a generated file, and never implies
 2. **Repairs a missing MemoryProxy binding** — verifies `better-sqlite3` is
    loadable and reinstalls it when absent (a missing binding silently degrades
    proxy storage `sqlite -> fs -> memory` and makes the memory bridge answer
-   `40101`).
+   `40101`). The memory stack pins Node v22, so installs and this check run
+   under the same Node `start-all.sh` starts the services on (bundled node22,
+   then Homebrew node@22, else the ambient node): under any other Node the
+   check lies both ways — npm 11 silently omits `better-sqlite3` (an
+   optionalDependency) when its install script is unapproved, and a binding
+   built under a different ABI fails to load. An idempotent `allowScripts`
+   patch in `MemoryProxy/package.json` covers the npm-11 fallback case.
 3. **Refreshes and rebuilds** — runs `pnpm install` + `pnpm run build` in the
    checkout (links the newly added workspace package and rebuilds host libs,
    client bundles, and the Web frontend), then `pnpm install` in the profile.
@@ -84,7 +90,8 @@ Restart afterwards: `./scripts/setup-dsh/start-all.sh` is idempotent, or
 | `…/MemoryPanel/web/dist/` | `npm ci && npm run build` in `MemoryPanel/web/` (upstream ships source only; without this the panel returns 404 on `/`) | no |
 | `…/MemoryKnowledge/.env` | `.env.example` | no |
 | `…/MemoryCore/.env.local` | prompted `TDAI_LLM_*` (points `TDAI_GATEWAY_CONFIG` at `tdai-stack/config/tdai-gateway.yaml`) | yes (0600) |
-| `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 build approvals: decides upstream `approve-builds` placeholders (`allowBuilds`: better-sqlite3/esbuild allowed, rest explicitly denied) | no |
+| `…/{MemoryCore,MemoryPanel,MemoryKnowledge}/pnpm-workspace.yaml` | pnpm 11 build approvals: decides upstream `approve-builds` placeholders (`allowBuilds`: better-sqlite3/esbuild/protobufjs allowed, rest explicitly denied) | no |
+| `…/MemoryProxy/package.json` (`allowScripts`) | npm 11 install-script approvals, mirroring the proxy's upstream `pnpm-workspace.yaml` `allowBuilds` (npm 10 ignores the field) | no |
 | `…/metadata.db` → `meta_users` + `meta_user_keys` | Bootstraps the MemoryCore admin user keyed with `PROXY_USER_KEY` when the database exists but no admin user is present (so the agent can authenticate through the proxy) | yes |
 | `~/.dsh/skills/gitlab-mr-workflow/` | `gitlab-mr/gitlab-mr-workflow/*` (repo) — GitLab MR workflow skill | no |
 | `~/.dsh/profiles/web/cordis.patch.yml` (+`gitlab-mr` entry) | `gitlab-mr/gitlab-mr-poller.mjs` (repo) — poller plugin mount | no |
