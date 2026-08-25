@@ -796,6 +796,7 @@ function toReceiveEvent(
   const snd = sender as Record<string, unknown> | undefined
   const senderIdType = normalizeSenderIdType(snd?.sender_type)
   const chatId = typeof msg?.chat_id === 'string' ? msg.chat_id : ''
+  const chatType = typeof msg?.chat_type === 'string' ? msg.chat_type : undefined
   const rawMsgType = msg === undefined ? undefined : (msg.message_type ?? msg.msg_type)
   const msgType = typeof rawMsgType === 'string' ? rawMsgType : ''
   const { text: content, images } = extractMessageContent(msgType, msg?.content)
@@ -807,6 +808,7 @@ function toReceiveEvent(
     senderId: extractSenderId(snd?.sender_id, senderIdType),
     senderIdType,
     chatId,
+    ...(chatType === undefined ? {} : { chatType }),
     ...(typeof msg?.message_id === 'string' ? { messageId: msg.message_id } : {}),
     ...(typeof msg?.parent_id === 'string' ? { parentId: msg.parent_id } : {}),
     ...(typeof msg?.root_id === 'string' ? { rootId: msg.root_id } : {}),

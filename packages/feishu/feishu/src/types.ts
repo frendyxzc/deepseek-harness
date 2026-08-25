@@ -72,6 +72,8 @@ export interface FeishuReceiveEvent {
   readonly senderIdType: FeishuReceiveIdType
   /** The chat or user id where the message was received. */
   readonly chatId: string
+  /** The source conversation type (`p2p` for one-on-one chats, `group` for group chats). */
+  readonly chatType?: string
   /** The received message's id, when the event carries one. */
   readonly messageId?: string
   /** The immediately referenced (quoted / replied-to) message id, when present. */

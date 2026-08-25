@@ -346,6 +346,23 @@ describe('feishu-receive', () => {
     await fiber.dispose()
   })
 
+  it('injects the sender open_id as the reply target for a one-on-one (p2p) chat', async () => {
+    const { ctx, handler, fiber, systemPrompt } = await mountReceive({
+      onRoots: () => [root()],
+      presetOfRoot: 'preset-web',
+    })
+
+    handler(event('hello', 'oc_p2p', { chatType: 'p2p' }))
+
+    await vi.waitFor(() => { expect(systemPrompt.context).toHaveBeenCalledTimes(1) })
+    const entry = systemPrompt.contextCalls[0]!
+    expect(entry.text).toContain('ou_1')
+    expect(entry.text).toContain('open_id')
+    expect(entry.text).toContain('feishu_send_message')
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
   it('drops events without a chat id without raising or creating', async () => {
     const { ctx, handler, fiber, create } = await mountReceive({ onRoots: () => [root()] })
 
@@ -481,6 +498,18 @@ describe('feishu-receive', () => {
 
     await vi.waitFor(() => { expect(sends).toHaveLength(1) })
     expect(sends[0]).toEqual({ receiveId: 'oc_9', receiveIdType: 'chat_id', content: expect.stringContaining('已收到') as string })
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    await ctx.fiber.dispose()
+    await fiber.dispose()
+  })
+
+  it('acknowledges a one-on-one (p2p) message with the sender open_id, not the chat id', async () => {
+    const { ctx, handler, fiber, sends, agents } = await mountReceive({ onRoots: () => [root()] })
+
+    handler(event('hello', 'oc_p2p', { chatType: 'p2p' }))
+
+    await vi.waitFor(() => { expect(sends).toHaveLength(1) })
+    expect(sends[0]).toEqual({ receiveId: 'ou_1', receiveIdType: 'open_id', content: expect.stringContaining('已收到') as string })
     await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
     await ctx.fiber.dispose()
     await fiber.dispose()

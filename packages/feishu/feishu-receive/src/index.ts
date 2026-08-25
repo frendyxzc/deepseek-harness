@@ -20,7 +20,7 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { FeishuError } from '@deepseek-ai/dsh-feishu'
-import type { FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
+import type { FeishuReceiveEvent, FeishuReceiveIdType } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -86,6 +86,26 @@ interface ResolvedConfig extends Config {
 
 /** The acknowledgement text sent back to the chat before the agent starts. */
 const ACK_MESSAGE = '已收到，正在处理…'
+
+/** Resolved reply target: where a reply to one inbound event must be sent. */
+interface ReplyTarget {
+  readonly receiveId: string
+  readonly receiveIdType: FeishuReceiveIdType
+}
+
+/**
+ * Resolve where to reply to an inbound event. Feishu accepts `chat_id` only for
+ * group chats; a one-on-one (p2p) message must be replied to with the sender's
+ * id (`open_id` by default), otherwise the send fails with `invalid receive_id`.
+ * @param event - the inbound message event.
+ * @returns the reply target for this event.
+ */
+function resolveReplyTarget(event: FeishuReceiveEvent): ReplyTarget {
+  if (event.chatType === 'p2p' && event.senderId.length > 0) {
+    return { receiveId: event.senderId, receiveIdType: event.senderIdType }
+  }
+  return { receiveId: event.chatId, receiveIdType: 'chat_id' }
+}
 
 /** Prefix marking content resolved from a quoted / replied-to message. */
 const REFERENCED_LABEL = '[引用消息]'
@@ -293,7 +313,7 @@ export function apply(ctx: Context, config: Config = {}): void {
     }
   }
 
-  const getOrCreate = (chatId: string, providerId?: string): Promise<AgentHandle> => {
+  const getOrCreate = (chatId: string, providerId: string | undefined, reply: ReplyTarget): Promise<AgentHandle> => {
     const existing = handles.get(chatId)
     if (existing !== undefined) return existing
     let template: { presetId: string; agentOptions?: AgentOptions; cwd: string }
@@ -325,7 +345,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       agentCtx.systemPrompt.context({
         name: 'feishu:chat-context',
         order: 130,
-        text: `You are responding inside a Feishu (飞书) chat. The user's messages arrive from this chat, and your text responses are NOT visible to the user. To reply, you MUST call the feishu_send_message tool with receiveId set to "${chatId}", receiveIdType set to "chat_id", and content set to your reply text. Without calling this tool, the user will not receive your response.`,
+        text: `You are responding inside a Feishu (飞书) chat. The user's messages arrive from this chat, and your text responses are NOT visible to the user. To reply, you MUST call the feishu_send_message tool with receiveId set to "${reply.receiveId}", receiveIdType set to "${reply.receiveIdType}", and content set to your reply text. Without calling this tool, the user will not receive your response.`,
       })
     }
 
@@ -370,18 +390,19 @@ export function apply(ctx: Context, config: Config = {}): void {
             ctx.logger.warn('feishu-receive: event without a chat id; dropped')
             return
           }
+          const reply = resolveReplyTarget(event)
           void (async () => {
             // Immediate feedback before the agent starts: the acknowledgement
             // is awaited so it lands ahead of any reply, and a failure only
             // logs — delivery must never depend on it.
             if (resolved.ack) {
               try {
-                await ctx.feishu.sendMessage({ receiveId: chatId, receiveIdType: 'chat_id', content: ACK_MESSAGE })
+                await ctx.feishu.sendMessage({ receiveId: reply.receiveId, receiveIdType: reply.receiveIdType, content: ACK_MESSAGE })
               } catch (error: unknown) {
                 ctx.logger.warn('feishu-receive: failed to acknowledge chat %s: %s', chatId, String(error))
               }
             }
-            const handle = await getOrCreate(chatId, event.providerId)
+            const handle = await getOrCreate(chatId, event.providerId, reply)
             created.add(handle)
             const referenced = await resolveReferencedContent(ctx, event)
             const text = referenced.text.length > 0 ? `${referenced.text}\n\n${event.content}` : event.content
