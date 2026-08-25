@@ -24,10 +24,10 @@
 #   --skip-memory       do not clone/configure the memory stack
 #   --skip-install      do not run pnpm/npm install in the memory services
 #   --upgrade           migrate an EXISTING deployment in place: append the
-#                       feishu-bot bots/credentials patch, repair a missing
-#                       MemoryProxy native binding, refresh deps + rebuild.
-#                       Never touches secrets or regenerates generated files
-#                       (no --force); safe to re-run.
+#                       feishu-bot bots/credentials patch, refresh the memory
+#                       stack deps + rebuild the panel web UI, refresh dsh
+#                       deps + rebuild. Never touches secrets or regenerates
+#                       generated files (no --force); safe to re-run.
 #   --force             overwrite existing generated files
 #   --non-interactive   never prompt; fail if a required value is missing
 #   -h, --help          this help
@@ -165,9 +165,11 @@ write_if_absent() {
 
 # ── Upgrade mode (--upgrade): in-place migration of an existing deployment ──
 # Non-destructive by construction: it appends one idempotent patch entry to the
-# profile, repairs a missing MemoryProxy binding, and refreshes/rebuilds the dsh
-# workspace. It never regenerates a secret or overwrites a generated file (no
-# --force), so it is safe to run repeatedly and after every `git pull`.
+# profile, refreshes the memory stack dependencies (incl. the MemoryProxy
+# better-sqlite3 verify-and-repair) and rebuilds the panel web UI, then
+# refreshes/rebuilds the dsh workspace. It never regenerates a secret or
+# overwrites a generated file (no --force), so it is safe to run repeatedly
+# and after every `git pull`.
 
 # ensure_proxy_sqlite <memory-proxy-dir> — verify the better-sqlite3 native
 # binding is loadable and (re)install it when absent. better-sqlite3 is an
@@ -189,6 +191,71 @@ ensure_proxy_sqlite() {
     ok "MemoryProxy better-sqlite3 native binding installed"
   else
     die "MemoryProxy better-sqlite3 native binding failed to build — check /health storage.effective"
+  fi
+}
+
+# ensure_memory_deps <memory-root> <force> — Memory 栈依赖安装 + panel web 构建。
+# <force>=1: 即使 node_modules / web/dist 已存在也重装重建（--upgrade 与
+# setup.sh --force 均以 1 调用）；<force>=0: 仅补缺（首次安装路径）。
+# 修补 MemoryCore/Panel/Knowledge 的 pnpm allowBuilds 批准文件（幂等，且
+# --skip-install 时也执行，留下后续手动安装可用的批准文件）：pnpm 11 不再读
+# package.json 的 "pnpm" 字段，且依赖带未批准的 build script 时硬失败
+# (ERR_PNPM_IGNORED_BUILDS)。上游仓库的 approve-builds 占位值是字面文本
+# "set this to true or false"，pnpm 视为未批准，所以这里逐条决定：放行本栈真正
+# 需要的脚本（better-sqlite3 native 绑定、esbuild 二进制），显式拒绝其余（列入
+# deny 不触发硬错误）；没有 workspace yaml 的服务生成最小批准文件。
+# MemoryProxy 的 better-sqlite3 每次运行都验证-修复（ensure_proxy_sqlite）：
+# 它是 proxy 的 sqlite 存储后端，缺失时 proxy 静默降级 sqlite -> fs -> memory，
+# memory-bridge 应答 40101。
+ensure_memory_deps() {
+  local root="$1" force="$2" svc yaml
+
+  for svc in MemoryCore MemoryPanel MemoryKnowledge; do
+    yaml="$root/$svc/pnpm-workspace.yaml"
+    if [[ ! -f "$yaml" ]]; then
+      cat > "$yaml" <<'EOF'
+allowBuilds:
+  better-sqlite3: true
+  esbuild: true
+  protobufjs: true
+EOF
+    else
+      sed -e 's/set this to true or false/false/g' \
+          -e 's/^  better-sqlite3: false$/  better-sqlite3: true/' \
+          -e 's/^  esbuild: false$/  esbuild: true/' \
+          -e 's/^  protobufjs: false$/  protobufjs: true/' \
+        "$yaml" > "$yaml.tmp"
+      mv "$yaml.tmp" "$yaml"
+    fi
+    ok "pnpm build approvals -> $yaml"
+  done
+
+  if [[ "$SKIP_INSTALL" == "1" ]]; then
+    warn "--skip-install: not installing memory service dependencies"
+    return 0
+  fi
+
+  if [[ "$force" == "1" || ! -d "$root/MemoryProxy/node_modules" ]]; then
+    info "install MemoryProxy deps (npm)"
+    (cd "$root/MemoryProxy" && npm install --no-audit --no-fund)
+  fi
+  # better-sqlite3 verify-and-repair on every run (see the function comment).
+  ensure_proxy_sqlite "$root/MemoryProxy"
+  for svc in MemoryCore MemoryPanel MemoryKnowledge; do
+    if [[ "$force" == "1" || ! -d "$root/$svc/node_modules" ]]; then
+      info "install $svc deps (pnpm)"
+      (cd "$root/$svc" && pnpm install)
+    fi
+  done
+  ok "memory service dependencies ready"
+
+  # MemoryPanel serves its web UI from web/dist/; the upstream repo ships the
+  # source but not the built artifacts, so a fresh clone returns 404 on / even
+  # though /health reports 200.
+  if [[ "$force" == "1" || ! -d "$root/MemoryPanel/web/dist" ]]; then
+    info "build MemoryPanel web UI"
+    (cd "$root/MemoryPanel/web" && npm ci && npm run build)
+    ok "MemoryPanel web UI built -> $root/MemoryPanel/web/dist"
   fi
 }
 
@@ -251,11 +318,12 @@ run_upgrade() {
   upgrade_feishu_bot_config
 
   if [[ "$SKIP_MEMORY" != "1" ]]; then
-    local proxy_dir="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryProxy"
-    if [[ -d "$proxy_dir" ]]; then
-      ensure_proxy_sqlite "$proxy_dir"
+    local memory_root="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory"
+    if [[ -d "$memory_root/.git" ]]; then
+      info "refreshing memory stack deps and rebuilding panel web UI"
+      ensure_memory_deps "$memory_root" 1
     else
-      warn "memory stack not found at $proxy_dir; skipping (run the full setup.sh first)"
+      warn "memory stack not found at $memory_root; skipping (run the full setup.sh first)"
     fi
   fi
 
@@ -270,8 +338,8 @@ run_upgrade() {
   echo
   ok "upgrade complete."
   echo
-  echo "Restart to pick up the new code (start-all.sh is idempotent):"
-  echo "  ./scripts/setup-dsh/start-all.sh"
+  echo "Stop the running stack (if any), then restart to pick up the new code:"
+  echo "  ./scripts/setup-dsh/stop-all.sh && ./scripts/setup-dsh/start-all.sh"
   echo "or, for just the Web UI:"
   echo "  cd $REPO_ROOT && pnpm dsh web --host 0.0.0.0 --port 3080"
   echo
@@ -495,67 +563,14 @@ else
     ok "core env -> $CORE_ENV_FILE"
   fi
 
-  # 6e. Install service dependencies (matches what each service was built with)
-  # pnpm 11 stopped reading the "pnpm" field in package.json (it warns about
-  # the ignored keys) and hard-fails when a dependency ships a build script
-  # that is not approved (ERR_PNPM_IGNORED_BUILDS). The upstream services ship
-  # an approve-builds placeholder yaml whose values are the literal text
-  # "set this to true or false" — pnpm treats that as unapproved, so decide
-  # every entry here instead of forcing the operator through interactive
-  # approve-builds: allow the scripts this stack really needs (better-sqlite3
-  # native binding, esbuild binary), explicitly deny the rest (a listed deny
-  # does not trip the hard error). A service without a workspace yaml gets a
-  # minimal one. Generated here so --skip-install still leaves a usable
-  # approval file for a later install.
-  for svc in MemoryCore MemoryPanel MemoryKnowledge; do
-    yaml="$MEMORY_ROOT/$svc/pnpm-workspace.yaml"
-    if [[ ! -f "$yaml" ]]; then
-      cat > "$yaml" <<'EOF'
-allowBuilds:
-  better-sqlite3: true
-  esbuild: true
-  protobufjs: true
-EOF
-    else
-      sed -e 's/set this to true or false/false/g' \
-          -e 's/^  better-sqlite3: false$/  better-sqlite3: true/' \
-          -e 's/^  esbuild: false$/  esbuild: true/' \
-          -e 's/^  protobufjs: false$/  protobufjs: true/' \
-        "$yaml" > "$yaml.tmp"
-      mv "$yaml.tmp" "$yaml"
-    fi
-    ok "pnpm build approvals -> $yaml"
-  done
-  if [[ "$SKIP_INSTALL" == "1" ]]; then
-    warn "--skip-install: not installing memory service dependencies"
-  else
-    if [[ ! -d "$MEMORY_ROOT/MemoryProxy/node_modules" || "$FORCE" == "1" ]]; then
-      info "install MemoryProxy deps (npm)"
-      (cd "$MEMORY_ROOT/MemoryProxy" && npm install --no-audit --no-fund)
-    fi
-    # better-sqlite3 is MemoryProxy's sqlite storage backend; when it is missing
-    # the proxy silently degrades sqlite -> fs -> memory and memory-bridge answers
-    # 40101, so verify-and-repair it on every run (see ensure_proxy_sqlite).
-    ensure_proxy_sqlite "$MEMORY_ROOT/MemoryProxy"
-    for svc in MemoryCore MemoryPanel MemoryKnowledge; do
-      if [[ ! -d "$MEMORY_ROOT/$svc/node_modules" || "$FORCE" == "1" ]]; then
-        info "install $svc deps (pnpm)"
-        (cd "$MEMORY_ROOT/$svc" && pnpm install)
-      fi
-    done
+  # 6e. Install service dependencies (matches what each service was built with).
+  # The approve-builds repair, per-service installs, and panel web build live in
+  # ensure_memory_deps, shared with --upgrade.
+  ensure_memory_deps "$MEMORY_ROOT" "$FORCE"
+  if [[ "$SKIP_INSTALL" != "1" ]]; then
     if [[ ! -d "$DSH_HOME/profiles/web/node_modules" || "$FORCE" == "1" ]]; then
       info "install web profile deps (pnpm)"
       (cd "$DSH_HOME/profiles/web" && pnpm install)
-    fi
-    ok "memory service dependencies ready"
-
-    # MemoryPanel serves its web UI from web/dist/; the upstream repo ships
-    # the source but not the built artifacts, so a fresh clone returns 404
-    # on / even though /health reports 200. Build the frontend once here.
-    if [[ ! -d "$MEMORY_ROOT/MemoryPanel/web/dist" || "$FORCE" == "1" ]]; then
-      info "build MemoryPanel web UI"
-      (cd "$MEMORY_ROOT/MemoryPanel/web" && npm ci && npm run build)
-      ok "MemoryPanel web UI built -> $MEMORY_ROOT/MemoryPanel/web/dist"
     fi
   fi
 
