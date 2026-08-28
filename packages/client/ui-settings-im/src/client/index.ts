@@ -1,7 +1,7 @@
 /** Feishu multi-bot manager (status + team/agent mapping) registered into Web Settings. */
 
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
 import { FeishuStatusTab, type FeishuStatusTabInjected } from './FeishuStatusTab.tsx'

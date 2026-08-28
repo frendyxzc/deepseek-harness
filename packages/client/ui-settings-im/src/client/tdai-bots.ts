@@ -8,7 +8,7 @@
  * branch, so a save cannot overwrite them.
  */
 
-import type { SettingsScope } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 /** Settings namespace the owning Host plugin (`dsh-feishu-bot`) registers. */
 export const FEISHU_BOT_SETTINGS_NAMESPACE = 'feishu-bot'
