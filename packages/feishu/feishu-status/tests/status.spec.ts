@@ -53,8 +53,8 @@ describe('FeishuStatusGateway', () => {
     ctx.feishu.registerProvider(makeProvider({ id: 'bot-b' }))
     const list = await gateway.list()
     expect(list).toHaveLength(2)
-    expect(list[0]).toMatchObject({ id: 'bot-a', state: 'connected', receiveActive: true, maskedAppId: 'cli_a****' })
-    expect(list[1]).toMatchObject({ id: 'bot-b', state: 'connected', receiveActive: false })
+    expect(list[0]).toMatchObject({ id: 'bot-a', state: 'connected', receiveActive: true, maskedAppId: 'cli_a****', appSecretConfigured: true })
+    expect(list[1]).toMatchObject({ id: 'bot-b', state: 'connected', receiveActive: false, appSecretConfigured: false })
   })
 
   it('projects the seam status for a provider without a status report', async () => {

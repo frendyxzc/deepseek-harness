@@ -41,6 +41,26 @@ const DEFAULT_APP_ID_ENV = 'FEISHU_APP_ID'
 /** Default env var naming the Feishu App Secret. */
 const DEFAULT_APP_SECRET_ENV = 'FEISHU_APP_SECRET'
 
+/**
+ * Derive the per-bot App Secret reference the provider resolves when the
+ * composition names none. The flat single-app provider keeps the conventional
+ * `FEISHU_APP_SECRET`; every other bot gets a reference derived from its own id,
+ * so the Settings IM tab can store each bot's secret under a distinct, stable
+ * name (write-only, through the credentials service).
+ *
+ * The Settings IM tab mirrors this rule in `dsh-client-ui-settings-im`; the two
+ * must stay in sync so a new bot's secret lands under the reference this plugin
+ * resolves.
+ * @param botId - the bot's registry id.
+ * @returns the App Secret credential reference name.
+ */
+export function feishuAppSecretRef(botId: string): string {
+  if (botId === FEISHU_BOT_PROVIDER_ID) return DEFAULT_APP_SECRET_ENV
+  const suffix = botId.toUpperCase().replace(/[^A-Za-z0-9]+/g, '_')
+  const safe = suffix.length === 0 || /^[0-9]/.test(suffix) ? `BOT_${suffix}` : suffix
+  return `FEISHU_APP_SECRET_${safe}`
+}
+
 /** One bot's settings-editable identity and mapping; secrets stay OUT of here. */
 export interface FeishuBotEntry {
   /** Stable provider id (unique within the seam) used to route replies back to this app. */
@@ -164,7 +184,9 @@ function credentialFor(config: Config, botId: string): CredentialLike {
 function resolveOptions(ctx: Context, entry: ResolvedEntry): FeishuBotProviderOptions {
   const credential = entry.credential
   const appIdEnv = credentialRef(credential.appIdEnv ?? DEFAULT_APP_ID_ENV)
-  const appSecretEnv = credentialRef(credential.appSecretEnv ?? DEFAULT_APP_SECRET_ENV)
+  const appSecretEnv = credentialRef(credential.appSecretEnv !== undefined && credential.appSecretEnv.length > 0
+    ? credential.appSecretEnv
+    : feishuAppSecretRef(entry.id))
   const literalAppId = entry.appId !== undefined && entry.appId.length > 0 ? entry.appId : undefined
   const literalAppSecret = credential.appSecret !== undefined && credential.appSecret.length > 0 ? credential.appSecret : undefined
 

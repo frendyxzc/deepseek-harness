@@ -18,6 +18,8 @@ export interface FeishuStatusTabInjected {
   listTeams: () => Promise<TdaiTeamOption[]>
   /** Read one team's agent catalog. */
   listAgents: (teamId: string) => Promise<TdaiAgentOption[]>
+  /** Persist one bot's App Secret under its derived reference (write-only). */
+  setAppSecret: (ref: string, value: string) => Promise<void>
 }
 
 /** Full component props assembled by the Settings slot renderer. */
@@ -27,7 +29,9 @@ export type FeishuStatusTabProps =
   & InjectFace<FeishuStatusTabInjected>
 
 /** Render the multi-bot manager: per-bot status plus the team/agent editor. */
-export function FeishuStatusTab({ t, loadBots, saveBots, listTeams, listAgents, listStatus }: FeishuStatusTabProps): ReactNode {
+export function FeishuStatusTab({
+  t, loadBots, saveBots, listTeams, listAgents, listStatus, setAppSecret,
+}: FeishuStatusTabProps): ReactNode {
   const [statuses, setStatuses] = useState<FeishuBotStatusView[]>([])
 
   useEffect(() => {
@@ -48,7 +52,15 @@ export function FeishuStatusTab({ t, loadBots, saveBots, listTeams, listAgents, 
           <p className={css.subtitle}>{t('mastheadHint')}</p>
         </div>
       </header>
-      <TdaiBotsEditor t={t} loadBots={loadBots} saveBots={saveBots} listTeams={listTeams} listAgents={listAgents} statuses={statuses} />
+      <TdaiBotsEditor
+        t={t}
+        loadBots={loadBots}
+        saveBots={saveBots}
+        listTeams={listTeams}
+        listAgents={listAgents}
+        statuses={statuses}
+        setAppSecret={setAppSecret}
+      />
     </div>
   )
 }

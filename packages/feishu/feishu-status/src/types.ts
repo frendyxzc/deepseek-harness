@@ -28,6 +28,8 @@ export interface FeishuBotStatusView {
   readonly maskedAppId?: string
   /** The bot's connection state. */
   readonly state: FeishuConnectionState
+  /** Whether the provider can currently resolve this bot's App Secret. */
+  readonly appSecretConfigured?: boolean
   /** Whether this bot currently has an open receive channel. */
   readonly receiveActive: boolean
   /** The most recent failure, when recorded. */

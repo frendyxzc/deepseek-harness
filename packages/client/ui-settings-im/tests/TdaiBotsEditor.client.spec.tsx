@@ -20,6 +20,7 @@ function makeProps(overrides: Partial<Parameters<typeof TdaiBotsEditor>[0]> = {}
     listTeams: vi.fn(() => Promise.resolve([])),
     listAgents: vi.fn(() => Promise.resolve([])),
     statuses: [],
+    setAppSecret: vi.fn<(ref: string, value: string) => Promise<void>>(() => Promise.resolve()),
     ...overrides,
   }
 }
@@ -65,5 +66,27 @@ describe('TdaiBotsEditor', () => {
     await screen.findByDisplayValue('app-a')
     expect(await screen.findByText('DSH')).toBeTruthy()
     expect(await screen.findByText('BugFixer')).toBeTruthy()
+  })
+
+  it('writes a typed App Secret under its derived reference on save', async () => {
+    const setAppSecret = vi.fn<(ref: string, value: string) => Promise<void>>(() => Promise.resolve())
+    render(<TdaiBotsEditor {...makeProps({ setAppSecret })} />)
+    await screen.findByDisplayValue('app-a')
+
+    fireEvent.change(screen.getByPlaceholderText('appSecretEmpty'), { target: { value: '  sk-secret  ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'botSave' }))
+
+    await waitFor(() => { expect(setAppSecret).toHaveBeenCalled() })
+    expect(setAppSecret).toHaveBeenCalledWith('FEISHU_APP_SECRET_BOT_A', 'sk-secret')
+  })
+
+  it('leaves the credential untouched when no secret is typed', async () => {
+    const setAppSecret = vi.fn<(ref: string, value: string) => Promise<void>>(() => Promise.resolve())
+    render(<TdaiBotsEditor {...makeProps({ setAppSecret })} />)
+    await screen.findByDisplayValue('app-a')
+
+    fireEvent.click(screen.getByRole('button', { name: 'botSave' }))
+
+    await waitFor(() => { expect(setAppSecret).not.toHaveBeenCalled() })
   })
 })

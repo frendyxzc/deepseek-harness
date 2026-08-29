@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
 import { FeishuLogo } from './FeishuLogo.tsx'
+import { feishuAppSecretRef } from './secret-ref.ts'
 import type { TdaiBot, TdaiBotsView } from './tdai-bots.ts'
 import type { ImStatusLocaleKey } from './locales.ts'
 import css from './TdaiBotsEditor.module.css'
@@ -17,6 +18,8 @@ export interface TdaiBotsEditorInjected {
   listTeams: () => Promise<TdaiTeamOption[]>
   /** Read one team's agent catalog. */
   listAgents: (teamId: string) => Promise<TdaiAgentOption[]>
+  /** Persist one bot's App Secret under its derived reference (write-only). */
+  setAppSecret: (ref: string, value: string) => Promise<void>
 }
 
 /** Resolved component props for the editor. */
@@ -28,6 +31,8 @@ export interface TdaiBotsEditorProps {
   listAgents: (teamId: string) => Promise<TdaiAgentOption[]>
   /** Per-bot status from `feishuStatus.list`, keyed by bot id. */
   statuses: readonly FeishuBotStatusView[]
+  /** Persist one bot's App Secret under its derived reference (write-only). */
+  setAppSecret: (ref: string, value: string) => Promise<void>
 }
 
 const EMPTY_BOT: TdaiBot = { id: '', appId: '', teamId: '', agentId: '' }
@@ -43,10 +48,12 @@ const STATE_KEYS: Record<string, ImStatusLocaleKey> = {
 type LoadState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; view: TdaiBotsView }
 
 /** The multi-bot manager, styled as one plugin-configuration card. */
-export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, statuses }: TdaiBotsEditorProps): ReactNode {
+export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, statuses, setAppSecret }: TdaiBotsEditorProps): ReactNode {
   const [open, setOpen] = useState(true)
   const [load, setLoad] = useState<LoadState>({ status: 'loading' })
   const [draft, setDraft] = useState<TdaiBot[]>([])
+  /** Write-only App Secret drafts, indexed in parallel with `draft`. */
+  const [secrets, setSecrets] = useState<string[]>([])
   const [teams, setTeams] = useState<TdaiTeamOption[]>([])
   const [agents, setAgents] = useState<Record<string, TdaiAgentOption[]>>({})
   const [dirty, setDirty] = useState(false)
@@ -73,6 +80,7 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
         if (!current) return
         setLoad({ status: 'ready', view })
         setDraft(view.bots.map(clone))
+        setSecrets(view.bots.map(() => ''))
         for (const bot of view.bots) {
           if (bot.teamId !== undefined && bot.teamId !== '') ensureAgents(bot.teamId)
         }
@@ -90,18 +98,21 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
   const reseed = (view: TdaiBotsView): void => {
     setLoad({ status: 'ready', view })
     setDraft(view.bots.map(clone))
+    setSecrets(view.bots.map(() => ''))
     setDirty(false)
     setFailed(false)
   }
 
   const add = (): void => {
     setDraft([...draft, { ...EMPTY_BOT }])
+    setSecrets([...secrets, ''])
     setDirty(true)
     setFailed(false)
   }
 
   const remove = (index: number): void => {
     setDraft(draft.filter((_, i) => i !== index))
+    setSecrets(secrets.filter((_, i) => i !== index))
     setDirty(true)
     setFailed(false)
   }
@@ -113,6 +124,12 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
     if (patch.teamId !== undefined) ensureAgents(patch.teamId)
   }
 
+  const setSecret = (index: number, value: string): void => {
+    setSecrets(secrets.map((secret, i) => i === index ? value : secret))
+    setDirty(true)
+    setFailed(false)
+  }
+
   const save = (): void => {
     if (load.status !== 'ready' || load.view.writable === false) return
     void (async () => {
@@ -120,6 +137,13 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
       setFailed(false)
       try {
         await saveBots(draft)
+        // Write each bot's App Secret only when a fresh value was typed; an
+        // empty field leaves the stored credential untouched.
+        for (let index = 0; index < draft.length; index += 1) {
+          const bot = draft[index]
+          const secret = (secrets[index] ?? '').trim()
+          if (secret.length > 0 && bot !== undefined) await setAppSecret(feishuAppSecretRef(bot.id), secret)
+        }
         reseed(await loadBots())
       } catch {
         setFailed(true)
@@ -182,6 +206,12 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
                         onChange={(teamId) => { edit(index, { teamId }) }} />
                       <AgentSelect t={t} value={bot.agentId ?? ''} agents={agents[bot.teamId ?? ''] ?? []} disabled={!writable}
                         onChange={(agentId) => { edit(index, { agentId }) }} />
+                      <Field label={t('botAppSecret')}>
+                        <input className={css.input} type="password" autoComplete="off"
+                          value={secrets[index] ?? ''} disabled={!writable}
+                          placeholder={status?.appSecretConfigured === true ? t('appSecretConfigured') : t('appSecretEmpty')}
+                          onChange={(event) => { setSecret(index, event.target.value) }} />
+                      </Field>
                     </div>
                     <div className={css.botFooter}>
                       <span className={css.spacer} />

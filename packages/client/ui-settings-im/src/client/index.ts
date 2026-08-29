@@ -24,7 +24,7 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const NS = 'settings.im'
 
 /** Services required by the Settings registration and generated Remote face. */
-export const inject = ['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'settingsScope']
+export const inject = ['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'remote.credentials', 'settingsScope']
 
 /** Contribute the lazy IM settings tab to the Plugins settings section. */
 export function apply(ctx: ClientContext): void {
@@ -44,12 +44,20 @@ export function apply(ctx: ClientContext): void {
     const result = await ctx.remote.tdaiMemory.listAgents(teamId)
     return result.ok ? result.value : []
   }
+  const setAppSecret = async (ref: string, value: string): Promise<void> => {
+    const result = await ctx.remote.credentials.set(ref, value)
+    if (!result.ok) {
+      const error = result.error as { message?: unknown }
+      throw new Error(typeof error?.message === 'string' ? error.message : 'credential write failed')
+    }
+  }
   const injected = (): FeishuStatusTabInjected => ({
     listStatus,
     loadBots: () => bots.load(),
     saveBots: next => bots.save(next),
     listTeams,
     listAgents,
+    setAppSecret,
   })
 
   ctx.slots.inject('settings.plugins.tab', () => ctx.slots.register({

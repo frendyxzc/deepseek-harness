@@ -15,20 +15,22 @@ Registers one `FeishuBotProvider` per configured app with `ctx.feishu` (the flat
 | `appId` | `string` | — | Literal Feishu App ID (wins over `appIdEnv`) |
 | `appSecret` | `string` | — | Literal Feishu App Secret (wins over `appSecretEnv`) |
 | `appIdEnv` | `string` | `FEISHU_APP_ID` | Credential reference resolved for each operation |
-| `appSecretEnv` | `string` | `FEISHU_APP_SECRET` | Credential reference resolved for each operation |
+| `appSecretEnv` | `string` | `FEISHU_APP_SECRET` (flat) or `FEISHU_APP_SECRET_<BOT_ID>` per bot | Credential reference resolved for each operation |
 | `baseURL` | `string` | `https://open.feishu.cn/open-apis` | Feishu Open API base URL |
 | `bots` | `array` | — | Bot apps (settings-editable): each `{ id, appId?, teamId?, agentId? }` registers one provider under its own `id`; non-empty replaces the flat single app |
 | `credentials` | `array` | — | Secrets per bot (composition-only): each `{ id, appSecret?, appSecretEnv?, appIdEnv?, baseURL? }` supplies the secrets a `bots` entry never carries |
 
 ## Multiple apps
 
-When `bots` is non-empty, each entry becomes one provider under its own `id`, and the flat `appId` / `appSecret` fields serve as the fallback credentials. Secrets intentionally live in `credentials` (composition-only), not `bots`: the settings UI reads `bots` but cannot reply a redacted `role('secret')` value, so keeping them separate means editing a bot's `teamId` / `agentId` can never overwrite its secret. Inbound events carry both the resolved `appId` and the provider `id`, and the Feishu seam routes a reply to a chat back through the provider that received it.
+When `bots` is non-empty, each entry becomes one provider under its own `id`, and the flat `appId` / `appSecret` fields serve as the fallback credentials. A bot's literal `appSecret` stays in `credentials` (composition-only); the Settings IM tab also stores each bot's App Secret through the Harness credentials service, where the value crosses only the write path — addressed by `feishuAppSecretRef`, a reference derived from the bot id (`FEISHU_APP_SECRET_<BOT_ID>`, or the flat `FEISHU_APP_SECRET` for `feishu-bot`) — so editing a bot's `teamId` / `agentId` never overwrites its secret. Inbound events carry both the resolved `appId` and the provider `id`, and the Feishu seam routes a reply to a chat back through the provider that received it.
 
 ## Credentials
 
 The provider resolves each credential per operation in this order:
 1. Literal `appId` / `appSecret` from config.
 2. The `appIdEnv` / `appSecretEnv` credential reference through the Harness credentials service, falling back to the launch environment.
+
+When a bot's `credentials` entry names no `appSecretEnv`, `appSecretEnv` defaults to `feishuAppSecretRef(id)` — the flat `FEISHU_APP_SECRET` for `feishu-bot`, or a per-bot `FEISHU_APP_SECRET_<BOT_ID>` derived from the sanitized id otherwise. The Settings IM tab writes each bot's secret under this same reference, so a secret entered there reaches the provider's next operation.
 
 The tenant access token is cached and refreshed on expiry, with a 60-second safety margin.
 

@@ -51,6 +51,7 @@ export class FeishuStatusGateway extends TypertRemoteService {
         id: provider.id,
         ...(status?.appIdMasked === undefined ? {} : { maskedAppId: status.appIdMasked }),
         state: status?.state ?? (provider.available() ? 'connected' : 'unavailable'),
+        appSecretConfigured: status?.appSecretConfigured ?? false,
         receiveActive: status?.receiveActive ?? false,
         ...(status?.lastError === undefined ? {} : { lastError: status.lastError }),
       }

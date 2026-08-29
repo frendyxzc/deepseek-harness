@@ -15,20 +15,22 @@
 | `appId` | `string` | — | 字面飞书 App ID（优先于 `appIdEnv`） |
 | `appSecret` | `string` | — | 字面飞书 App Secret（优先于 `appSecretEnv`） |
 | `appIdEnv` | `string` | `FEISHU_APP_ID` | 每次操作解析的凭据引用 |
-| `appSecretEnv` | `string` | `FEISHU_APP_SECRET` | 每次操作解析的凭据引用 |
+| `appSecretEnv` | `string` | 平铺为 `FEISHU_APP_SECRET`，多 bot 每个为 `FEISHU_APP_SECRET_<BOT_ID>` | 每次操作解析的凭据引用 |
 | `baseURL` | `string` | `https://open.feishu.cn/open-apis` | 飞书开放平台 base URL |
 | `bots` | `array` | — | bot 应用（设置可编辑）：每项 `{ id, appId?, teamId?, agentId? }` 以一个自己的 `id` 注册一个提供方；非空时取代平铺单应用 |
 | `credentials` | `array` | — | 每个 bot 的秘密（仅组合期）：每项 `{ id, appSecret?, appSecretEnv?, appIdEnv?, baseURL? }` 提供 `bots` 项永不携带的秘密 |
 
 ## 多应用
 
-当 `bots` 非空时，每项以一个自己的 `id` 成为一个提供方，平铺的 `appId` / `appSecret` 字段作为回退凭据。秘密刻意放在 `credentials`（仅组合期）而非 `bots`：设置 UI 读取 `bots` 但无法回传被脱敏的 `role('secret')` 值，分开存放意味着编辑 bot 的 `teamId` / `agentId` 绝不会覆盖其秘密。入站事件同时携带解析后的 `appId` 与提供方 `id`，飞书 seam 会把对某群聊的回复路由回接收它的那个提供方。
+当 `bots` 非空时，每项以一个自己的 `id` 成为一个提供方，平铺的 `appId` / `appSecret` 字段作为回退凭据。bot 的字面 `appSecret` 仍放在 `credentials`（仅组合期）；设置里的 IM 页也会通过 Harness 凭据服务保存每个 bot 的 App Secret，值只经过写入方向——以 `feishuAppSecretRef` 从 bot id 派生的引用寻址（`FEISHU_APP_SECRET_<BOT_ID>`，平铺 `feishu-bot` 则为 `FEISHU_APP_SECRET`）——因此编辑 bot 的 `teamId` / `agentId` 绝不会覆盖其秘密。入站事件同时携带解析后的 `appId` 与提供方 `id`，飞书 seam 会把对某群聊的回复路由回接收它的那个提供方。
 
 ## 凭据
 
 提供方每次操作按以下顺序解析每个凭据：
 1. 来自配置的字面 `appId` / `appSecret`。
 2. 通过 Harness 凭据服务解析的 `appIdEnv` / `appSecretEnv` 凭据引用，回退到启动环境。
+
+当某 bot 的 `credentials` 项未命名 `appSecretEnv` 时，`appSecretEnv` 默认取 `feishuAppSecretRef(id)`——`feishu-bot` 为平铺的 `FEISHU_APP_SECRET`，否则为由规范化 id 派生的 `FEISHU_APP_SECRET_<BOT_ID>`。设置里的 IM 页以同一引用保存每个 bot 的 App Secret，因此在此处填写的秘密会到达提供方的下一次操作。
 
 租户 access token 被缓存并在到期时刷新，留 60 秒安全余量。
 

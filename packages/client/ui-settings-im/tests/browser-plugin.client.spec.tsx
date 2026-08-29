@@ -30,8 +30,11 @@ async function bench() {
   new RemoteService(ctx)
   const status = vi.fn<() => Promise<StatusResult>>()
     .mockResolvedValue({ ok: true, value: [{ id: 'bot', state: 'connected', receiveActive: false }] })
+  const setSecret = vi.fn<(ref: string, value: string) => Promise<{ ok: true } | { ok: false; error: { message: string } }>>()
+    .mockResolvedValue({ ok: true })
   ctx.provide('remote.feishuStatus', { list: status })
   ctx.provide('remote.tdaiMemory', { listTeams: async () => [], listAgents: async () => [] })
+  ctx.provide('remote.credentials', { set: setSecret })
   ctx.provide('settingsScope', {
     bind: () => ({
       getSnapshot: () => ({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'memory' }),
@@ -40,7 +43,7 @@ async function bench() {
       unset: async () => {},
     }),
   })
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, status }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, status, setSecret }
 }
 
 function declare(slots: SlotRegistry): () => void {
@@ -52,7 +55,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-im browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'remote.credentials', 'settingsScope'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {
@@ -72,6 +75,8 @@ describe('ui-settings-im browser plugin', () => {
     expect(b.status).toHaveBeenCalledOnce()
     b.status.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })
     await expect(injected.listStatus()).resolves.toEqual([])
+    await expect(injected.setAppSecret('FEISHU_APP_SECRET_MAIN', 'sk-secret')).resolves.toBeUndefined()
+    expect(b.setSecret).toHaveBeenCalledWith('FEISHU_APP_SECRET_MAIN', 'sk-secret')
     await b.ctx.fiber.dispose()
   })
 
