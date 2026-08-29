@@ -188,7 +188,11 @@ start_service panel 8123 "http://127.0.0.1:8123/health" 30 \
   "cd '$MEMORY_ROOT/MemoryPanel' && pnpm dev"
 
 # 5. dsh Web UI :3080
-start_service dsh-web 3080 "http://127.0.0.1:3080/" 120 \
+# dsh-web has no unauthenticated HTTP health route: `/` (and every API path)
+# is token-gated (401), while `/health` is 404 (the static fallback treats it
+# as a missing asset). Pass an empty health URL so wait_healthy falls back to
+# the TCP-port check instead of misreporting "not ready (http=401)".
+start_service dsh-web 3080 "" 120 \
   "cd '$WORKSPACE' && pnpm dsh web --host 0.0.0.0 --port 3080"
 
 echo
