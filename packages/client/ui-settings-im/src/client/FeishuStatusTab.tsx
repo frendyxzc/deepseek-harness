@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { TdaiBotsEditor } from './TdaiBotsEditor.tsx'
+import { FeishuLogo } from './FeishuLogo.tsx'
 import type { TdaiBot, TdaiBotsView } from './tdai-bots.ts'
 import css from './FeishuStatusTab.module.css'
 
@@ -40,6 +41,13 @@ export function FeishuStatusTab({ t, loadBots, saveBots, listTeams, listAgents, 
 
   return (
     <div className={css.section}>
+      <header className={css.masthead}>
+        <span className={css.logo} aria-hidden="true"><FeishuLogo size={26} /></span>
+        <div className={css.brand}>
+          <strong className={css.title}>{t('heading')}</strong>
+          <p className={css.subtitle}>{t('mastheadHint')}</p>
+        </div>
+      </header>
       <TdaiBotsEditor t={t} loadBots={loadBots} saveBots={saveBots} listTeams={listTeams} listAgents={listAgents} statuses={statuses} />
     </div>
   )

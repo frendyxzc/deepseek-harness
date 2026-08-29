@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
+import { FeishuLogo } from './FeishuLogo.tsx'
 import type { TdaiBot, TdaiBotsView } from './tdai-bots.ts'
 import type { ImStatusLocaleKey } from './locales.ts'
 import css from './TdaiBotsEditor.module.css'
@@ -140,7 +141,7 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
   const blocked = !dirty || saving || !writable
 
   return (
-    <div className={clsx(css.card, open && css.cardOpen)}>
+    <section className={clsx(css.card, open && css.cardOpen)}>
       <button type="button" className={css.header} aria-expanded={open} onClick={() => { setOpen(!open) }}>
         <span className={css.headText}>
           <span className={css.name}>{t('botsHeading')}</span>
@@ -160,29 +161,41 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
                 const status = statusById.get(bot.id)
                 return (
                   <li className={css.bot} key={index}>
-                    <StatusBadge t={t} state={status?.state} />
-                    <Field label={t('botId')}>
-                      <input className={css.input} type="text" value={bot.id} disabled={!writable}
-                        onChange={(event) => { edit(index, { id: event.target.value }) }} />
-                    </Field>
-                    <Field label={t('botAppId')}>
-                      <input className={css.input} type="text" value={bot.appId ?? ''} disabled={!writable}
-                        onChange={(event) => { edit(index, { appId: event.target.value }) }} />
-                    </Field>
-                    <TeamSelect t={t} value={bot.teamId ?? ''} teams={teams} disabled={!writable}
-                      onChange={(teamId) => { edit(index, { teamId }) }} />
-                    <AgentSelect t={t} value={bot.agentId ?? ''} agents={agents[bot.teamId ?? ''] ?? []} disabled={!writable}
-                      onChange={(agentId) => { edit(index, { agentId }) }} />
-                    <button type="button" className={css.remove} disabled={!writable} onClick={() => { remove(index) }}>
-                      {t('botRemove')}
-                    </button>
+                    <div className={css.botTop}>
+                      <span className={css.avatar} aria-hidden="true"><FeishuLogo size={24} /></span>
+                      <div className={css.identity}>
+                        <span className={css.botName}>{bot.id.trim() !== '' ? bot.id : t('botUntitled')}</span>
+                        {bot.appId ? <span className={css.botAppId}>{bot.appId}</span> : null}
+                      </div>
+                      <StatusBadge t={t} state={status?.state} />
+                    </div>
+                    <div className={css.fields}>
+                      <Field label={t('botId')}>
+                        <input className={css.input} type="text" value={bot.id} disabled={!writable}
+                          onChange={(event) => { edit(index, { id: event.target.value }) }} />
+                      </Field>
+                      <Field label={t('botAppId')}>
+                        <input className={css.input} type="text" value={bot.appId ?? ''} disabled={!writable}
+                          onChange={(event) => { edit(index, { appId: event.target.value }) }} />
+                      </Field>
+                      <TeamSelect t={t} value={bot.teamId ?? ''} teams={teams} disabled={!writable}
+                        onChange={(teamId) => { edit(index, { teamId }) }} />
+                      <AgentSelect t={t} value={bot.agentId ?? ''} agents={agents[bot.teamId ?? ''] ?? []} disabled={!writable}
+                        onChange={(agentId) => { edit(index, { agentId }) }} />
+                    </div>
+                    <div className={css.botFooter}>
+                      <span className={css.spacer} />
+                      <button type="button" className={css.remove} disabled={!writable} onClick={() => { remove(index) }}>
+                        {t('botRemove')}
+                      </button>
+                    </div>
                   </li>
                 )
               })}
             </ul>
-            <button type="button" className={css.add} disabled={!writable} onClick={add}>{t('botAdd')}</button>
             <div className={css.footer}>
               {failed ? <p className={css.failed} role="status">{t('botsFailed')}</p> : null}
+              <button type="button" className={css.add} disabled={!writable} onClick={add}>{t('botAdd')}</button>
               <span className={css.spacer} />
               <button type="button" className={css.discard} disabled={!dirty || saving} onClick={discard}>
                 {t('botDiscard')}
@@ -194,7 +207,7 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
           </div>
         )
         : null}
-    </div>
+    </section>
   )
 }
 
@@ -210,13 +223,21 @@ function Field({ label, children }: { label: string; children: ReactNode }): Rea
   )
 }
 
-/** A small state indicator for one bot. */
+/** Feishu connection state → visual tone for the status dot. */
+const STATE_TONES: Record<string, 'success' | 'warning' | 'error'> = {
+  connected: 'success',
+  unconfigured: 'warning',
+  error: 'error',
+}
+
+/** A health-pill state indicator for one bot (colored dot + locale label). */
 function StatusBadge({ t, state }: { t: (key: ImStatusLocaleKey) => string; state: string | undefined }): ReactNode {
   const key = state === undefined || STATE_KEYS[state] === undefined ? 'stateUnavailable' : STATE_KEYS[state]
-  const stateLabel = t(key)
+  const tone = state === undefined ? 'neutral' : (STATE_TONES[state] ?? 'neutral')
   return (
-    <span className={css.statusDot} data-state={state ?? 'unavailable'} role="img" aria-label={stateLabel}>
-      {stateLabel}
+    <span className={css.statusPill} data-tone={tone}>
+      <span className={css.statusDot} aria-hidden="true" />
+      {t(key)}
     </span>
   )
 }
