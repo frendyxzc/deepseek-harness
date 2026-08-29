@@ -12,9 +12,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
-// Type-only: pulls the ctx.remote merge and the forwarded-event key face
-// (settings/credentials invalidations ride the allowlist) into this program.
-import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the ctx.remote merge, the forwarded-event key face
+// (settings/credentials invalidations ride the allowlist), and the
+// ConnectionHandle type into this program.
+import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 import { ModelsSection } from './ModelsSection.tsx'
 import type { ModelsSectionInjected } from './ModelsSection.tsx'
 import { DeepSeekOnboardingDialog } from './DeepSeekOnboardingDialog.tsx'
@@ -61,7 +62,7 @@ export function refreshIfLoaded(controller: ModelsSettingsStore): void {
  * constrained; registration depends on each slot through `slots.inject()`.
  */
 export const inject = [
-  'slots', 'locale', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
+  'slots', 'locale', 'connection', 'remote', 'remote.credentials', 'remote.llm', 'remote.settings',
   'settingsScope', 'settingsSchema',
 ]
 
@@ -75,13 +76,14 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-models: copy dictionaries')
 
   const schema = createSettingsSchemaOperations(ctx.settingsSchema)
+  const connection = ctx.get('connection') as ConnectionHandle
   // Every configuration operation rides its owning Remote namespace.
   const wire: ModelsWire = {
     credentials: ctx.remote.credentials,
     llm: ctx.remote.llm,
     settings: ctx.remote.settings,
   }
-  const controller = new ModelsSettingsStore(wire, schema, ctx.settingsScope.describe())
+  const controller = new ModelsSettingsStore(wire, schema, ctx.settingsScope.describe(), !connection.isLoopback)
   // Registration-time text (the nav label thunk) and the inject faces share
   // one bound translate; copy freshness rides the locale revision.
   const t = ctx.locale.bind(NS) as ModelsSectionInjected['t']
@@ -99,8 +101,8 @@ export function apply(ctx: ClientContext): void {
     schema,
     t,
   })
-  // The scope's own memory mode is what keeps a remote browser process-local,
-  // so the store needs no isLoopback branch of its own.
+  // The welcome notice follows its settings scope, whose own memory mode keeps
+  // a remote browser process-local, so it needs no loopback branch of its own.
   const welcomeController = new WelcomeNoticeStore(ctx.settingsScope.bind({
     namespace: WELCOME_NOTICE_SETTINGS_NAMESPACE,
     decode: decodeWelcomeSection,

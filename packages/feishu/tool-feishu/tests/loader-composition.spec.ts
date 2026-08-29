@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Include from '@deepseek-ai/cordis-plugin-include'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
 import FeishuRuntime from '@deepseek-ai/dsh-feishu'
@@ -110,7 +110,7 @@ describe('feishu real composition', () => {
 
     const out = await ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: CallId('c-1'),
+      callId: ToolCallId('c-1'),
       name: 'feishu_send_message',
       arguments: { receiveId: 'ou_1', content: 'hello' },
     })
@@ -125,7 +125,7 @@ describe('feishu real composition', () => {
 
     const out = await ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: CallId('c-2'),
+      callId: ToolCallId('c-2'),
       name: 'feishu_update_message',
       arguments: { messageId: 'mid-1', content: 'revised reply' },
     })

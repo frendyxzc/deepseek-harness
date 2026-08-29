@@ -3,6 +3,8 @@
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: pulls the ctx.slots Context merge.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
 import { FeishuStatusTab, type FeishuStatusTabInjected } from './FeishuStatusTab.tsx'
 import { TdaiBotsController, FEISHU_BOT_SETTINGS_NAMESPACE } from './tdai-bots.ts'

@@ -24,6 +24,7 @@ function scopeOf(snapshot: SettingsScopeSnapshot<TdaiBotsSection>): SettingsScop
       for (const listener of [...listeners]) listener()
     }),
     unset: vi.fn(async () => {}),
+    mutate: vi.fn(async () => {}),
   }
 }
 

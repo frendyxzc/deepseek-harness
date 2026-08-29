@@ -18,7 +18,6 @@ import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import UserQuestionService, {
   type AskUserQuestionAnswer,
   type AskUserQuestionItem,
-  type UserQuestionProvider,
 } from '@deepseek-ai/dsh-user-questions'
 import * as FeishuQuestion from '@deepseek-ai/dsh-feishu-question'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
@@ -471,14 +470,11 @@ describe('feishu-question', () => {
   it('leaves asks of unbound agents to the default provider without sending a card', async () => {
     const { ctx, fiber, sent } = await mountQuestion()
     const seen: AskUserQuestionAnswer[] = []
-    const fallback: UserQuestionProvider = {
-      ask: async (request) => {
-        const answer = { answers: request.questions.map(question => ({ id: question.id, selected: ['from-web'] })) }
-        seen.push(answer)
-        return answer
-      },
-    }
-    ctx.userQuestions.registerProvider(fallback)
+    ctx.on('user-questions/request', async (request) => {
+      const answer = { answers: request.questions.map(question => ({ id: question.id, selected: ['from-web'] })) }
+      seen.push(answer)
+      return answer
+    })
     const stranger = chatAgent(ctx, 'web-gui-session')
 
     const result = await ctx.userQuestions.ask({ questions: [singleSelect()], agent: stranger })
@@ -563,10 +559,9 @@ describe('feishu-question', () => {
 
   it('releases a chat binding when its agent is disposed', async () => {
     const { ctx, fiber, sent } = await mountQuestion()
-    const fallback: UserQuestionProvider = {
-      ask: async request => ({ answers: request.questions.map(question => ({ id: question.id, selected: ['from-web'] })) }),
-    }
-    ctx.userQuestions.registerProvider(fallback)
+    ctx.on('user-questions/request', async request => (
+      { answers: request.questions.map(question => ({ id: question.id, selected: ['from-web'] })) }
+    ))
     const agent = chatAgent(ctx)
     bindChat(ctx, agent, 'oc_1')
     ctx.emit('agent/disposed', { agent })

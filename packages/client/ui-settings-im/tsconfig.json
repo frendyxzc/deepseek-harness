@@ -18,10 +18,10 @@
       "path": "../locale"
     },
     {
-      "path": "../runtime"
+      "path": "../ui-settings"
     },
     {
-      "path": "../ui-settings"
+      "path": "../ui-renderer"
     },
     {
       "path": "../ui-primitives"

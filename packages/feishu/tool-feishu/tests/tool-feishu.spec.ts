@@ -6,7 +6,7 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { type ToolExecutionResult } from '@deepseek-ai/dsh-tools'
 import FeishuRuntime, { type FeishuSendRequest } from '@deepseek-ai/dsh-feishu'
@@ -46,7 +46,7 @@ afterEach(async () => {
 
 let counter = 0
 function call(args: unknown, name = 'feishu_send_message'): Promise<ToolExecutionResult> {
-  return ctx.tools.execute({ signal: testToolSignal, callId: CallId(`call-${++counter}`), name, arguments: args })
+  return ctx.tools.execute({ signal: testToolSignal, callId: ToolCallId(`call-${++counter}`), name, arguments: args })
 }
 
 describe('tool-feishu', () => {
@@ -143,7 +143,7 @@ describe('tool-feishu', () => {
     const bareFiber = await bare.plugin(ToolFeishu)
     const out = await bare.tools.execute({
       signal: testToolSignal,
-      callId: CallId(`call-${++counter}`),
+      callId: ToolCallId(`call-${++counter}`),
       name: 'feishu_update_message',
       arguments: { messageId: 'mid-1', content: 'revised' },
     })

@@ -192,11 +192,13 @@ export class ModelsSettingsStore {
    * @param api - the page's credentials Remote and LLM wire faces.
    * @param schema - settings schema operations.
    * @param describeFace - the shared mirror's describe face (namespace views and writability).
+   * @param loopbackOnly - whether the configuration plane is unreachable from this origin (a LAN client).
    */
   constructor(
     private readonly api: Pick<ModelsWire, 'credentials' | 'llm'>,
     private readonly schema: SettingsSchemaOperations,
     private readonly describeFace: SettingsDescribeFace,
+    private readonly loopbackOnly: boolean = false,
   ) {}
 
   /**
@@ -208,6 +210,18 @@ export class ModelsSettingsStore {
    * @returns nothing; the snapshot carries the outcome.
    */
   async load(): Promise<void> {
+    // The configuration plane is loopback-only: a LAN browser would 403 on
+    // every settings/credentials read, so surface that fact up front instead
+    // of a transport error.
+    if (this.loopbackOnly) {
+      this.generation += 1
+      this.store.update((s) => {
+        s.status = 'error'
+        s.error = null
+        s.loopbackOnly = true
+      })
+      return
+    }
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'loading'; s.error = null })
     let providers: ProviderDirectoryEntry[]

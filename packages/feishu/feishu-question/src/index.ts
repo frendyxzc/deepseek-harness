@@ -1,17 +1,16 @@
 /**
  * `@deepseek-ai/dsh-feishu-question`: the question-card answerer for Feishu
- * chat agents. It registers a routing `ctx.userQuestions` provider that
+ * chat agents. It joins the `user-questions/request` answerer waterfall and
  * claims every ask whose owner agent is bound to a Feishu chat — a per-chat
  * agent announced by `@deepseek-ai/dsh-feishu-receive`, or a subagent
- * descendant of one — and answers it with an interactive v1 card in the
- * owning chat: one button per option, settled by tapping. A shared one-time
- * nonce correlates every tap with its ask and settles it exactly once when
- * every option-bearing question is answered; a question without options
- * invites a chat reply, and a timeout, an abort, a superseding chat message,
- * or a plugin teardown rejects the ask fail-closed. The user-questions seam
- * races every accepting provider for the first answer, so a Feishu-bound ask
- * is also offered to the default provider (the Web UI) and either surface can
- * answer it; asks with no Feishu binding reach the default provider alone.
+ * descendant of one — answering it with an interactive v1 card in the owning
+ * chat: one button per option, settled by tapping. A shared one-time nonce
+ * correlates every tap with its ask and settles it exactly once when every
+ * option-bearing question is answered; a question without options invites a
+ * chat reply, and a timeout, an abort, a superseding chat message, or a
+ * plugin teardown rejects the ask fail-closed. Asks with no Feishu binding
+ * are delegated through the waterfall's `next()`, so a non-Feishu ask still
+ * reaches the default answerer (the Web UI).
  *
  * @module @deepseek-ai/dsh-feishu-question
  */
@@ -452,12 +451,15 @@ export function apply(ctx: Context, config: Config): void {
     })
     /* jscpd:ignore-end */
 
-    // Routing provider: claims Feishu-bound asks via `accepts`; every other
-    // ask falls through to the default provider unchanged.
-    const disposeProvider = ctx.userQuestions.registerProvider({ accepts, ask })
+    // Prepend so this answerer is consulted BEFORE any catch-all answerer
+    // (the Web host answers every ask it can claim): Feishu-bound asks are
+    // claimed here; everything else delegates through next().
+    const offAnswerer = ctx.on('user-questions/request', (request, next) => (
+      accepts(request) ? ask(request) : next()
+    ), { prepend: true })
 
     return () => {
-      disposeProvider()
+      offAnswerer()
       closeChannels()
       offProviderAdded()
       offProviderRemoved()

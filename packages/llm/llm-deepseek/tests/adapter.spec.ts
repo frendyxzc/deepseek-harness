@@ -373,6 +373,7 @@ describe('DeepSeekAdapter against a mock server', () => {
       resolveApiKey: () => Promise.resolve('k'),
       resolveUserId: () => TEST_USER_ID,
       resolveTdaiHeaders: () => ({ 'x-team-id': 'team-t', 'x-task-id': 'tsk-k' }),
+      prepareExtensions: noExtensions,
     })
 
     await drain(adapter.stream({

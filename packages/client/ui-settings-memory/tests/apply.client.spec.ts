@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /** Memory section registration: slot declaration injection, the locale-following label thunk, and disposal. */
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
