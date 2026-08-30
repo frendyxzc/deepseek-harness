@@ -44,7 +44,7 @@ re-running the full, partly-destructive bootstrap:
 
 `--upgrade` is non-destructive and safe to re-run: it never prompts for or
 regenerates a secret, never overwrites a generated file, and never implies
-`--force`. It does three things:
+`--force`. It does four things:
 
 1. **Migrates the profile's `feishu-bot` patch** — appends one idempotent
    config-override (keyed by a marker comment, so a re-run is a no-op) that
@@ -52,7 +52,13 @@ regenerates a secret, never overwrites a generated file, and never implies
    Settings → Plugins → IM tab can map team/agent per bot. A flat deployment
    keeps working until this runs (the flat fields stay backward compatible);
    secrets stay in `FEISHU_APP_ID` / `FEISHU_APP_SECRET`.
-2. **Repairs a missing MemoryProxy binding** — verifies `better-sqlite3` is
+2. **Adds an image-capable model** — appends `qwen3-vl-plus` (declared
+   `input: [text, image]`) to the `llm-pi-ai` dashscope `models` list in
+   `settings.yaml`, so the deployment can select a vision route and read pasted
+   images natively. Idempotent — a run where the model is already listed is a
+   no-op, and a `settings.yaml` without the `llm-pi-ai`/dashscope block is left
+   untouched.
+3. **Repairs a missing MemoryProxy binding** — verifies `better-sqlite3` is
    loadable and reinstalls it when absent (a missing binding silently degrades
    proxy storage `sqlite -> fs -> memory` and makes the memory bridge answer
    `40101`). The memory stack pins Node v22, so installs and this check run
@@ -62,7 +68,7 @@ regenerates a secret, never overwrites a generated file, and never implies
    optionalDependency) when its install script is unapproved, and a binding
    built under a different ABI fails to load. An idempotent `allowScripts`
    patch in `MemoryProxy/package.json` covers the npm-11 fallback case.
-3. **Refreshes and rebuilds** — runs `pnpm install` + `pnpm run build` in the
+4. **Refreshes and rebuilds** — runs `pnpm install` + `pnpm run build` in the
    checkout (links the newly added workspace package and rebuilds host libs,
    client bundles, and the Web frontend), then `pnpm install` in the profile.
 

@@ -24,10 +24,11 @@
 #   --skip-memory       do not clone/configure the memory stack
 #   --skip-install      do not run pnpm/npm install in the memory services
 #   --upgrade           migrate an EXISTING deployment in place: append the
-#                       feishu-bot bots/credentials patch, refresh the memory
-#                       stack deps + rebuild the panel web UI, refresh dsh
-#                       deps + rebuild. Never touches secrets or regenerates
-#                       generated files (no --force); safe to re-run.
+#                       feishu-bot bots/credentials patch, add the
+#                       qwen3-vl-plus vision model to settings.yaml, refresh
+#                       the memory stack deps + rebuild the panel web UI,
+#                       refresh dsh deps + rebuild. Never touches secrets or
+#                       regenerates generated files (no --force); safe to run.
 #   --force             overwrite existing generated files
 #   --non-interactive   never prompt; fail if a required value is missing
 #   -h, --help          this help
@@ -357,6 +358,63 @@ upgrade_feishu_bot_config() {
   ok "feishu-bot bots/credentials config appended -> $patch"
 }
 
+# upgrade_vision_model_config — add the `qwen3-vl-plus` vision model to the
+# `llm-pi-ai.providers.dashscope.models` list of an EXISTING settings.yaml, so
+# a text-only deployment gains one image-capable route in place. Idempotent and
+# non-destructive: the awk pass re-emits every line and injects the entry only
+# as the last item of the dashscope `models:` list, leaving every other section
+# (and any hand edit) byte-for-byte intact. A settings.yaml without the
+# llm-pi-ai/dashscope block is left alone.
+upgrade_vision_model_config() {
+  local settings="$DSH_HOME/settings.yaml"
+  if [[ ! -f "$settings" ]]; then
+    warn "settings.yaml missing ($settings); run a full ./scripts/setup-dsh/setup.sh first"
+    return 0
+  fi
+  if grep -q "id: qwen3-vl-plus" "$settings"; then
+    ok "qwen3-vl-plus already present in settings.yaml; skipping"
+    return 0
+  fi
+  if ! grep -q "^llm-pi-ai:" "$settings" || ! grep -q "dashscope:" "$settings"; then
+    warn "settings.yaml has no llm-pi-ai/dashscope block; skipping vision model migration"
+    return 0
+  fi
+
+  awk '
+    BEGIN { phase = 0 }
+    /^llm-pi-ai:$/                 { phase = 1; print; next }
+    phase == 1 && /^    dashscope:$/ { phase = 2; print; next }
+    phase == 2 && /^      models:$/  { phase = 3; print; next }
+    phase == 3 {
+      if (/^[[:space:]]*$/) { print; next }
+      if (/^        /)      { print; next }
+      print "        - id: qwen3-vl-plus"
+      print "          name: Qwen3 VL Plus"
+      print "          input: [text, image]"
+      phase = 0
+      print
+      next
+    }
+    { print }
+    END {
+      if (phase == 3) {
+        print "        - id: qwen3-vl-plus"
+        print "          name: Qwen3 VL Plus"
+        print "          input: [text, image]"
+      }
+    }
+  ' "$settings" > "$settings.tmp"
+
+  if ! grep -q "id: qwen3-vl-plus" "$settings.tmp"; then
+    warn "could not locate the dashscope models list; leaving settings.yaml unchanged"
+    rm -f "$settings.tmp"
+    return 0
+  fi
+  chmod 600 "$settings.tmp"
+  mv "$settings.tmp" "$settings"
+  ok "qwen3-vl-plus vision model added -> $settings (llm-pi-ai dashscope models)"
+}
+
 # run_upgrade — the --upgrade body; ends the process on completion.
 run_upgrade() {
   info "upgrade mode: migrating an existing deployment at $DSH_HOME"
@@ -364,6 +422,7 @@ run_upgrade() {
 
   PROFILE_DIR="$DSH_HOME/profiles/web"
   upgrade_feishu_bot_config
+  upgrade_vision_model_config
 
   if [[ "$SKIP_MEMORY" != "1" ]]; then
     local memory_root="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory"

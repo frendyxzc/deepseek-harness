@@ -23,6 +23,9 @@ llm-pi-ai:
           name: DeepSeek V4 Pro
         - id: deepseek-v4-pro-0813
           name: deepseek-v4-pro-0813
+        - id: qwen3-vl-plus
+          name: Qwen3 VL Plus
+          input: [text, image]
 agent-default-model:
   # llm-deepseek registers under provider id "deepseek-official". Both routes
   # send x-deepseek-harness-session-id, which the MemoryProxy uses to bind the
