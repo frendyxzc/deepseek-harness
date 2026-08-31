@@ -435,7 +435,11 @@ run_upgrade() {
   fi
 
   # Refresh the workspace deps (links the newly-added @deepseek-ai/dsh-tdai-memory
-  # package) and rebuild host libs + client bundles + the Web frontend.
+  # package) and rebuild host libs + client bundles + the Web frontend. Clean
+  # first: a `git pull` that removes a package leaves its gitignored lib/ and
+  # node_modules/ behind, and the tsdown workspace glob still builds that dead
+  # directory from its stale output (MISSING_EXPORT against current sources).
+  (cd "$REPO_ROOT" && pnpm run clean) || die "pnpm run clean failed in $REPO_ROOT"
   (cd "$REPO_ROOT" && pnpm install) || die "pnpm install failed in $REPO_ROOT"
   (cd "$REPO_ROOT" && pnpm run build) || die "pnpm run build failed in $REPO_ROOT"
   if [[ -f "$PROFILE_DIR/package.json" ]]; then
