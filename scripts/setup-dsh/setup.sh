@@ -27,8 +27,9 @@
 #                       feishu-bot bots/credentials patch, add the
 #                       qwen3-vl-plus vision model to settings.yaml, refresh
 #                       the memory stack deps + rebuild the panel web UI,
-#                       refresh dsh deps + rebuild. Never touches secrets or
-#                       regenerates generated files (no --force); safe to run.
+#                       provision the Knowledge wiki-ingest LLM from the existing
+#                       core LLM config, refresh dsh deps + rebuild. Never prompts
+#                       for or regenerates a secret (no --force); safe to run.
 #   --force             overwrite existing generated files
 #   --non-interactive   never prompt; fail if a required value is missing
 #   -h, --help          this help
@@ -43,9 +44,9 @@
 #                                    proxy appends endpoint paths to this base)
 #   DSH_PROXY_UPSTREAM_API_KEY    -> proxy-config.yaml upstream.apiKey
 #   DSH_KERNEL_GATEWAY_API_KEY    -> panel metadata-instances.json api_key (default: empty)
-#   DSH_TDAI_LLM_API_KEY          -> memory core gateway tdai-gateway.yaml
-#   DSH_TDAI_LLM_BASE_URL         -> memory core gateway tdai-gateway.yaml
-#   DSH_TDAI_LLM_MODEL            -> memory core gateway tdai-gateway.yaml
+#   DSH_TDAI_LLM_API_KEY          -> memory core gateway + Knowledge wiki-ingest LLM
+#   DSH_TDAI_LLM_BASE_URL         -> memory core gateway + Knowledge wiki-ingest LLM
+#   DSH_TDAI_LLM_MODEL            -> memory core gateway + Knowledge wiki-ingest LLM
 #   DSH_MEMORY_DATA_DIR           -> gateway data.baseDir (default ~/.memory-tencentdb/memory-tdai)
 #   DSH_GITLAB_BOT_USERNAME       -> enables GitLab MR integration (bot's GitLab username)
 #   DSH_GITLAB_API_BASE           -> GitLab API base URL (default https://gitlab.com/api/v4)
@@ -174,10 +175,11 @@ write_if_absent() {
 # ── Upgrade mode (--upgrade): in-place migration of an existing deployment ──
 # Non-destructive by construction: it appends one idempotent patch entry to the
 # profile, refreshes the memory stack dependencies (incl. the MemoryProxy
-# better-sqlite3 verify-and-repair) and rebuilds the panel web UI, then
-# refreshes/rebuilds the dsh workspace. It never regenerates a secret or
-# overwrites a generated file (no --force), so it is safe to run repeatedly
-# and after every `git pull`.
+# better-sqlite3 verify-and-repair) and rebuilds the panel web UI, provisions
+# the Knowledge wiki-ingest LLM from the existing core LLM config, then
+# refreshes/rebuilds the dsh workspace. It never prompts for or regenerates a
+# secret (no --force) — the Knowledge LLM reuses the core's existing values — so
+# it is safe to run repeatedly and after every `git pull`.
 
 # ensure_proxy_npm_approvals <memory-proxy-dir> — record npm install-script
 # approvals in MemoryProxy/package.json (idempotent, like the pnpm-workspace.yaml
@@ -308,6 +310,49 @@ EOF
   PATH="$old_path"
 }
 
+# write_knowledge_llm_env <memory-root> <api-key> <base-url> <model> — rewrite
+# MemoryKnowledge/.env to the shared custom (BYO) wiki-ingest LLM. Idempotent:
+# the sed only rewrites the four LLM_* lines (appending LLM_API_KEY when it is
+# absent), so a re-run keeps the same values. Silently no-ops when an input is
+# empty or the file is missing.
+write_knowledge_llm_env() {
+  local root="$1" api_key="$2" base_url="$3" model="$4"
+  local env_file="$root/MemoryKnowledge/.env"
+  [[ -z "$api_key" || -z "$base_url" || -z "$model" || ! -f "$env_file" ]] && return 0
+  sed -e 's|^LLM_MODE=.*$|LLM_MODE=custom|' \
+      -e "s|^LLM_MODEL=.*$|LLM_MODEL=${model}|" \
+      -e "s|^LLM_BASE_URL=.*$|LLM_BASE_URL=${base_url}|" \
+      -e "s|^LLM_API_KEY=.*$|LLM_API_KEY=${api_key}|" \
+    "$env_file" > "$env_file.tmp"
+  if ! grep -q '^LLM_API_KEY=' "$env_file.tmp"; then
+    printf 'LLM_API_KEY=%s\n' "$api_key" >> "$env_file.tmp"
+  fi
+  chmod 600 "$env_file.tmp"
+  mv "$env_file.tmp" "$env_file"
+  ok "knowledge llm -> $env_file"
+}
+
+# upgrade_knowledge_llm_config <memory-root> — point an EXISTING deployment's
+# Knowledge wiki-ingest LLM at the endpoint MemoryCore already uses, without a
+# --force or a re-prompt. Reuses the TDAI_LLM_* values the full setup wrote into
+# MemoryCore/.env.local; runs idempotently and warns instead of failing when the
+# source or values are absent.
+upgrade_knowledge_llm_config() {
+  local memory_root="$1"
+  local core_env="$memory_root/MemoryCore/.env.local"
+  if [[ ! -f "$core_env" ]]; then
+    warn "MemoryCore/.env.local not found; skipping knowledge llm provisioning"
+    return 0
+  fi
+  # shellcheck disable=SC1090
+  source "$core_env"
+  if [[ -z "${TDAI_LLM_API_KEY:-}" || -z "${TDAI_LLM_BASE_URL:-}" || -z "${TDAI_LLM_MODEL:-}" ]]; then
+    warn "MemoryCore/.env.local lacks TDAI_LLM_*; skipping knowledge llm provisioning"
+    return 0
+  fi
+  write_knowledge_llm_env "$memory_root" "$TDAI_LLM_API_KEY" "$TDAI_LLM_BASE_URL" "$TDAI_LLM_MODEL"
+}
+
 # upgrade_feishu_bot_config — migrate a flat single-app `feishu-bot` profile to
 # the multi-bot bots/credentials split by APPENDING a config-override patch entry
 # (the same idempotent pattern §7b uses), never rewrites the insert block. The
@@ -429,6 +474,7 @@ run_upgrade() {
     if [[ -d "$memory_root/.git" ]]; then
       info "refreshing memory stack deps and rebuilding panel web UI"
       ensure_memory_deps "$memory_root" 1
+      upgrade_knowledge_llm_config "$memory_root"
     else
       warn "memory stack not found at $memory_root; skipping (run the full setup.sh first)"
     fi
@@ -636,9 +682,10 @@ else
   CORE_ENV_FILE="$MEMORY_ROOT/MemoryCore/.env.local"
   GATEWAY_CONFIG="$TDAI_STACK_CONFIG/tdai-gateway.yaml"
   MEMORY_DATA_DIR="${DSH_MEMORY_DATA_DIR:-$HOME/.memory-tencentdb/memory-tdai}"
-  # Ask once and share the values: both generated files below consume them,
-  # and asking twice would let an interactive typo diverge the gateway config
-  # from .env.local. Each file's block runs only when that file is (re)generated,
+  # Ask once and share the values: the generated files below (gateway config,
+  # MemoryCore/.env.local, and the Knowledge wiki-ingest LLM) consume them, and
+  # asking twice would let an interactive typo diverge the gateway config from
+  # .env.local. Each file's block runs only when that file is (re)generated,
   # so the variables are always set whenever a block needs them.
   if [[ ! -f "$GATEWAY_CONFIG" || ! -f "$CORE_ENV_FILE" || "$FORCE" == "1" ]]; then
     TDAI_LLM_API_KEY="$(ask_secret DSH_TDAI_LLM_API_KEY 'MemoryCore TDAI_LLM_API_KEY')"
@@ -673,6 +720,13 @@ else
     } > "$CORE_ENV_FILE"
     ok "core env -> $CORE_ENV_FILE"
   fi
+
+  # Knowledge wiki-ingest LLM. The stock MemoryKnowledge/.env.example ships
+  # LLM_MODE=proxy + no key: proxy mode expects a TMC-pushed per-service
+  # llm_binding, which a standalone deploy has none of, so every wiki ingest
+  # fails with "LLM apiKey 未配置". Rewrite it to custom (BYO) on the shared
+  # endpoint (write_knowledge_llm_env no-ops when the ask above did not run).
+  write_knowledge_llm_env "$MEMORY_ROOT" "${TDAI_LLM_API_KEY:-}" "${TDAI_LLM_BASE_URL:-}" "${TDAI_LLM_MODEL:-}"
 
   # 6e. Install service dependencies (matches what each service was built with).
   # The approve-builds repair, per-service installs, and panel web build live in
