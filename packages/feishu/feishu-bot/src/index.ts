@@ -16,7 +16,7 @@ import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-feishu'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import { FeishuBotProvider, FEISHU_BOT_PROVIDER_ID, FEISHU_DEFAULT_BASE_URL } from './provider.ts'
 import type { FeishuBotProviderOptions } from './provider.ts'
 
@@ -34,7 +34,7 @@ export const name = 'feishu-bot'
 export const inject = ['feishu']
 
 /** Settings namespace carrying the per-bot identity/mapping (no secrets). */
-export const FEISHU_BOT_SETTINGS_NAMESPACE = settingsNamespace('feishu-bot')
+export const FEISHU_BOT_SETTINGS_NAMESPACE = 'feishu-bot'
 
 /** Default env var naming the Feishu App ID. */
 const DEFAULT_APP_ID_ENV = 'FEISHU_APP_ID'
@@ -135,6 +135,7 @@ export interface FeishuBotSettings {
   bots?: FeishuBotEntry[]
 }
 
+/** Zod schema for the `feishu-bot` settings section (identity/mapping only). */
 export const FeishuBotSettingsConfig: z<FeishuBotSettings> = z.object({
   bots: z.array(botEntrySchema),
 })
@@ -250,11 +251,13 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
-  installSettingsSection(ctx, FEISHU_BOT_SETTINGS_NAMESPACE, FeishuBotSettingsConfig, { bots: config.bots ?? [] }, {
-    setSource: (source) => {
-      currentSettings = source
-    },
-    onChange: sync,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, FEISHU_BOT_SETTINGS_NAMESPACE, FeishuBotSettingsConfig, { bots: config.bots ?? [] }, {
+      setSource: (source) => {
+        currentSettings = source
+      },
+      onChange: sync,
+    })
   })
   // Register from the composition entry up front; the settings section, when
   // mounted, re-syncs from its live user layer.

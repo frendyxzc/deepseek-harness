@@ -203,6 +203,12 @@ Selection semantics (resolved at execution time, never order-dependent):
 
 ```ts cordis-catalog
 /**
+ * Every registered provider, in registration order.
+ * @returns the registered providers.
+ */
+listProviders(): readonly FeishuProvider[]
+
+/**
  * Register a Feishu provider. Throws {@link FeishuError} `FEISHU_DUPLICATE_PROVIDER`
  * if its id is already registered. Returns a disposer; disposed with the calling fiber.
  * Emits `feishu/provider-added` once the registration commits (a throwing
@@ -232,6 +238,16 @@ async sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<Fei
  * @returns a disposer that stops the receive channel.
  */
 startReceiving(handler: FeishuReceiveHandler): () => void
+
+/**
+ * Start receiving from every registered provider that can receive. Each
+ * inbound event is stamped with its provider id and recorded against its chat
+ * id, so a reply to that chat routes back through the same app. Returns a
+ * combined disposer that closes every opened channel.
+ * @param handler - the callback for each received {@link FeishuReceiveEvent}.
+ * @returns a disposer that stops every channel this call opened.
+ */
+startReceivingAll(handler: FeishuReceiveHandler): () => void
 
 /**
  * Start receiving card button actions through the selected provider.
@@ -268,6 +284,20 @@ async updateMessage(messageId: string, content: string, signal?: AbortSignal): P
  * @returns the fetched message with its content extracted as plain text.
  */
 async getMessage(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>
+
+/**
+ * Fetch one binary image attached to a message through the selected provider —
+ * e.g. the image a user posted so a multimodal model can read it. Resolves
+ * the provider at call time with the selection rules above; throws
+ * {@link FeishuError} `FEISHU_RESOURCE_UNSUPPORTED` when the provider has no
+ * `getMessageResource`, or the provider's own failure when the fetch does not
+ * succeed.
+ * @param messageId - the Feishu message id the image belongs to.
+ * @param fileKey - the image's file key from the message content.
+ * @param signal - optional cancellation signal forwarded to the provider.
+ * @returns the raw image bytes.
+ */
+async getMessageResource(messageId: string, fileKey: string, signal?: AbortSignal): Promise<FeishuMessageResource>
 
 /**
  * Project the effective connection state of this capability for status

@@ -40,6 +40,7 @@ declare module '@deepseek-ai/cordis' {
 
 /** Outbound header names the proxy's `sessionInit.headerAutoSelect` reads. */
 export const TEAM_HEADER = 'x-team-id'
+/** Outbound agent id header the proxy's `sessionInit.headerAutoSelect` reads. */
 export const AGENT_HEADER = 'x-agent-id'
 /**
  * Task header the proxy's header auto-select requires alongside team/agent
@@ -153,7 +154,11 @@ export class TdaiMemoryService extends TypertRemoteService {
     this.config = config
   }
 
-  /** Resolved team/agent identity for one bot, read from the `feishu-bot` section. */
+  /**
+   * Resolved team/agent identity for one bot, read from the `feishu-bot` section.
+   * @param botId - the Feishu bot id whose identity to resolve.
+   * @returns the bot's team/agent identity, or undefined when the bot is unmapped.
+   */
   identityFor(botId: string): TdaiIdentity | undefined {
     const settings = this.ctx.get('settings')
     const section = settings?.get(FEISHU_BOT_SETTINGS_NAMESPACE) as { bots?: FeishuBotEntry[] } | undefined
@@ -166,7 +171,11 @@ export class TdaiMemoryService extends TypertRemoteService {
     return taskId.trim()
   }
 
-  /** Headers for one bot, from its merged identity and the default task. */
+  /**
+   * Headers for one bot, from its merged identity and the default task.
+   * @param botId - the Feishu bot id whose headers to build.
+   * @returns the TDAI headers for the bot's identity and default task, or an empty map when the bot is unmapped.
+   */
   headersFor(botId: string): Record<string, string> {
     const identity = this.identityFor(botId)
     return identity === undefined ? {} : tdaiMemoryHeaders(identity, this.resolveTaskId())
@@ -187,20 +196,28 @@ export class TdaiMemoryService extends TypertRemoteService {
    * set when the session was never bound (a non-Feishu session) or the bot is
    * unmapped.
    * @param sessionId - the session id the loop stamped on its request.
+   * @returns the TDAI headers for the session's bound bot, or an empty map when unbound.
    */
   headersForSession(sessionId: string): Record<string, string> {
     const botId = this.sessionBots.get(sessionId)
     return botId === undefined ? {} : this.headersFor(botId)
   }
 
-  /** The teams the core catalog serves, for the configuration dropdown. */
+  /**
+   * The teams the core catalog serves, for the configuration dropdown.
+   * @returns the teams the core catalog serves.
+   */
   @Remote('listTeams')
   async listTeams(): Promise<TdaiTeamOption[]> {
     const items = await this.fetchCore('/v3/meta/team/list', { user_key: await this.userKey() })
     return items.map(item => teamOption(item as CoreTeam)).filter((option): option is TdaiTeamOption => option !== undefined)
   }
 
-  /** The agents one team serves, for the configuration dropdown. */
+  /**
+   * The agents one team serves, for the configuration dropdown.
+   * @param teamId - the team id whose agents to list.
+   * @returns the team's active agents.
+   */
   @Remote('listAgents')
   async listAgents(teamId: string): Promise<TdaiAgentOption[]> {
     const items = await this.fetchCore('/v3/meta/agent/list', { team_id: teamId, status: 'active' })
