@@ -44,6 +44,7 @@
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
+| `@deepseek-ai/dsh-tool-feishu` | `feishu_send_message`、`feishu_update_message` | `ctx.tools`、`ctx.feishu`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | feishu_send_message 将提供方选择置于 ctx.feishu 之后，使模型可见 schema 在更换后端时保持稳定。 |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
 
@@ -2257,3 +2258,80 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 来源：[`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。
+
+<a id="deepseek-aidsh-tool-feishu"></a>
+
+## `@deepseek-ai/dsh-tool-feishu`
+
+### `feishu_send_message`
+
+通过飞书（Feishu）聊天发送消息。需要有效的接收方 id（open_id、user_id 或 chat_id）和消息内容。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "receiveId": {
+      "type": "string",
+      "description": "The recipient id: open_id, user_id, union_id, email, or chat_id."
+    },
+    "content": {
+      "type": "string",
+      "description": "The plain text message content to send."
+    },
+    "receiveIdType": {
+      "type": "string",
+      "description": "The recipient id type. Defaults to open_id.",
+      "enum": [
+        "open_id",
+        "user_id",
+        "union_id",
+        "email",
+        "chat_id"
+      ]
+    },
+    "msgType": {
+      "type": "string",
+      "description": "Message type. Defaults to text.",
+      "enum": [
+        "text",
+        "interactive"
+      ]
+    }
+  },
+  "required": [
+    "receiveId",
+    "content"
+  ]
+}
+```
+
+来源：[`packages/feishu/tool-feishu/src/index.ts`](../packages/feishu/tool-feishu/src/index.ts)
+
+### `feishu_update_message`
+
+更新此前通过飞书（Feishu）发送的消息内容。需要 feishu_send_message 返回的消息 id 和替换内容。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "description": "The Feishu message id of the message to update, as returned by feishu_send_message."
+    },
+    "content": {
+      "type": "string",
+      "description": "The replacement content; same encoding as the message being replaced (plain text for text messages, a card JSON string for interactive ones)."
+    }
+  },
+  "required": [
+    "messageId",
+    "content"
+  ]
+}
+```
+
+来源：[`packages/feishu/tool-feishu/src/index.ts`](../packages/feishu/tool-feishu/src/index.ts)
+
+feishu_send_message 将提供方选择置于 ctx.feishu 之后，使模型可见 schema 在更换后端时保持稳定。

@@ -598,6 +598,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'The Feishu Bot API provider registers into one ctx.feishu seam; tool-feishu owns the stable model-facing send and update names, feishu-receive bridges inbound messages into per-chat agent sessions, feishu-approval answers those sessions\' tool-approval requests with interactive Allow/Deny cards, and feishu-question answers their ask_user_question asks with interactive form cards.',
   },
   {
+    key: 'tdaiMemory',
+    pkg: 'tdai-memory',
+    title: 'TDAI memory identity for outgoing LLM requests',
+    mode: 'core',
+    consumers: ['feishu-receive', 'llm-pi-ai', 'llm-deepseek', 'ui-settings-im'],
+    note: 'Owns the session → bot bindings the Feishu receive channel writes and the team/agent header resolution the LLM adapters send; ui-settings-im reads listTeams/listAgents as Typert Remotes for its dropdowns.',
+  },
+  {
     key: 'spillStore',
     pkg: 'spill',
     title: 'Spill storage seam',

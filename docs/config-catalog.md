@@ -690,6 +690,150 @@ export interface Config {
 
 Source: [`packages/experimental/tool-agent-team/src/index.ts:17`](../packages/experimental/tool-agent-team/src/index.ts)
 
+<a id="deepseek-aidsh-feishu"></a>
+
+## `@deepseek-ai/dsh-feishu`
+
+```ts config-catalog
+/**
+ * Config for the Feishu seam. `provider` pins which provider wins; omitted
+ * auto-selects when exactly one usable provider is registered.
+ */
+export interface FeishuRuntimeConfig {
+  /** Explicit provider id. Omitted = auto-select when exactly one usable. */
+  readonly provider?: string
+}
+```
+
+Source: [`packages/feishu/feishu/src/index.ts:82`](../packages/feishu/feishu/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-approval"></a>
+
+## `@deepseek-ai/dsh-feishu-approval`
+
+Requires: `feishu` · `approval`
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /**
+   * How long (ms) one approval card waits for a tap before it is denied
+   * automatically. Defaults to 60000; must be a positive finite number.
+   */
+  timeoutMs?: number
+  /**
+   * Feishu chat that receives approval cards for sessions with no Feishu
+   * chat binding — Web GUI, headless, or ACP sessions. Omitted = such
+   * approvals delegate to the next answerer. Must be a non-empty chat id
+   * when provided.
+   */
+  fallbackChatId?: string
+}
+```
+
+Source: [`packages/feishu/feishu-approval/src/index.ts:46`](../packages/feishu/feishu-approval/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-bot"></a>
+
+## `@deepseek-ai/dsh-feishu-bot`
+
+Requires: `feishu`
+
+```ts config-catalog
+/** Plugin config: the flat single app, plus the multi-app `bots` + `credentials`. */
+export interface Config {
+  /** Literal Feishu App ID (flat single app). */
+  appId?: string
+  /** Literal Feishu App Secret (flat single app). */
+  appSecret?: string
+  /** Credential reference for the flat single app's App ID. */
+  appIdEnv?: string
+  /** Credential reference for the flat single app's App Secret. */
+  appSecretEnv?: string
+  /** Feishu Open API base URL (flat single app). */
+  baseURL?: string
+  /** Bot apps; when non-empty these replace the flat single-app fields. */
+  bots?: FeishuBotEntry[]
+  /** Secrets and endpoint per bot; composition-only, no settings exposure. */
+  credentials?: FeishuBotCredential[]
+}
+
+/** One bot's settings-editable identity and mapping; secrets stay OUT of here. */
+export interface FeishuBotEntry {
+  /** Stable provider id (unique within the seam) used to route replies back to this app. */
+  id: string
+  /** Literal Feishu App ID; when absent, the credential's `appIdEnv` resolves it. */
+  appId?: string
+  /** TDAI team id this bot sends as `x-team-id`. */
+  teamId?: string
+  /** TDAI agent id this bot sends as `x-agent-id`. */
+  agentId?: string
+}
+
+/** One bot's secrets and endpoint, composition-only and keyed by {@link FeishuBotEntry.id}. */
+export interface FeishuBotCredential {
+  /** The bot id these credentials belong to. */
+  id: string
+  /** Literal Feishu App Secret; prefer {@link appSecretEnv} so no secret enters configuration files. */
+  appSecret?: string
+  /** Credential reference resolving the App ID when the entry has no literal `appId`. */
+  appIdEnv?: string
+  /** Credential reference resolving the App Secret; defaults to `FEISHU_APP_SECRET`. */
+  appSecretEnv?: string
+  /** Feishu Open API base URL. */
+  baseURL?: string
+}
+```
+
+Source: [`packages/feishu/feishu-bot/src/index.ts:91`](../packages/feishu/feishu-bot/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-question"></a>
+
+## `@deepseek-ai/dsh-feishu-question`
+
+Requires: `feishu` · `userQuestions`
+
+```ts config-catalog
+/** Plugin config. */
+export interface Config {
+  /**
+   * How long (ms) one question card waits for a submission before it is
+   * rejected automatically. Defaults to 300000; must be a positive finite
+   * number.
+   */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/feishu/feishu-question/src/index.ts:55`](../packages/feishu/feishu-question/src/index.ts)
+
+<a id="deepseek-aidsh-feishu-receive"></a>
+
+## `@deepseek-ai/dsh-feishu-receive`
+
+Requires: `feishu` · `agents` · `agentPresets` · `systemPrompt`
+
+```ts config-catalog
+/** Plugin config: the working directory used when no live root agent is available to inherit one from. */
+export interface Config {
+  /**
+   * Fallback working directory for per-chat agents when the live root session
+   * has no cwd (or no root agent exists yet). Without this, the first
+   * message from any chat is rejected until a live root with a cwd appears.
+   */
+  cwd?: string
+  /**
+   * Reply to every incoming chat message with a short acknowledgement before
+   * the per-chat agent starts working, so the user gets immediate feedback
+   * that the message arrived. Defaults to true; a failed acknowledgement is
+   * logged and never blocks delivery.
+   */
+  ack?: boolean
+}
+```
+
+Source: [`packages/feishu/feishu-receive/src/index.ts:61`](../packages/feishu/feishu-receive/src/index.ts)
+
 <a id="deepseek-aidsh-file-reference-local"></a>
 
 ## `@deepseek-ai/dsh-file-reference-local`
@@ -1012,7 +1156,7 @@ export interface DeepSeekCatalogModel {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/llm/llm-deepseek/src/index.ts:125`](../packages/llm/llm-deepseek/src/index.ts)
+Source: [`packages/llm/llm-deepseek/src/index.ts:126`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 
@@ -2517,6 +2661,34 @@ export interface Config {
 
 Source: [`packages/core/system-prompt/src/index.ts:237`](../packages/core/system-prompt/src/index.ts)
 
+<a id="deepseek-aidsh-tdai-memory"></a>
+
+## `@deepseek-ai/dsh-tdai-memory`
+
+```ts config-catalog
+/** Composition config for the TDAI core catalog the Remote reads from. */
+export interface Config {
+  /** TDAI core base URL. */
+  endpoint?: string
+  /** Core tenant/service id sent on catalog requests. */
+  serviceId?: string
+  /** Core service token sent on catalog requests. */
+  serviceToken?: string
+  /** Credential reference naming the core user key (`sk-mem-*`). */
+  userKeyEnv?: string
+  /**
+   * Default task id sent as `x-task-id` for every bound session. The proxy's
+   * header auto-select refuses to register directly without team + agent + task,
+   * so a deployment with single-agent teams must pin this (typically the proxy's
+   * own `sessionInit.defaultTaskId`) or the session falls into the bypass path
+   * and never writes memory.
+   */
+  defaultTaskId?: string
+}
+```
+
+Source: [`packages/llm/tdai-memory/src/index.ts:71`](../packages/llm/tdai-memory/src/index.ts)
+
 <a id="deepseek-aidsh-terminal-bash"></a>
 
 ## `@deepseek-ai/dsh-terminal-bash`
@@ -2651,6 +2823,26 @@ export interface Config {
 ```
 
 Source: [`packages/shell/tool-bash-persistent/src/index.ts:432`](../packages/shell/tool-bash-persistent/src/index.ts)
+
+<a id="deepseek-aidsh-tool-feishu"></a>
+
+## `@deepseek-ai/dsh-tool-feishu`
+
+Requires: `tools` · `feishu` · `systemPrompt`
+
+```ts config-catalog
+/** Plugin config: whether to register the tools and their timeout budget. */
+export interface Config {
+  /** Register `feishu_send_message`. Defaults to true. */
+  send?: boolean
+  /** Register `feishu_update_message`. Defaults to true. */
+  update?: boolean
+  /** Cooperative timeout budget (ms) for the Feishu tools. Defaults to 30000. */
+  timeoutMs?: number
+}
+```
+
+Source: [`packages/feishu/tool-feishu/src/index.ts:25`](../packages/feishu/tool-feishu/src/index.ts)
 
 <a id="deepseek-aidsh-tool-fs"></a>
 
@@ -3366,6 +3558,8 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-client-ui-session` ([`packages/client/ui-session/src/index.ts`](../packages/client/ui-session/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings` ([`packages/client/ui-settings/src/index.ts`](../packages/client/ui-settings/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-general` ([`packages/client/ui-settings-general/src/index.ts`](../packages/client/ui-settings-general/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-im` ([`packages/client/ui-settings-im/src/index.ts`](../packages/client/ui-settings-im/src/index.ts))
+- `@deepseek-ai/dsh-client-ui-settings-memory` ([`packages/client/ui-settings-memory/src/index.ts`](../packages/client/ui-settings-memory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-models` ([`packages/client/ui-settings-models/src/index.ts`](../packages/client/ui-settings-models/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` ([`packages/client/ui-settings-plugin-inventory/src/index.ts`](../packages/client/ui-settings-plugin-inventory/src/index.ts))
 - `@deepseek-ai/dsh-client-ui-settings-plugins` ([`packages/client/ui-settings-plugins/src/index.ts`](../packages/client/ui-settings-plugins/src/index.ts))
@@ -3385,6 +3579,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-cordis-client-runner` ([`packages/extensions/cordis-client-runner/src/index.ts`](../packages/extensions/cordis-client-runner/src/index.ts))
 - `@deepseek-ai/dsh-deepseek-llm-api-extensions` ([`packages/llm/deepseek-llm-api-extensions/src/index.ts`](../packages/llm/deepseek-llm-api-extensions/src/index.ts))
 - `@deepseek-ai/dsh-experimental-client-ui-agent-team` ([`packages/experimental/client-ui-agent-team/src/index.ts`](../packages/experimental/client-ui-agent-team/src/index.ts))
+- `@deepseek-ai/dsh-feishu-status` — requires `feishu` ([`packages/feishu/feishu-status/src/index.ts`](../packages/feishu/feishu-status/src/index.ts))
 - `@deepseek-ai/dsh-fs-e2b` — requires `e2b` ([`packages/e2b/fs-e2b/src/index.ts`](../packages/e2b/fs-e2b/src/index.ts))
 - `@deepseek-ai/dsh-fs-observation-policy` ([`packages/fs/fs-observation-policy/src/index.ts`](../packages/fs/fs-observation-policy/src/index.ts))
 - `@deepseek-ai/dsh-goal-round-driver` — requires `agents` · `goals` · `sessions` ([`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts))

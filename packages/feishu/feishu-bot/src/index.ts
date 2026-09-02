@@ -135,6 +135,7 @@ export interface FeishuBotSettings {
   bots?: FeishuBotEntry[]
 }
 
+/** Zod schema for the `feishu-bot` settings section (identity/mapping only). */
 export const FeishuBotSettingsConfig: z<FeishuBotSettings> = z.object({
   bots: z.array(botEntrySchema),
 })

@@ -838,6 +838,72 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'feishu',
+    summary: 'The Feishu chat service.',
+    description: 'The Feishu chat service. Registered as `ctx.feishu` (one instance per context).\n\nSelection semantics (resolved at execution time, never order-dependent):\n\n- A configured id that is registered and `available()` → that provider.\n- A configured id not registered → `FEISHU_PROVIDER_CONFIGURED_MISSING`.\n- A configured id registered but unavailable → `FEISHU_PROVIDER_CONFIGURED_UNAVAILABLE`.\n- No id configured, exactly one registered usable provider → that provider.\n- No id configured, multiple usable providers → `FEISHU_PROVIDER_AMBIGUOUS`.\n- No id configured, no usable provider → `FEISHU_PROVIDER_UNAVAILABLE`.',
+    methods: [
+      {
+        signature: 'listProviders(): readonly FeishuProvider[]',
+        description: 'Every registered provider, in registration order.',
+        parameters: [],
+        returns: 'the registered providers.',
+      },
+      {
+        signature: 'registerProvider(provider: FeishuProvider): () => void',
+        description: 'Register a Feishu provider. Throws FeishuError `FEISHU_DUPLICATE_PROVIDER` if its id is already registered. Returns a disposer; disposed with the calling fiber. Emits `feishu/provider-added` once the registration commits (a throwing listener rolls it back) and `feishu/provider-removed` when it is disposed.',
+        parameters: [{ name: 'provider', description: 'the provider; its `id` is the registry key.' }],
+        returns: 'the disposer that unregisters the provider.',
+      },
+      {
+        signature: 'async sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>',
+        description: 'Send one message through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError when the capability cannot run.',
+        parameters: [{ name: 'request', description: 'the target recipient and content.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the provider\'s send result.',
+      },
+      {
+        signature: 'startReceiving(handler: FeishuReceiveHandler): () => void',
+        description: 'Start receiving messages through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no `startReceiving`, or the provider\'s own failure when it cannot set up its receive channel (e.g. unmatched credentials).',
+        parameters: [{ name: 'handler', description: 'the callback for each received {@link FeishuReceiveEvent}.' }],
+        returns: 'a disposer that stops the receive channel.',
+      },
+      {
+        signature: 'startReceivingAll(handler: FeishuReceiveHandler): () => void',
+        description: 'Start receiving from every registered provider that can receive. Each inbound event is stamped with its provider id and recorded against its chat id, so a reply to that chat routes back through the same app. Returns a combined disposer that closes every opened channel.',
+        parameters: [{ name: 'handler', description: 'the callback for each received {@link FeishuReceiveEvent}.' }],
+        returns: 'a disposer that stops every channel this call opened.',
+      },
+      {
+        signature: 'startReceivingCardActions(handler: FeishuCardActionHandler): () => void',
+        description: 'Start receiving card button actions through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no `startReceivingCardActions`. Card actions share the provider\'s receive channel with startReceiving subscribers.',
+        parameters: [{ name: 'handler', description: 'the callback for each received {@link FeishuCardActionEvent}.' }],
+        returns: 'a disposer that stops this card-action subscription.',
+      },
+      {
+        signature: 'async updateMessage(messageId: string, content: string, signal?: AbortSignal): Promise<void>',
+        description: 'Replace the content of a message sent earlier through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_UPDATE_UNSUPPORTED` when the provider has no `updateMessage`, or the provider\'s own failure when the update does not succeed.',
+        parameters: [{ name: 'messageId', description: 'the provider message id returned by an earlier send.' }, { name: 'content', description: 'the replacement content.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+      },
+      {
+        signature: 'async getMessage(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>',
+        description: 'Fetch one message by id through the selected provider — e.g. to read a quoted or replied-to message referenced by an inbound event. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_GET_UNSUPPORTED` when the provider has no `getMessage`, or the provider\'s own failure when the fetch does not succeed.',
+        parameters: [{ name: 'messageId', description: 'the Feishu message id.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the fetched message with its content extracted as plain text.',
+      },
+      {
+        signature: 'async getMessageResource(messageId: string, fileKey: string, signal?: AbortSignal): Promise<FeishuMessageResource>',
+        description: 'Fetch one binary image attached to a message through the selected provider — e.g. the image a user posted so a multimodal model can read it. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_RESOURCE_UNSUPPORTED` when the provider has no `getMessageResource`, or the provider\'s own failure when the fetch does not succeed.',
+        parameters: [{ name: 'messageId', description: 'the Feishu message id the image belongs to.' }, { name: 'fileKey', description: 'the image\'s file key from the message content.' }, { name: 'signal', description: 'optional cancellation signal forwarded to the provider.' }],
+        returns: 'the raw image bytes.',
+      },
+      {
+        signature: 'async describeStatus(): Promise<FeishuRuntimeStatus>',
+        description: 'Project the effective connection state of this capability for status surfaces. Applies the same selection rules as sendMessage without throwing; selection failures surface as `state: \'error\'` with FeishuRuntimeStatus.selectionError. Providers without a `status` method project from `available()`.',
+        parameters: [],
+        returns: 'the effective status view.',
+      },
+    ],
+  },
+  {
     key: 'fileReferences',
     summary: 'Host capability for cancellable file-reference discovery.',
     description: 'Host capability for cancellable file-reference discovery.',
@@ -2363,6 +2429,48 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'tdaiMemory',
+    summary: 'Owns the session → bot bindings the Feishu receive channel writes, the team/agent header resolution the LLM adapters read, and the TDAI core catalog Remote the configuration UI reads for its dropdowns.',
+    description: 'Owns the session → bot bindings the Feishu receive channel writes, the team/agent header resolution the LLM adapters read, and the TDAI core catalog Remote the configuration UI reads for its dropdowns.',
+    methods: [
+      {
+        signature: 'identityFor(botId: string): TdaiIdentity | undefined',
+        description: 'Resolved team/agent identity for one bot, read from the `feishu-bot` section.',
+        parameters: [{ name: 'botId', description: 'the Feishu bot id whose identity to resolve.' }],
+        returns: 'the bot\'s team/agent identity, or undefined when the bot is unmapped.',
+      },
+      {
+        signature: 'headersFor(botId: string): Record<string, string>',
+        description: 'Headers for one bot, from its merged identity and the default task.',
+        parameters: [{ name: 'botId', description: 'the Feishu bot id whose headers to build.' }],
+        returns: 'the TDAI headers for the bot\'s identity and default task, or an empty map when the bot is unmapped.',
+      },
+      {
+        signature: 'bindSession(sessionId: string, botId: string): void',
+        description: 'Bind one agent session to the bot that received it, so the LLM adapters resolve that session\'s requests to the bot\'s team/agent headers.',
+        parameters: [{ name: 'sessionId', description: 'the session id the loop stamps on its requests.' }, { name: 'botId', description: 'the Feishu bot id the session belongs to.' }],
+      },
+      {
+        signature: 'headersForSession(sessionId: string): Record<string, string>',
+        description: 'Headers for one agent session: its bound bot\'s merged identity, or an empty set when the session was never bound (a non-Feishu session) or the bot is unmapped.',
+        parameters: [{ name: 'sessionId', description: 'the session id the loop stamped on its request.' }],
+        returns: 'the TDAI headers for the session\'s bound bot, or an empty map when unbound.',
+      },
+      {
+        signature: '@Remote(\'listTeams\') async listTeams(): Promise<TdaiTeamOption[]>',
+        description: 'The teams the core catalog serves, for the configuration dropdown.',
+        parameters: [],
+        returns: 'the teams the core catalog serves.',
+      },
+      {
+        signature: '@Remote(\'listAgents\') async listAgents(teamId: string): Promise<TdaiAgentOption[]>',
+        description: 'The agents one team serves, for the configuration dropdown.',
+        parameters: [{ name: 'teamId', description: 'the team id whose agents to list.' }],
+        returns: 'the team\'s active agents.',
+      },
+    ],
+  },
+  {
     key: 'terminals',
     summary: 'In-process registry for replaceable PTY backends and exact-Agent sessions.',
     description: 'In-process registry for replaceable PTY backends and exact-Agent sessions.',
@@ -3121,6 +3229,30 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'A domain record or the global singleton changed, emitted once per write strictly after the backend acknowledged durability.',
     description: 'A domain record or the global singleton changed, emitted once per write strictly after the backend acknowledged durability. Events of one domain arrive in its write-chain order.',
     parameters: [{ name: 'change', description: 'domain, table (`\'\'` for global), key (`\'\'` for global), operation discriminant, and on `put` the new snapshot.' }],
+  },
+  {
+    name: 'feishu/chat-agent',
+    mode: 'emit',
+    signature: '\'feishu/chat-agent\'(payload: { agent: Agent; chatId: string }): void',
+    summary: 'A per-chat agent was published for one Feishu chat: the routing pin is live and every message from that chat now reaches this agent.',
+    description: 'A per-chat agent was published for one Feishu chat: the routing pin is live and every message from that chat now reaches this agent. Emitted once per chat per process, after `agent/created`, by `@deepseek-ai/dsh-feishu-receive`; consumers that need the chat ↔ agent binding (approval cards, per-chat surfaces) subscribe here instead of re-deriving the routing.',
+    parameters: [{ name: 'payload', description: '.chatId - the Feishu chat whose messages this agent serves.' }],
+  },
+  {
+    name: 'feishu/provider-added',
+    mode: 'emit',
+    signature: '\'feishu/provider-added\'(provider: FeishuProvider): void',
+    summary: 'A Feishu provider was registered with `ctx.feishu.registerProvider`.',
+    description: 'A Feishu provider was registered with `ctx.feishu.registerProvider`. Load-time consumers (receive channels) subscribe here so they open on the registered provider regardless of parallel entry load order.',
+    parameters: [{ name: 'provider', description: 'the registered provider.' }],
+  },
+  {
+    name: 'feishu/provider-removed',
+    mode: 'emit',
+    signature: '\'feishu/provider-removed\'(id: string): void',
+    summary: 'A Feishu provider left the registry (its registering fiber unloaded).',
+    description: 'A Feishu provider left the registry (its registering fiber unloaded).',
+    parameters: [{ name: 'id', description: 'the provider id that no longer resolves.' }],
   },
   {
     name: 'fs/edit-intent',
@@ -3997,6 +4129,66 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'EpochHeader',
     declaration: 'export interface EpochHeader {\n    config: LlmCallConfig;\n    adapterDefaults?: LlmCallConfigAdapterDefaults;\n    system?: string;\n    tools?: ToolSchema[];\n}',
+  },
+  {
+    name: 'FeishuCardActionEvent',
+    declaration: 'export interface FeishuCardActionEvent {\n    readonly operatorId: string;\n    readonly chatId: string;\n    readonly messageId: string;\n    readonly value: unknown;\n    readonly formValue?: Record<string, unknown>;\n    readonly raw: unknown;\n}',
+  },
+  {
+    name: 'FeishuCardActionHandler',
+    declaration: 'export type FeishuCardActionHandler = (event: FeishuCardActionEvent) => void;',
+  },
+  {
+    name: 'FeishuConnectionState',
+    declaration: 'export type FeishuConnectionState = (typeof FEISHU_CONNECTION_STATES)[number];',
+  },
+  {
+    name: 'FeishuMessage',
+    declaration: 'export interface FeishuMessage {\n    readonly messageId: string;\n    readonly msgType: string;\n    readonly content: string;\n    readonly images?: readonly FeishuMessageImage[];\n    readonly parentId?: string;\n    readonly rootId?: string;\n    readonly raw: unknown;\n}',
+  },
+  {
+    name: 'FeishuMessageImage',
+    declaration: 'export interface FeishuMessageImage {\n    readonly fileKey: string;\n}',
+  },
+  {
+    name: 'FeishuMessageResource',
+    declaration: 'export interface FeishuMessageResource {\n    readonly data: Uint8Array;\n}',
+  },
+  {
+    name: 'FeishuMsgType',
+    declaration: 'export type FeishuMsgType = (typeof FEISHU_MSG_TYPES)[number];',
+  },
+  {
+    name: 'FeishuProvider',
+    declaration: 'export interface FeishuProvider {\n    readonly id: string;\n    available(): boolean;\n    sendMessage(request: FeishuSendRequest, signal?: AbortSignal): Promise<FeishuSendResult>;\n    startReceiving?(handler: FeishuReceiveHandler): () => void;\n    startReceivingCardActions?(handler: FeishuCardActionHandler): () => void;\n    updateMessage?(messageId: string, content: string, signal?: AbortSignal): Promise<void>;\n    getMessage?(messageId: string, signal?: AbortSignal): Promise<FeishuMessage>;\n    getMessageResource?(messageId: string, fileKey: string, signal?: AbortSignal): Promise<FeishuMessageResource>;\n    status?(): Promise<FeishuProviderStatus>;\n}',
+  },
+  {
+    name: 'FeishuProviderStatus',
+    declaration: 'export interface FeishuProviderStatus {\n    readonly state: FeishuConnectionState;\n    readonly appIdMasked?: string;\n    readonly appSecretConfigured: boolean;\n    readonly baseURL?: string;\n    readonly receiveActive: boolean;\n    readonly lastError?: string;\n}',
+  },
+  {
+    name: 'FeishuReceiveEvent',
+    declaration: 'export interface FeishuReceiveEvent {\n    readonly eventType: string;\n    readonly appId?: string;\n    readonly providerId?: string;\n    readonly senderId: string;\n    readonly senderIdType: FeishuReceiveIdType;\n    readonly chatId: string;\n    readonly chatType?: string;\n    readonly messageId?: string;\n    readonly parentId?: string;\n    readonly rootId?: string;\n    readonly content: string;\n    readonly images?: readonly FeishuMessageImage[];\n    readonly raw: unknown;\n}',
+  },
+  {
+    name: 'FeishuReceiveHandler',
+    declaration: 'export type FeishuReceiveHandler = (event: FeishuReceiveEvent) => void;',
+  },
+  {
+    name: 'FeishuReceiveIdType',
+    declaration: 'export type FeishuReceiveIdType = (typeof FEISHU_RECEIVE_ID_TYPES)[number];',
+  },
+  {
+    name: 'FeishuRuntimeStatus',
+    declaration: 'export interface FeishuRuntimeStatus {\n    readonly state: FeishuConnectionState;\n    readonly providerId?: string;\n    readonly providerStatus?: FeishuProviderStatus;\n    readonly selectionError?: string;\n}',
+  },
+  {
+    name: 'FeishuSendRequest',
+    declaration: 'export interface FeishuSendRequest {\n    readonly receiveId: string;\n    readonly receiveIdType?: FeishuReceiveIdType;\n    readonly providerId?: string;\n    readonly content: string;\n    readonly msgType?: FeishuMsgType;\n}',
+  },
+  {
+    name: 'FeishuSendResult',
+    declaration: 'export interface FeishuSendResult {\n    readonly messageId: string;\n}',
   },
   {
     name: 'FiberState',
@@ -5589,6 +5781,18 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'TableValueOf',
     declaration: 'export type TableValueOf<S extends DomainSpec, N extends keyof S[\'tables\']> = S[\'tables\'][N] extends DomainTableSpec<string, infer V> ? V : never;',
+  },
+  {
+    name: 'TdaiAgentOption',
+    declaration: 'export interface TdaiAgentOption {\n    agentId: string;\n    name: string;\n}',
+  },
+  {
+    name: 'TdaiIdentity',
+    declaration: 'export interface TdaiIdentity {\n    teamId?: string;\n    agentId?: string;\n}',
+  },
+  {
+    name: 'TdaiTeamOption',
+    declaration: 'export interface TdaiTeamOption {\n    teamId: string;\n    name: string;\n}',
   },
   {
     name: 'TeamId',

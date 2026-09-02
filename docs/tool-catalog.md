@@ -15,7 +15,7 @@ This table connects model-visible tool names to the plugin package and service s
 
 | Tool package | Model-visible names | Requires | Writes / affects | Shipped aliases | Deployment note |
 | --- | --- | --- | --- | --- | --- |
-| `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`, `ctx.userQuestions` | `tool/call`, `tool/result after a UI/provider answers the question` | - | ask_user_question pauses the tool call until the active UI provider returns a human answer. |
+| `@deepseek-ai/dsh-tool-ask-user` | `ask_user_question` | `ctx.tools`, `ctx.userQuestions` | `tool/call`, `tool/result after a UI/provider answers the question` | - | ask_user_question pauses the tool call until a UI provider returns a human answer. |
 | `@deepseek-ai/dsh-tools` | `run_code` | `ctx.tools`, `ctx.codeRuntime (execution time)`, `ctx.systemPrompt` | `tool/call`, `one tool/code-dispatch-start + tool/code-dispatch pair per bridged sub-call`, `tool/result` | - | Owned by the tool registry as a reserved transport outside filterable capability layers under `mode: ptc` / `mode: both` (see the PTC mode Agent Note). Under `ptc` it is the registry's only wire contribution; the other visible capabilities are declared in a generated SDK section in the loaded runtime's language, and a program calls them through bindings scheduled under the native concurrency contract (submission-ordered starts and policy; concurrency-safe bodies overlap up to `maxParallelSubCalls`) that re-enter the complete guarded tool pipeline and link each nested execution to this outer result. |
 | `@deepseek-ai/dsh-plan-mode` | `exit_plan_mode` | `ctx.tools`, `ctx.systemPrompt`, `ctx.userQuestions (execution time, opportunistic)` | `tool/call`, `plan/mode inactive on an approved review`, `tool/result` | - | exit_plan_mode stays in the model-facing schema while planning is inactive so transitions add no tool-catalog churn on top of the plan-policy change. Its execute path rejects calls outside plan mode; in plan mode it presents the plan over the user-questions seam (approve / keep planning with feedback), and approval logs plan mode inactive at the step boundary. |
 | `@deepseek-ai/dsh-tool-bash` | `bash` | `ctx.tools`, `ctx.shell`, `ctx.systemPrompt`, `ctx.shellEnv`, `ctx.jobs at call time for run_in_background` | `tool/call`, `tool/result` | - | The bash tool is the model-facing consumer of the bash executor seam. A `run_in_background` run registers with the generic `ctx.jobs` runtime and is collected/stopped through the `job_*` tools from `@deepseek-ai/dsh-tool-jobs`; the `enableRunInBackground` config (default true) removes the parameter entirely when disabled. |
@@ -40,6 +40,7 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`, `web_search` | `ctx.tools`, `ctx.web`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps. |
+| `@deepseek-ai/dsh-tool-feishu` | `feishu_send_message`, `feishu_update_message` | `ctx.tools`, `ctx.feishu`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | feishu_send_message keeps provider selection behind ctx.feishu so the model-visible schema stays stable across backend swaps. |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
 
@@ -113,7 +114,7 @@ Ask the user a concise question when you need confirmation, a choice, or missing
 
 Source: [`packages/interaction/tool-ask-user/src/index.ts`](../packages/interaction/tool-ask-user/src/index.ts)
 
-ask_user_question pauses the tool call until the active UI provider returns a human answer.
+ask_user_question pauses the tool call until a UI provider returns a human answer.
 
 <a id="deepseek-aidsh-tools"></a>
 
@@ -2249,3 +2250,80 @@ Search the web for current information. Provide 1–4 queries in the required qu
 Source: [`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.
+
+<a id="deepseek-aidsh-tool-feishu"></a>
+
+## `@deepseek-ai/dsh-tool-feishu`
+
+### `feishu_send_message`
+
+Send a message through Feishu (飞书) chat. Requires a valid recipient id (open_id, user_id, or chat_id) and the message content.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "receiveId": {
+      "type": "string",
+      "description": "The recipient id: open_id, user_id, union_id, email, or chat_id."
+    },
+    "content": {
+      "type": "string",
+      "description": "The plain text message content to send."
+    },
+    "receiveIdType": {
+      "type": "string",
+      "description": "The recipient id type. Defaults to open_id.",
+      "enum": [
+        "open_id",
+        "user_id",
+        "union_id",
+        "email",
+        "chat_id"
+      ]
+    },
+    "msgType": {
+      "type": "string",
+      "description": "Message type. Defaults to text.",
+      "enum": [
+        "text",
+        "interactive"
+      ]
+    }
+  },
+  "required": [
+    "receiveId",
+    "content"
+  ]
+}
+```
+
+Source: [`packages/feishu/tool-feishu/src/index.ts`](../packages/feishu/tool-feishu/src/index.ts)
+
+### `feishu_update_message`
+
+Update the content of a Feishu (飞书) message sent earlier. Requires the message id returned by feishu_send_message and the replacement content.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "messageId": {
+      "type": "string",
+      "description": "The Feishu message id of the message to update, as returned by feishu_send_message."
+    },
+    "content": {
+      "type": "string",
+      "description": "The replacement content; same encoding as the message being replaced (plain text for text messages, a card JSON string for interactive ones)."
+    }
+  },
+  "required": [
+    "messageId",
+    "content"
+  ]
+}
+```
+
+Source: [`packages/feishu/tool-feishu/src/index.ts`](../packages/feishu/tool-feishu/src/index.ts)
+
+feishu_send_message keeps provider selection behind ctx.feishu so the model-visible schema stays stable across backend swaps.

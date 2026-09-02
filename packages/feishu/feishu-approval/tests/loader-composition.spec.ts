@@ -160,15 +160,15 @@ describe('feishu-approval real composition', () => {
     expect(content).toContain('rm -rf the build dir')
 
     // The ask stays pending until a decision arrives; audit pair so far is the asked half.
-    const asked = agent.session.events.filter(event => event.type === 'approval/asked')
+    const asked = agent.session.snapshotEvents().filter(event => event.type === 'approval/asked')
     expect(asked).toHaveLength(1)
-    expect(agent.session.events.filter(event => event.type === 'approval/decided')).toHaveLength(0)
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'approval/decided')).toHaveLength(0)
 
     // Disposal withdraws the pending card fail-closed and completes the audit pair.
     await context!.fiber.dispose()
     context = undefined
     await expect(pending).resolves.toBe('cancelled')
-    const decided = agent.session.events.filter(event => event.type === 'approval/decided')
+    const decided = agent.session.snapshotEvents().filter(event => event.type === 'approval/decided')
     expect(decided).toHaveLength(1)
     expect(decided[0]!.data).toMatchObject({ outcome: 'cancelled' })
   })
@@ -189,7 +189,7 @@ describe('feishu-approval real composition', () => {
     const settled = JSON.parse(patch.body.content as string) as { elements: Array<{ text: { content: string } }> }
     expect(settled.elements[0]!.text.content).toContain('Timed out')
 
-    const decided = agent.session.events.filter(event => event.type === 'approval/decided')
+    const decided = agent.session.snapshotEvents().filter(event => event.type === 'approval/decided')
     expect(decided).toHaveLength(1)
     expect(decided[0]!.data).toMatchObject({ outcome: 'rejected' })
   })
@@ -211,15 +211,15 @@ describe('feishu-approval real composition', () => {
     expect(content).toContain('bash')
     expect(content).toContain('install a plugin')
 
-    const asked = agent.session.events.filter(event => event.type === 'approval/asked')
+    const asked = agent.session.snapshotEvents().filter(event => event.type === 'approval/asked')
     expect(asked).toHaveLength(1)
-    expect(agent.session.events.filter(event => event.type === 'approval/decided')).toHaveLength(0)
+    expect(agent.session.snapshotEvents().filter(event => event.type === 'approval/decided')).toHaveLength(0)
 
     // Disposal withdraws the pending fallback card and completes the audit pair.
     await context!.fiber.dispose()
     context = undefined
     await expect(pending).resolves.toBe('cancelled')
-    const decided = agent.session.events.filter(event => event.type === 'approval/decided')
+    const decided = agent.session.snapshotEvents().filter(event => event.type === 'approval/decided')
     expect(decided).toHaveLength(1)
     expect(decided[0]!.data).toMatchObject({ outcome: 'cancelled' })
   })
