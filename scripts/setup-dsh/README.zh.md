@@ -28,12 +28,13 @@
 ./scripts/setup-dsh/setup.sh --upgrade
 ```
 
-`--upgrade` 是非破坏性的、可安全重复运行：它从不提示或重新生成密钥，从不覆盖已生成文件，也绝不隐含 `--force`。它做四件事：
+`--upgrade` 是非破坏性的、可安全重复运行：它从不提示或重新生成密钥，从不覆盖已生成文件，也绝不隐含 `--force`。它做五件事：
 
 1. **迁移 profile 的 `feishu-bot` 补丁** —— 追加一条幂等的 config-override（以 marker 注释为键，重跑即 no-op），把扁平单应用条目换成 `bots` + `credentials` 分离，使 Settings → Plugins → IM 选项卡能按 bot 映射 team/agent。扁平部署在本次运行前仍能正常工作（扁平字段保持向后兼容）；密钥仍留在 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
 2. **新增图片能力模型** —— 把 `qwen3-vl-plus`（声明 `input: [text, image]`）追加到 `settings.yaml` 里 `llm-pi-ai` dashscope 的 `models` 列表，使部署可以选一条视觉路由来原生读取粘贴图片。幂等 —— 模型已在列表里时该步即 no-op，缺少 `llm-pi-ai`/dashscope 块的 `settings.yaml` 则原样保留。
 3. **修复缺失的 MemoryProxy 绑定** —— 校验 `better-sqlite3` 可加载，缺失时重装（缺失绑定会让代理存储静默降级 `sqlite -> fs -> memory`，并使 memory bridge 返回 `40101`）。内存栈钉在 Node v22 上，因此安装与校验都在 `start-all.sh` 启动服务所用的同一个 Node 下运行（捆绑的 node22，其次 Homebrew node@22，否则环境里的 Node）：换成别的 Node 时检查两头都会撒谎——npm 11 会静默省略安装脚本未获批准的 `better-sqlite3`（可选依赖），而不同 ABI 下构建的绑定无法加载。`MemoryProxy/package.json` 里幂等的 `allowScripts` 补丁覆盖 npm 11 回退场景。
 4. **刷新并重建** —— 在 checkout 里运行 `pnpm install` + `pnpm run build`（链接新增的工作区包，并重建 host libs、client bundles 与 Web 前端），随后在 profile 里运行 `pnpm install`。
+5. **刷新 better-harness 技能** —— fetch 并把 `~/.dsh/better-harness` 的 checkout 重置到钉住的分支，重装其根运行时依赖，保持 `/better-harness` 工作流评审技能最新（见 [better-harness skill](#better-harness-skill-optional) 一节）。
 
 之后重启：`./scripts/setup-dsh/start-all.sh` 是幂等的，或仅重启 Web UI 用 `pnpm dsh web --host 0.0.0.0 --port 3080`。
 
@@ -58,6 +59,8 @@
 | `…/MemoryProxy/package.json`（`allowScripts`） | npm 11 安装脚本审批，对齐该服务上游 `pnpm-workspace.yaml` 的 `allowBuilds`（npm 10 忽略该字段） | 否 |
 | `…/metadata.db` → `meta_users` + `meta_user_keys` | 数据库存在但没有 admin 用户时，用 `PROXY_USER_KEY` 引导 MemoryCore admin 用户（使 agent 能通过代理认证） | 是 |
 | `~/.dsh/skills/gitlab-mr-workflow/` | `gitlab-mr/gitlab-mr-workflow/*`（仓库）—— GitLab MR 工作流 skill | 否 |
+| `~/.dsh/better-harness/` | git clone [QoderAI/better-harness](https://github.com/QoderAI/better-harness) 的 `main` + `npm ci`（根运行时依赖） | 否 |
+| `~/.dsh/skills/better-harness/` | 指向该 checkout 的包装 SKILL.md（由 §8 生成） | 否 |
 | `~/.dsh/profiles/web/cordis.patch.yml`（+`gitlab-mr` 条目） | `gitlab-mr/gitlab-mr-poller.mjs`（仓库）—— poller 插件挂载 | 否 |
 | `<repo>/.env`（+`GITLAB_TOKEN`） | 提示输入的 `DSH_GITLAB_TOKEN` | 是（gitignored，由 §7 追加） |
 
@@ -72,6 +75,18 @@
 3. **Token** —— `DSH_GITLAB_TOKEN` 以 `GITLAB_TOKEN` 追加到 `<repo>/.env`（提供且尚不存在时）；poller 与 agent 的 `glab` 都从环境读取它。
 
 相关变量：`DSH_GITLAB_BOT_USERNAME`（启用）、`DSH_GITLAB_API_BASE`（默认 `https://gitlab.com/api/v4`）、`DSH_GITLAB_TOKEN`（bot 的 PAT）。把它们写进 `~/.dsh/setup-dsh.env`（`setup.env.example` 有填好的模板），走无提示的 `setup-one.sh` 路径。
+
+## better-harness skill (optional)
+
+默认安装（`--skip-better-harness` 关闭）：setup.sh 把开源的 [QoderAI/better-harness](https://github.com/QoderAI/better-harness) 仓库克隆到 `~/.dsh/better-harness`，在钉住的 Node v22 下安装其根运行时依赖，并把一个小包装 skill 写到 `~/.dsh/skills/better-harness/`——即 `skill-filesystem` 扫描的用户 skills 根目录——由它把 agent 指向 checkout 里的规范 SKILL.md。任何会话里 agent 都可以运行：
+
+```text
+/better-harness analyze this project's AI coding workflow and generate an evidence-backed report
+```
+
+better-harness 读取与工作区匹配的本地会话日志（有界、只读、脱敏）加项目的静态 harness 证据，产出一份五维 Agent Work Loop 报告和按优先级排序的发现。`setup.sh --upgrade` 刷新 checkout 及其依赖；包装 skill 在重跑时保留（仅 `--force` 会重写）。
+
+相关变量：`DSH_BETTER_HARNESS_REPO_URL`（默认公开的 QoderAI/better-harness 仓库）、`DSH_BETTER_HARNESS_BRANCH`（默认 `main`）。
 
 ## Start the services (after setup)
 

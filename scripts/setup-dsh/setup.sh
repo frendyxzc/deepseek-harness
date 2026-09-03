@@ -11,6 +11,8 @@
 #   ~/.dsh/tdai-stack/TencentDB-Agent-Memory   git clone + per-service config
 #   ~/.dsh/tdai-stack/config/{proxy-config,tdai-gateway}.yaml   generated from templates/tdai-stack/
 #   ~/.dsh/skills/gitlab-mr-workflow           optional GitLab MR workflow skill (see §7)
+#   ~/.dsh/better-harness                  optional better-harness checkout (see §8)
+#   ~/.dsh/skills/better-harness           wrapper skill delegating to that checkout (§8)
 #   <repo>/.env                         DEEPSEEK_API_KEY + FEISHU_* (prompted) + GITLAB_TOKEN (§7)
 #
 # Idempotent: existing files are kept unless --force is passed. Secrets are
@@ -23,13 +25,15 @@
 #   --branch REF        TencentDB-Agent-Memory branch (default: feat/server_team)
 #   --skip-memory       do not clone/configure the memory stack
 #   --skip-install      do not run pnpm/npm install in the memory services
+#   --skip-better-harness  do not clone/refresh the better-harness skill (§8)
 #   --upgrade           migrate an EXISTING deployment in place: append the
 #                       feishu-bot bots/credentials patch, add the
 #                       qwen3-vl-plus vision model to settings.yaml, refresh
 #                       the memory stack deps + rebuild the panel web UI,
 #                       provision the Knowledge wiki-ingest LLM from the existing
-#                       core LLM config, refresh dsh deps + rebuild. Never prompts
-#                       for or regenerates a secret (no --force); safe to run.
+#                       core LLM config, refresh dsh deps + rebuild, refresh
+#                       the better-harness skill checkout + deps (§8). Never
+#                       prompts for or regenerates a secret (no --force); safe to run.
 #   --force             overwrite existing generated files
 #   --non-interactive   never prompt; fail if a required value is missing
 #   -h, --help          this help
@@ -51,6 +55,9 @@
 #   DSH_GITLAB_BOT_USERNAME       -> enables GitLab MR integration (bot's GitLab username)
 #   DSH_GITLAB_API_BASE           -> GitLab API base URL (default https://gitlab.com/api/v4)
 #   DSH_GITLAB_TOKEN              -> bot PAT appended to <repo>/.env GITLAB_TOKEN
+#   DSH_BETTER_HARNESS_REPO_URL    -> better-harness git URL (default: the public
+#                                      QoderAI/better-harness repo)
+#   DSH_BETTER_HARNESS_BRANCH      -> better-harness branch (default: main)
 set -euo pipefail
 
 # ── Resolve the checked-out repo root and defaults ───────────────────────────
@@ -68,11 +75,15 @@ source "$SCRIPT_DIR/lib.sh"
 MEMORY_REPO_URL="${DSH_MEMORY_REPO_URL:-https://github.com/frendyxzc/TencentDB-Agent-Memory.git}"
 MEMORY_BRANCH="${DSH_MEMORY_BRANCH:-feat/server_team}"
 
+BETTER_HARNESS_REPO_URL="${DSH_BETTER_HARNESS_REPO_URL:-https://github.com/QoderAI/better-harness.git}"
+BETTER_HARNESS_BRANCH="${DSH_BETTER_HARNESS_BRANCH:-main}"
+
 DSH_HOME="${DSH_HOME:-$HOME/.dsh}"
 WORKSPACE="$REPO_ROOT"
 
 SKIP_MEMORY=0
 SKIP_INSTALL=0
+SKIP_BETTER_HARNESS=0
 UPGRADE=0
 FORCE=0
 NON_INTERACTIVE=0
@@ -94,6 +105,7 @@ while [[ $# -gt 0 ]]; do
     --branch)          MEMORY_BRANCH="$2"; shift 2 ;;
     --skip-memory)     SKIP_MEMORY=1; shift ;;
     --skip-install)    SKIP_INSTALL=1; shift ;;
+    --skip-better-harness) SKIP_BETTER_HARNESS=1; shift ;;
     --upgrade)         UPGRADE=1; shift ;;
     --force)           FORCE=1; shift ;;
     --non-interactive) NON_INTERACTIVE=1; shift ;;
@@ -460,6 +472,80 @@ upgrade_vision_model_config() {
   ok "qwen3-vl-plus vision model added -> $settings (llm-pi-ai dashscope models)"
 }
 
+# ensure_better_harness — clone/refresh the better-harness checkout under the
+# harness home, install its root runtime deps under the pinned Node v22, and
+# drop a wrapper skill into the user skills root so skill-filesystem discovers
+# /better-harness in every session (the same root the gitlab-mr skill uses).
+# Upstream pins engines node >=22.20 <25, so installs run under stack_node_bin
+# (bundled node22, then Homebrew node@22, else the ambient node with a warning);
+# the wrapper skill records the same resolution for the agent. The wrapper
+# points at the checkout's canonical SKILL.md so the upstream `../..` root
+# resolution keeps working, and upgrades only pull the checkout.
+ensure_better_harness() {
+  local bh_root="$DSH_HOME/better-harness"
+
+  if [[ -d "$bh_root/.git" ]]; then
+    info "refreshing better-harness checkout at $bh_root"
+    (cd "$bh_root" && git fetch --quiet origin "$BETTER_HARNESS_BRANCH" \
+      && git reset --hard --quiet "origin/$BETTER_HARNESS_BRANCH") \
+      || warn "better-harness git refresh failed; keeping the existing checkout"
+  else
+    info "cloning better-harness -> $bh_root"
+    git clone --quiet --depth 1 --branch "$BETTER_HARNESS_BRANCH" "$BETTER_HARNESS_REPO_URL" "$bh_root" \
+      || die "failed to clone $BETTER_HARNESS_REPO_URL into $bh_root"
+  fi
+
+  if [[ "$SKIP_INSTALL" == "1" ]]; then
+    warn "--skip-install: not installing better-harness dependencies"
+    return 0
+  fi
+
+  local node_dir="" old_path="$PATH" node_hint
+  if node_dir="$(stack_node_bin 2>/dev/null)"; then
+    PATH="$node_dir:$PATH"
+    node_hint="$node_dir/node"
+  else
+    warn "no pinned Node v22 found; better-harness may run outside its engines range"
+    node_hint="the ambient node"
+  fi
+
+  # Root production deps only: the workspace packages (harness-studio,
+  # harness-ui) pull Playwright and friends the CLI never imports.
+  info "install better-harness deps (npm ci, root workspace only)"
+  (cd "$bh_root" && npm ci --omit=dev --workspaces=false --no-audit --no-fund) \
+    || die "npm ci failed in $bh_root"
+  PATH="$old_path"
+
+  local skill_dir="$DSH_HOME/skills/better-harness"
+  if [[ ! -e "$skill_dir/SKILL.md" || "$FORCE" == "1" ]]; then
+    mkdir -p "$skill_dir"
+    cat > "$skill_dir/SKILL.md" <<EOF
+---
+name: better-harness
+description: Use when /better-harness reviews the outer coding-agent Harness for lifecycle controls, repeated work, project feedback, agent assets, session outcomes, repair planning, durable reports, finding-bound fixes, or manual direct fixes. Invoke only via slash command.
+---
+
+# Better Harness
+
+Mounted by \`scripts/setup-dsh/setup.sh\`. The canonical workflow and evidence
+collectors live in the checkout below; this wrapper only overrides the
+canonical SKILL.md's root resolution, which assumes the file is read inside
+the upstream repository.
+
+- Resolve \`<better-harness-root>\` to \`$bh_root\` (the canonical SKILL.md's
+  \`../..\` derivation does not apply from this mount).
+- Read and follow \`<better-harness-root>/skills/better-harness/SKILL.md\`.
+- Resolve \`<node>\` to \`$node_hint\` (upstream pins engines node >=22.20 <25).
+- If \`$bh_root/scripts/better-harness.mjs\` is missing, the skill is not
+  installed: run \`./scripts/setup-dsh/setup.sh --upgrade\` in the
+  deepseek-harness checkout, or install better-harness manually.
+EOF
+    ok "better-harness skill -> $skill_dir/SKILL.md"
+  else
+    warn "better-harness skill already exists, skipping: $skill_dir/SKILL.md"
+  fi
+}
+
 # run_upgrade — the --upgrade body; ends the process on completion.
 run_upgrade() {
   info "upgrade mode: migrating an existing deployment at $DSH_HOME"
@@ -478,6 +564,10 @@ run_upgrade() {
     else
       warn "memory stack not found at $memory_root; skipping (run the full setup.sh first)"
     fi
+  fi
+
+  if [[ "$SKIP_BETTER_HARNESS" != "1" ]]; then
+    ensure_better_harness
   fi
 
   # Refresh the workspace deps (links the newly-added @deepseek-ai/dsh-tdai-memory
@@ -843,7 +933,18 @@ else
   info "GitLab MR integration skipped (no bot username)"
 fi
 
-# ── Summary ────────────────────────────────────────────────────────────────
+# ── 8. better-harness skill (optional) ───────────────────────────────────────
+# Clones/refreshes the open-source better-harness checkout under the harness
+# home and installs its root runtime deps, then drops a wrapper skill into the
+# user skills root so the agent can run /better-harness workflow reviews in any
+# session. Defaults on; --skip-better-harness turns it off.
+if [[ "$SKIP_BETTER_HARNESS" != "1" ]]; then
+  ensure_better_harness
+else
+  info "better-harness skill skipped (--skip-better-harness)"
+fi
+
+# ── Summary ─────────────────────────────────────────────────────────────────
 echo
 ok "bootstrap complete."
 echo
