@@ -17,6 +17,8 @@ English | [中文](2026-08-25-setup-dsh-memory-stack-node-match.zh.md)
 
 For the fallback where no pinned Node exists anywhere, `ensure_proxy_npm_approvals` idempotently patches `MemoryProxy/package.json` with an `allowScripts` entry mirroring the proxy's own upstream `pnpm-workspace.yaml` `allowBuilds` (better-sqlite3/esbuild/node-pty/protobufjs), so npm 11 installs the optional dependency instead of omitting it; npm 10 ignores the field, so the patch is inert under the pinned toolchain. The approval patch runs even under `--skip-install`, like the pnpm-workspace.yaml patches (the pnpm-side approvals predate this fix — see the [MemoryCore admin bootstrap note](2026-08-23-setup-dsh-admin-bootstrap-after-core-start.md)). `start-all.sh`'s storage guard now points the repair at `setup.sh --upgrade` instead of a bare `npm install better-sqlite3` that would hit the same traps.
 
+`run_upgrade`'s dsh-workspace refresh (`pnpm run clean`, `pnpm install`, `pnpm run build` in `$REPO_ROOT`, plus the profile install) also runs under `stack_node_bin`: `start-all.sh` starts the dsh Web UI on Node 22, so an ambient-Node install compiles workspace native bindings (fs-ext, node-pty, koffi) against the wrong ABI and the UI fails to load them. The initial fix covered the memory-stack and better-harness installs only; the 0.1.3-alpha sync surfaced the same trap in the workspace refresh when upstream added fs-ext.
+
 ## Alternatives considered
 
 **Approve scripts via `npm install-scripts approve`.** Rejected: the command only matches installed packages, and the omitted optional dependency is exactly the one not installed — the approval tool cannot unstick its own failure mode.

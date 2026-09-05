@@ -575,12 +575,21 @@ run_upgrade() {
   # first: a `git pull` that removes a package leaves its gitignored lib/ and
   # node_modules/ behind, and the tsdown workspace glob still builds that dead
   # directory from its stale output (MISSING_EXPORT against current sources).
+  # Run under the stack Node (stack_node_bin, same as ensure_memory_deps and
+  # ensure_better_harness above): dsh-web starts on Node 22, so a pnpm install
+  # under the ambient Node compiles native bindings (fs-ext, node-pty, koffi)
+  # against the wrong ABI and the Web UI fails to load them at startup.
+  local node_dir="" old_path="$PATH"
+  if node_dir="$(stack_node_bin)"; then
+    PATH="$node_dir:$PATH"
+  fi
   (cd "$REPO_ROOT" && pnpm run clean) || die "pnpm run clean failed in $REPO_ROOT"
   (cd "$REPO_ROOT" && pnpm install) || die "pnpm install failed in $REPO_ROOT"
   (cd "$REPO_ROOT" && pnpm run build) || die "pnpm run build failed in $REPO_ROOT"
   if [[ -f "$PROFILE_DIR/package.json" ]]; then
     (cd "$PROFILE_DIR" && pnpm install) || warn "profile pnpm install failed (non-fatal)"
   fi
+  PATH="$old_path"
 
   echo
   ok "upgrade complete."

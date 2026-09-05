@@ -17,6 +17,8 @@ Status: implemented
 
 针对到处都没有钉住 Node 的回退场景，`ensure_proxy_npm_approvals` 幂等地向 `MemoryProxy/package.json` 写入 `allowScripts` 条目（better-sqlite3/esbuild/node-pty/protobufjs，对齐该服务自己的上游 `pnpm-workspace.yaml` `allowBuilds`），让 npm 11 安装可选依赖而不是省略它；npm 10 忽略该字段，钉住的工具链下补丁无副作用。审批补丁与 pnpm-workspace.yaml 补丁一样，在 `--skip-install` 时也执行（pnpm 侧的审批早于此修复，见 [MemoryCore admin 引导笔记](2026-08-23-setup-dsh-admin-bootstrap-after-core-start.zh.md)）。`start-all.sh` 的存储守卫现在把修复指向 `setup.sh --upgrade`，而不是一条会踩同样陷阱的裸 `npm install better-sqlite3`。
 
+`run_upgrade` 的 dsh workspace 刷新（`$REPO_ROOT` 里的 `pnpm run clean`、`pnpm install`、`pnpm run build`，以及 profile 安装）也在 `stack_node_bin` 下运行：`start-all.sh` 把 dsh Web UI 起在 Node 22 上，环境 Node 的安装会把 workspace 的 native 绑定（fs-ext、node-pty、koffi）编成错误的 ABI，UI 加载即崩。初版修复只覆盖内存栈和 better-harness 的安装；上游新增 fs-ext 后，0.1.3-alpha 同步把同一陷阱暴露在 workspace 刷新里。
+
 ## Alternatives considered
 
 **用 `npm install-scripts approve` 批准脚本。** 拒绝：该命令只匹配已安装的包，而被省略的可选依赖正是没装上的那个——批准工具无法解开自己的失败模式。

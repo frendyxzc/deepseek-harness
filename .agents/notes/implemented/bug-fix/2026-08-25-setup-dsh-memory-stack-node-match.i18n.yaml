@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-setup-dsh-memory-stack-node-match.md
-2026-08-25-setup-dsh-memory-stack-node-match.md: eef2889fcff432253b5febb8d6e312fa77755412
-2026-08-25-setup-dsh-memory-stack-node-match.zh.md: 9a848fefd523d8b59c5858b6169cfcc8b54d539d
+2026-08-25-setup-dsh-memory-stack-node-match.md: b3e558c0a468f15cc0d7f92dfb11ecb06c7ce840
+2026-08-25-setup-dsh-memory-stack-node-match.zh.md: 246b7853deee45afb5773ca14f74ec3135150bcf
