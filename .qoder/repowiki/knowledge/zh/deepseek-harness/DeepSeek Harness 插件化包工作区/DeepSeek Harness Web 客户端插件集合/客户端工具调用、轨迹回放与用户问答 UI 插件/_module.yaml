@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/client_ui/ui_features_tool_workflow
+title: 客户端工具调用、轨迹回放与用户问答 UI 插件
+scope:
+    - packages/client/ui-tool/
+    - packages/client/ui-trajectory/
+    - packages/client/ui-user-questions/
+source_files: []
+depends_on: []
+related_to: []

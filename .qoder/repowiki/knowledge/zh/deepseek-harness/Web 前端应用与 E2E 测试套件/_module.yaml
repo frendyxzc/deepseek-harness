@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: web
+title: Web 前端应用与 E2E 测试套件
+scope:
+    - apps/web/
+source_files: []
+depends_on: []
+related_to: []

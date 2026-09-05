@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/client_ui/settings_domains
+title: 设置页插件：模型、内存与插件目录
+scope:
+    - packages/client/ui-settings-memory/
+    - packages/client/ui-settings-models/
+    - packages/client/ui-settings-plugin-inventory/
+source_files: []
+depends_on: []
+related_to: []

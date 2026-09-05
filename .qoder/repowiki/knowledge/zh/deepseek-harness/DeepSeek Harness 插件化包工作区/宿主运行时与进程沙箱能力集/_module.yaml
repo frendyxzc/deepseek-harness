@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/host_runtime
+title: 宿主运行时与进程沙箱能力集
+scope:
+    - packages/host/
+    - packages/runtime-diagnostics/
+    - packages/sandbox/
+source_files: []
+depends_on: []
+related_to: []

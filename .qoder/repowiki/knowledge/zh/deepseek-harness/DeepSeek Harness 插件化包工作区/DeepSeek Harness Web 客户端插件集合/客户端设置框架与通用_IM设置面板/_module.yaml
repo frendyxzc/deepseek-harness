@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/client_ui/settings_framework
+title: 客户端设置框架与通用/IM设置面板
+scope:
+    - packages/client/ui-settings/
+    - packages/client/ui-settings-general/
+    - packages/client/ui-settings-im/
+source_files: []
+depends_on: []
+related_to: []

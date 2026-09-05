@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: packages/client_ui
+title: DeepSeek Harness Web 客户端插件集合
+scope:
+    - packages/client/
+source_files: []
+depends_on: []
+related_to: []

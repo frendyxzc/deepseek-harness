@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/tools_integrations
+title: Web/MCP/LSP 外部能力集成工具集
+scope:
+    - packages/web/
+    - packages/mcp/
+    - packages/lsp/
+source_files: []
+depends_on: []
+related_to: []

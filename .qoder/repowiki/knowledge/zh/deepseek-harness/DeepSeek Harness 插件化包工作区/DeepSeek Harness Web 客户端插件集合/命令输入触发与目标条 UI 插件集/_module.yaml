@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/client_ui/ui_commands_and_input
+title: 命令输入触发与目标条 UI 插件集
+scope:
+    - packages/client/ui-commands/
+    - packages/client/ui-input-trigger/
+    - packages/client/ui-goal/
+source_files: []
+depends_on: []
+related_to: []

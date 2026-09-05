@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/client_ui/runtime_core
+title: 客户端运行时核心：连接、HMR 与本地化
+scope:
+    - packages/client/connection/
+    - packages/client/hmr/
+    - packages/client/locale/
+source_files: []
+depends_on: []
+related_to: []

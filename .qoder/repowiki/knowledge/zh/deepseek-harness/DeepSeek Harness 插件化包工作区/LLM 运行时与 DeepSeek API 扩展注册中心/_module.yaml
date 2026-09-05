@@ -1,0 +1,9 @@
+schema_version: 1
+module_path: packages/core_llm_runtime
+title: LLM 运行时与 DeepSeek API 扩展注册中心
+scope:
+    - packages/llm/llm/
+    - packages/llm/deepseek-llm-api-extensions/
+source_files: []
+depends_on: []
+related_to: []

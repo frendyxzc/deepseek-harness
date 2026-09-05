@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: website
+title: DeepSeek Harness 文档站点（VitePress 多语言文档站）
+scope:
+    - website/
+source_files: []
+depends_on: []
+related_to: []

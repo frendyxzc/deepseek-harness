@@ -1,0 +1,300 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: master
+nodes_managed: true
+exported_at: "2026-09-05T04:44:33Z"
+modules:
+    "":
+        dir_name: deepseek-harness
+        title: deepseek-harness
+        scope: []
+        source_files: []
+        children:
+            - cli
+            - docs
+            - gitlab_mr
+            - packages
+            - python_sdk
+            - scripts
+            - snapshots
+            - web
+            - website
+        depends_on: []
+        related_to: []
+    cli:
+        dir_name: dsh CLI 启动器与配置编排
+        title: dsh CLI 启动器与配置编排
+        scope:
+            - apps/cli/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    docs:
+        dir_name: 项目文档与多语言翻译体系
+        title: 项目文档与多语言翻译体系
+        scope:
+            - docs/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    gitlab_mr:
+        dir_name: GitLab MR 入站轮询插件与协作 Skill
+        title: GitLab MR 入站轮询插件与协作 Skill
+        scope:
+            - gitlab-mr/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages:
+        dir_name: DeepSeek Harness 插件化包工作区
+        title: DeepSeek Harness 插件化包工作区
+        scope:
+            - packages/
+        source_files: []
+        children:
+            - packages/client_ui
+            - packages/core_llm_runtime
+            - packages/core_runtime
+            - packages/examples_test_support
+            - packages/host_runtime
+            - packages/infra_services
+            - packages/retry_and_token_meter
+            - packages/shared_libs
+            - packages/tools_integrations
+        depends_on: []
+        related_to: []
+    packages/client_ui:
+        dir_name: DeepSeek Harness Web 客户端插件集合
+        title: DeepSeek Harness Web 客户端插件集合
+        scope:
+            - packages/client/
+        source_files: []
+        children:
+            - packages/client_ui/chat_conversation
+            - packages/client_ui/module_system
+            - packages/client_ui/runtime_core
+            - packages/client_ui/settings_domains
+            - packages/client_ui/settings_framework
+            - packages/client_ui/ui_commands_and_input
+            - packages/client_ui/ui_features_jobs_models
+            - packages/client_ui/ui_features_tool_workflow
+        depends_on: []
+        related_to: []
+    packages/client_ui/chat_conversation:
+        dir_name: 对话会话 UI（ui-conversation 与 ui-chat）
+        title: 对话会话 UI（ui-conversation 与 ui-chat）
+        scope:
+            - packages/client/ui-chat/
+            - packages/client/ui-conversation/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/module_system:
+        dir_name: 客户端模块系统与快照状态存储
+        title: 客户端模块系统与快照状态存储
+        scope:
+            - packages/client/modules/
+            - packages/client/store/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/runtime_core:
+        dir_name: 客户端运行时核心：连接、HMR 与本地化
+        title: 客户端运行时核心：连接、HMR 与本地化
+        scope:
+            - packages/client/connection/
+            - packages/client/hmr/
+            - packages/client/locale/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/settings_domains:
+        dir_name: 设置页插件：模型、内存与插件目录
+        title: 设置页插件：模型、内存与插件目录
+        scope:
+            - packages/client/ui-settings-memory/
+            - packages/client/ui-settings-models/
+            - packages/client/ui-settings-plugin-inventory/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/settings_framework:
+        dir_name: 客户端设置框架与通用_IM设置面板
+        title: 客户端设置框架与通用/IM设置面板
+        scope:
+            - packages/client/ui-settings/
+            - packages/client/ui-settings-general/
+            - packages/client/ui-settings-im/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/ui_commands_and_input:
+        dir_name: 命令输入触发与目标条 UI 插件集
+        title: 命令输入触发与目标条 UI 插件集
+        scope:
+            - packages/client/ui-commands/
+            - packages/client/ui-input-trigger/
+            - packages/client/ui-goal/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/ui_features_jobs_models:
+        dir_name: 会话 UI 功能插件（任务列表、模型选择、消息反馈）
+        title: 会话 UI 功能插件（任务列表、模型选择、消息反馈）
+        scope:
+            - packages/client/ui-jobs/
+            - packages/client/ui-model-selection/
+            - packages/client/ui-message-feedback/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/client_ui/ui_features_tool_workflow:
+        dir_name: 客户端工具调用、轨迹回放与用户问答 UI 插件
+        title: 客户端工具调用、轨迹回放与用户问答 UI 插件
+        scope:
+            - packages/client/ui-tool/
+            - packages/client/ui-trajectory/
+            - packages/client/ui-user-questions/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/core_llm_runtime:
+        dir_name: LLM 运行时与 DeepSeek API 扩展注册中心
+        title: LLM 运行时与 DeepSeek API 扩展注册中心
+        scope:
+            - packages/llm/llm/
+            - packages/llm/deepseek-llm-api-extensions/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/core_runtime:
+        dir_name: Agent 运行时核心与上下文扩展
+        title: Agent 运行时核心与上下文扩展
+        scope:
+            - packages/core/
+            - packages/context/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/examples_test_support:
+        dir_name: 示例与测试支撑包集合（Agent Spine Demo、Client Runtime、Session Snapshot、LLM Mock Server、Load
+        title: 示例与测试支撑包集合（Agent Spine Demo、Client Runtime、Session Snapshot、LLM Mock Server、Loader Smoke）
+        scope:
+            - packages/examples/
+            - packages/test-support/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/host_runtime:
+        dir_name: 宿主运行时与进程沙箱能力集
+        title: 宿主运行时与进程沙箱能力集
+        scope:
+            - packages/host/
+            - packages/runtime-diagnostics/
+            - packages/sandbox/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/infra_services:
+        dir_name: 凭证、设置与持久化存储基础设施
+        title: 凭证、设置与持久化存储基础设施
+        scope:
+            - packages/credentials/
+            - packages/settings/
+            - packages/storage/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/retry_and_token_meter:
+        dir_name: LLM 重试策略与 Token 用量计量
+        title: LLM 重试策略与 Token 用量计量
+        scope:
+            - packages/llm/llm-retry/
+            - packages/llm/token-meter/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/shared_libs:
+        dir_name: 共享工具库与 Typert 类型化远程调用子系统
+        title: 共享工具库与 Typert 类型化远程调用子系统
+        scope:
+            - packages/util/
+            - packages/typert/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    packages/tools_integrations:
+        dir_name: Web_MCP_LSP 外部能力集成工具集
+        title: Web/MCP/LSP 外部能力集成工具集
+        scope:
+            - packages/web/
+            - packages/mcp/
+            - packages/lsp/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    python_sdk:
+        dir_name: DeepSeek Harness Python SDK 与运行时绑定
+        title: DeepSeek Harness Python SDK 与运行时绑定
+        scope:
+            - python/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    scripts:
+        dir_name: 构建、质量门禁与本地环境引导脚本集
+        title: 构建、质量门禁与本地环境引导脚本集
+        scope:
+            - scripts/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    snapshots:
+        dir_name: 会话录制快照与回归测试套件
+        title: 会话录制快照与回归测试套件
+        scope:
+            - snapshots/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    web:
+        dir_name: Web 前端应用与 E2E 测试套件
+        title: Web 前端应用与 E2E 测试套件
+        scope:
+            - apps/web/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []
+    website:
+        dir_name: DeepSeek Harness 文档站点（VitePress 多语言文档站）
+        title: DeepSeek Harness 文档站点（VitePress 多语言文档站）
+        scope:
+            - website/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

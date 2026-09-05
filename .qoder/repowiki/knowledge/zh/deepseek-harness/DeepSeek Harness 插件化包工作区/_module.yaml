@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: packages
+title: DeepSeek Harness 插件化包工作区
+scope:
+    - packages/
+source_files: []
+depends_on: []
+related_to: []

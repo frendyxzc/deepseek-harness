@@ -1,0 +1,8 @@
+schema_version: 1
+module_path: gitlab_mr
+title: GitLab MR 入站轮询插件与协作 Skill
+scope:
+    - gitlab-mr/
+source_files: []
+depends_on: []
+related_to: []

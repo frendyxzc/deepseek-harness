@@ -1,0 +1,10 @@
+schema_version: 1
+module_path: packages/client_ui/ui_features_jobs_models
+title: 会话 UI 功能插件（任务列表、模型选择、消息反馈）
+scope:
+    - packages/client/ui-jobs/
+    - packages/client/ui-model-selection/
+    - packages/client/ui-message-feedback/
+source_files: []
+depends_on: []
+related_to: []
