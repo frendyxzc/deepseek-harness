@@ -195,6 +195,18 @@ start_service panel 8123 "http://127.0.0.1:8123/health" 30 \
 start_service dsh-web 3080 "" 120 \
   "cd '$WORKSPACE' && pnpm dsh web --host 0.0.0.0 --port 3080"
 
+# Extract the authentication token from the dsh-web log. The token is printed
+# once at startup; grab it so the summary can show the authenticated URL.
+# Wait briefly for the log to be written (dsh-web prints the token after binding).
+DSH_WEB_TOKEN=""
+if DSH_WEB_LOG="$(logfile dsh-web)" && [[ -f "$DSH_WEB_LOG" ]]; then
+  for _ in 1 2 3 4 5; do
+    DSH_WEB_TOKEN="$(sed -n 's/.*token=\([A-Za-z0-9_-]*\).*/\1/p' "$DSH_WEB_LOG" 2>/dev/null | head -1 || true)"
+    [[ -n "$DSH_WEB_TOKEN" ]] && break
+    sleep 1
+  done
+fi
+
 echo
 ok "all services up."
 echo "  MemoryCore      http://127.0.0.1:8420/health"
@@ -202,10 +214,20 @@ echo "  MemoryProxy     http://127.0.0.1:8096/health"
 echo "  MemoryKnowledge http://127.0.0.1:8421/health"
 if LAN_IP="$(lan_ip)"; then
   echo "  MemoryPanel     http://127.0.0.1:8123  (control panel, LAN: http://$LAN_IP:8123)"
-  echo "  dsh Web UI      http://127.0.0.1:3080  (LAN: http://$LAN_IP:3080)"
+  if [[ -n "$DSH_WEB_TOKEN" ]]; then
+    echo "  dsh Web UI      http://127.0.0.1:3080/?token=$DSH_WEB_TOKEN  (LAN: http://$LAN_IP:3080/?token=$DSH_WEB_TOKEN)"
+  else
+    echo "  dsh Web UI      http://127.0.0.1:3080  (LAN: http://$LAN_IP:3080)"
+    warn "could not extract dsh-web token from log — check $(logfile dsh-web)"
+  fi
 else
   warn "no LAN IP detected — panel and web UI reachable via loopback only"
   echo "  MemoryPanel     http://127.0.0.1:8123  (control panel)"
-  echo "  dsh Web UI      http://127.0.0.1:3080"
+  if [[ -n "$DSH_WEB_TOKEN" ]]; then
+    echo "  dsh Web UI      http://127.0.0.1:3080/?token=$DSH_WEB_TOKEN"
+  else
+    echo "  dsh Web UI      http://127.0.0.1:3080"
+    warn "could not extract dsh-web token from log — check $(logfile dsh-web)"
+  fi
 fi
 echo "Stop with:       ./scripts/setup-dsh/stop-all.sh"
