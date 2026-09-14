@@ -183,7 +183,15 @@ function mountReceiveDeferred(
       available: opts.available ?? (() => true),
       sendMessage: async () => ({ messageId: 'm' }),
       ...(opts.receive === false ? {} : {
-        startReceiving: (h) => { handlers.push(h); return () => {} },
+        startReceiving: (h) => {
+          handlers.push(h)
+          // Model disposal so `handlers` reflects active subscriptions, not
+          // every handler ever pushed.
+          return () => {
+            const index = handlers.indexOf(h)
+            if (index >= 0) handlers.splice(index, 1)
+          }
+        },
       }),
     })
 
@@ -450,22 +458,22 @@ describe('feishu-receive', () => {
     await ctx.fiber.dispose()
   })
 
-  it('reopens the receive channel on the remaining provider when another leaves', async () => {
+  it('subscribes each provider as it registers and disposes its channel when it leaves', async () => {
     const { ctx, fiber, handlers, register } = await mountReceiveDeferred()
     const disposeA = register('bot-a')
     expect(handlers).toHaveLength(1)
     const disposeB = register('bot-b')
-    expect(handlers).toHaveLength(1)
+    expect(handlers).toHaveLength(2)
 
     disposeB()
-    expect(handlers).toHaveLength(2)
+    expect(handlers).toHaveLength(1)
     disposeA()
-    expect(handlers).toHaveLength(2)
+    expect(handlers).toHaveLength(0)
     await fiber.dispose()
     await ctx.fiber.dispose()
   })
 
-  it('falls back to waiting when the remaining provider cannot host the channel', async () => {
+  it('skips a send-only provider while a receivable one hosts, and re-subscribes after the receivable leaves', async () => {
     const { ctx, fiber, handlers, register } = await mountReceiveDeferred()
     const disposeGood = register('good')
     expect(handlers).toHaveLength(1)
@@ -473,10 +481,27 @@ describe('feishu-receive', () => {
     expect(handlers).toHaveLength(1)
 
     disposeGood()
-    expect(handlers).toHaveLength(1)
+    expect(handlers).toHaveLength(0)
     disposeSendOnly()
     register('good-2')
+    expect(handlers).toHaveLength(1)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('delivers messages from a bot registered after the channel opened', async () => {
+    const { ctx, fiber, handlers, create, agents, register } = await mountReceiveDeferred({ onRoots: () => [root()] })
+    register('bot-a')
+    expect(handlers).toHaveLength(1)
+    register('bot-b')
     expect(handlers).toHaveLength(2)
+
+    // The second bot's channel delivers — a bot added after the channel opened
+    // used to be skipped, so its messages never reached an agent.
+    handlers[1]!(event('hello from bot-b', 'oc_9'))
+    await vi.waitFor(() => { expect(create).toHaveBeenCalledTimes(1) })
+    await vi.waitFor(() => { expect(agents[0]!.followup).toHaveBeenCalledTimes(1) })
+    expect((agents[0]!.followup.mock.calls[0]![0] as { content: unknown[] }).content).toEqual([{ type: 'text', text: 'hello from bot-b' }])
     await fiber.dispose()
     await ctx.fiber.dispose()
   })

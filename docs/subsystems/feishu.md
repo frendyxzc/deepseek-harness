@@ -250,6 +250,19 @@ startReceiving(handler: FeishuReceiveHandler): () => void
 startReceivingAll(handler: FeishuReceiveHandler): () => void
 
 /**
+ * Subscribe one registered provider's receive channel, recording each inbound
+ * event's chat → provider binding so a reply routes back through the same app.
+ * Unlike {@link startReceivingAll}, this targets a single provider, so a
+ * consumer can add a provider that registered after the channel opened (e.g. a
+ * bot added through the settings UI after boot) without re-subscribing — and
+ * double-delivering to — the providers already receiving.
+ * @param provider - the registered provider to receive from.
+ * @param handler - the callback for each received {@link FeishuReceiveEvent}.
+ * @returns a disposer that stops this provider's subscription.
+ */
+startReceivingProvider(provider: FeishuProvider, handler: FeishuReceiveHandler): () => void
+
+/**
  * Start receiving card button actions through the selected provider.
  * Resolves the provider at call time with the selection rules above;
  * throws {@link FeishuError} `FEISHU_RECEIVE_UNSUPPORTED` when the

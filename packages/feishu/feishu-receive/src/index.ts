@@ -20,7 +20,7 @@ import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { FeishuError } from '@deepseek-ai/dsh-feishu'
-import type { FeishuReceiveEvent, FeishuReceiveIdType } from '@deepseek-ai/dsh-feishu'
+import type { FeishuProvider, FeishuReceiveEvent, FeishuReceiveIdType } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
@@ -373,111 +373,108 @@ export function apply(ctx: Context, config: Config = {}): void {
   }
 
   ctx.effect(() => {
-    // Sibling entry fibers load in parallel, so a provider plugin may still
-    // be activating when this effect runs; the seam's registration events
-    // open the channel then instead of failing the boot over load order.
-    let disposeReceive: (() => void) | undefined
-    /** Whether the channel waits for a usable provider to register. */
-    let waitingForProvider = false
-
-    /** Open the receive channel; false when no usable provider is registered yet. */
-    const openReceiveChannel = (): boolean => {
-      try {
-        if (ctx.feishu.listProviders().length === 0) return false
-        disposeReceive = ctx.feishu.startReceivingAll((event) => {
-          const chatId = event.chatId
-          if (chatId.length === 0) {
-            ctx.logger.warn('feishu-receive: event without a chat id; dropped')
-            return
-          }
-          const reply = resolveReplyTarget(event)
-          void (async () => {
-            // Immediate feedback before the agent starts: the acknowledgement
-            // is awaited so it lands ahead of any reply, and a failure only
-            // logs — delivery must never depend on it.
-            if (resolved.ack) {
-              try {
-                await ctx.feishu.sendMessage({ receiveId: reply.receiveId, receiveIdType: reply.receiveIdType, content: ACK_MESSAGE })
-              } catch (error: unknown) {
-                ctx.logger.warn('feishu-receive: failed to acknowledge chat %s: %s', chatId, String(error))
-              }
-            }
-            const handle = await getOrCreate(chatId, event.providerId, reply)
-            created.add(handle)
-            const referenced = await resolveReferencedContent(ctx, event)
-            const text = referenced.text.length > 0 ? `${referenced.text}\n\n${event.content}` : event.content
-            const eventMessageId = event.messageId
-            const eventImages: DownloadImage[] = eventMessageId !== undefined && event.images !== undefined
-              ? event.images.map(image => ({ messageId: eventMessageId, fileKey: image.fileKey }))
-              : []
-            const imageBlocks = await collectImageBlocks(ctx, [...eventImages, ...referenced.images])
-            // console, not ctx.logger: the default logger buffers in memory and is not
-            // exported to the process log, so the delivery diagnostic must print here
-            // to be visible in dsh-web.log. parent/root show whether the inbound event
-            // carried a quoted / replied-to reference at all, so an absent `[引用消息]`
-            // can be attributed to a missing reference rather than a failed read; the
-            // delivered length replaces the raw payload so the line stays concise.
-            console.log(
-              `feishu-receive: ${summarizeRawMessage(event.raw)} parent=${event.parentId ?? '-'} `
-              + `root=${event.rootId ?? '-'} → deliveredLen=${text.length} images=${imageBlocks.length}`,
-            )
-            const content: ContentBlock[] = []
-            if (text.length > 0) content.push({ type: 'text', text })
-            content.push(...imageBlocks)
-            handle.agent.followup(createUserMessage({
-              content,
-              source: { kind: 'user' },
-            }))
-            ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)
-          })().catch((error: unknown) => {
-            ctx.logger.error('feishu-receive: failed to create the per-chat agent for chat %s: %s', chatId, String(error))
-          })
-        })
-        return true
-      } catch (error: unknown) {
-        // Not registered (yet) — a provider fiber may still be loading.
-        if (error instanceof FeishuError
-          && (error.code === 'FEISHU_PROVIDER_UNAVAILABLE' || error.code === 'FEISHU_PROVIDER_CONFIGURED_MISSING')) {
-          return false
-        }
-        throw error
+    // Sibling entry fibers load in parallel, so a provider plugin may still be
+    // activating when this effect runs; the seam's provider-added event opens
+    // each provider's channel then instead of failing the boot over load order.
+    const receiveHandler = (event: FeishuReceiveEvent): void => {
+      const chatId = event.chatId
+      if (chatId.length === 0) {
+        ctx.logger.warn('feishu-receive: event without a chat id; dropped')
+        return
       }
-    }
-    const closeReceiveChannel = (): void => {
-      disposeReceive?.()
-      disposeReceive = undefined
+      const reply = resolveReplyTarget(event)
+      void (async () => {
+        // Immediate feedback before the agent starts: the acknowledgement
+        // is awaited so it lands ahead of any reply, and a failure only
+        // logs — delivery must never depend on it.
+        if (resolved.ack) {
+          try {
+            await ctx.feishu.sendMessage({ receiveId: reply.receiveId, receiveIdType: reply.receiveIdType, content: ACK_MESSAGE })
+          } catch (error: unknown) {
+            ctx.logger.warn('feishu-receive: failed to acknowledge chat %s: %s', chatId, String(error))
+          }
+        }
+        const handle = await getOrCreate(chatId, event.providerId, reply)
+        created.add(handle)
+        const referenced = await resolveReferencedContent(ctx, event)
+        const text = referenced.text.length > 0 ? `${referenced.text}\n\n${event.content}` : event.content
+        const eventMessageId = event.messageId
+        const eventImages: DownloadImage[] = eventMessageId !== undefined && event.images !== undefined
+          ? event.images.map(image => ({ messageId: eventMessageId, fileKey: image.fileKey }))
+          : []
+        const imageBlocks = await collectImageBlocks(ctx, [...eventImages, ...referenced.images])
+        // console, not ctx.logger: the default logger buffers in memory and is not
+        // exported to the process log, so the delivery diagnostic must print here
+        // to be visible in dsh-web.log. parent/root show whether the inbound event
+        // carried a quoted / replied-to reference at all, so an absent `[引用消息]`
+        // can be attributed to a missing reference rather than a failed read; the
+        // delivered length replaces the raw payload so the line stays concise.
+        console.log(
+          `feishu-receive: ${summarizeRawMessage(event.raw)} parent=${event.parentId ?? '-'} `
+          + `root=${event.rootId ?? '-'} → deliveredLen=${text.length} images=${imageBlocks.length}`,
+        )
+        const content: ContentBlock[] = []
+        if (text.length > 0) content.push({ type: 'text', text })
+        content.push(...imageBlocks)
+        handle.agent.followup(createUserMessage({
+          content,
+          source: { kind: 'user' },
+        }))
+        ctx.logger.info('feishu-receive: delivered a message to agent %s (chat %s)', handle.agent.id, chatId)
+      })().catch((error: unknown) => {
+        ctx.logger.error('feishu-receive: failed to create the per-chat agent for chat %s: %s', chatId, String(error))
+      })
     }
 
-    waitingForProvider = !openReceiveChannel()
-    if (waitingForProvider) {
+    // One receive subscription per provider, keyed by provider id, so a bot that
+    // registers after this channel opened — e.g. added through the settings
+    // multi-bot UI after boot — joins without re-subscribing (and double-delivering
+    // to) the providers already receiving.
+    const receiveDisposers = new Map<string, () => void>()
+
+    const subscribeProvider = (provider: FeishuProvider): void => {
+      if (receiveDisposers.has(provider.id)) return
+      if (!provider.available()) return
+      if (provider.startReceiving === undefined) {
+        // An available provider that cannot receive is a misconfiguration only
+        // when no other registered provider can host the channel; otherwise it
+        // is simply not subscribed for inbound messages.
+        const hasReceivable = ctx.feishu.listProviders()
+          .some(other => other.id !== provider.id && other.available() && other.startReceiving !== undefined)
+        if (hasReceivable) return
+        throw new FeishuError(
+          `Feishu provider "${provider.id}" does not support receiving messages`,
+          'FEISHU_RECEIVE_UNSUPPORTED',
+        )
+      }
+      receiveDisposers.set(provider.id, ctx.feishu.startReceivingProvider(provider, receiveHandler))
+    }
+
+    // Open the channel on every provider present at load. A lone send-only
+    // provider fails the boot loudly, matching the seam's registration contract.
+    const initialProviders = ctx.feishu.listProviders()
+    if (initialProviders.length === 0) {
       ctx.logger.warn('feishu-receive: no usable Feishu provider is registered yet; the receive channel opens when one registers')
     }
+    for (const provider of initialProviders) subscribeProvider(provider)
 
-    const offProviderAdded = ctx.on('feishu/provider-added', () => {
-      if (!waitingForProvider) return
-      // A registered provider that cannot receive is a real misconfiguration:
-      // the throw unwinds the provider's registration and fails its fiber
-      // loudly.
-      waitingForProvider = !openReceiveChannel()
+    const offProviderAdded = ctx.on('feishu/provider-added', (provider) => {
+      // A lone send-only provider throws here; that unwinds the provider's
+      // registration (the registerProvider emitter is the failing fiber).
+      subscribeProvider(provider)
     })
-    const offProviderRemoved = ctx.on('feishu/provider-removed', () => {
-      if (waitingForProvider) return
-      // The channel's provider is gone: re-open on a remaining provider, or
-      // wait for the next registration. This path never throws — a teardown
-      // reaction must not fail the unloading fiber.
-      closeReceiveChannel()
-      try {
-        waitingForProvider = !openReceiveChannel()
-      } catch (error: unknown) {
-        waitingForProvider = true
-        ctx.logger.warn('feishu-receive: receive channel closed and cannot reopen: %s', String(error))
-      }
+    const offProviderRemoved = ctx.on('feishu/provider-removed', (id) => {
+      const dispose = receiveDisposers.get(id)
+      if (dispose === undefined) return
+      receiveDisposers.delete(id)
+      dispose()
     })
 
     return () => {
-      closeReceiveChannel()
       offProviderAdded()
       offProviderRemoved()
+      for (const dispose of receiveDisposers.values()) dispose()
+      receiveDisposers.clear()
       for (const handle of created) void handle.dispose()
     }
   }, 'feishu-receive.startReceiving()')

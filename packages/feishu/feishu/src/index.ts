@@ -212,17 +212,55 @@ export class FeishuRuntime extends Service {
     }
     const disposers: Array<() => void> = []
     for (const provider of receivables) {
-      const dispose = provider.startReceiving((event) => {
-        if (event.providerId !== undefined && event.chatId.length > 0) {
-          this.chatProvider.set(event.chatId, event.providerId)
-        }
-        handler(event)
-      })
-      disposers.push(dispose)
+      disposers.push(this.subscribeProviderReceiving(provider, handler))
     }
     return () => {
       for (const dispose of disposers) dispose()
     }
+  }
+
+  /**
+   * Subscribe one registered provider's receive channel, recording each inbound
+   * event's chat → provider binding so a reply routes back through the same app.
+   * Unlike {@link startReceivingAll}, this targets a single provider, so a
+   * consumer can add a provider that registered after the channel opened (e.g. a
+   * bot added through the settings UI after boot) without re-subscribing — and
+   * double-delivering to — the providers already receiving.
+   * @param provider - the registered provider to receive from.
+   * @param handler - the callback for each received {@link FeishuReceiveEvent}.
+   * @returns a disposer that stops this provider's subscription.
+   */
+  startReceivingProvider(provider: FeishuProvider, handler: FeishuReceiveHandler): () => void {
+    if (provider.startReceiving === undefined) {
+      throw new FeishuError(
+        `Feishu provider "${provider.id}" does not support receiving messages`,
+        'FEISHU_RECEIVE_UNSUPPORTED',
+      )
+    }
+    return this.subscribeProviderReceiving(
+      provider as FeishuProvider & { startReceiving: NonNullable<FeishuProvider['startReceiving']> },
+      handler,
+    )
+  }
+
+  /**
+   * Record an inbound event's chat → provider binding, then invoke the handler.
+   * Shared by {@link startReceivingAll} and {@link startReceivingProvider} so a
+   * reply to a chat always routes back through the provider that received it.
+   * @param provider - the provider whose `startReceiving` accepts the handler.
+   * @param handler - the callback for each received {@link FeishuReceiveEvent}.
+   * @returns the provider's own subscription disposer.
+   */
+  private subscribeProviderReceiving(
+    provider: FeishuProvider & { startReceiving: NonNullable<FeishuProvider['startReceiving']> },
+    handler: FeishuReceiveHandler,
+  ): () => void {
+    return provider.startReceiving((event) => {
+      if (event.providerId !== undefined && event.chatId.length > 0) {
+        this.chatProvider.set(event.chatId, event.providerId)
+      }
+      handler(event)
+    })
   }
 
   /**

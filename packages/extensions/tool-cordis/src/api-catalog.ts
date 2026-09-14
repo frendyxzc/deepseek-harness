@@ -930,6 +930,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'a disposer that stops every channel this call opened.',
       },
       {
+        signature: 'startReceivingProvider(provider: FeishuProvider, handler: FeishuReceiveHandler): () => void',
+        description: 'Subscribe one registered provider\'s receive channel, recording each inbound event\'s chat → provider binding so a reply routes back through the same app. Unlike startReceivingAll, this targets a single provider, so a consumer can add a provider that registered after the channel opened (e.g. a bot added through the settings UI after boot) without re-subscribing — and double-delivering to — the providers already receiving.',
+        parameters: [{ name: 'provider', description: 'the registered provider to receive from.' }, { name: 'handler', description: 'the callback for each received {@link FeishuReceiveEvent}.' }],
+        returns: 'a disposer that stops this provider\'s subscription.',
+      },
+      {
         signature: 'startReceivingCardActions(handler: FeishuCardActionHandler): () => void',
         description: 'Start receiving card button actions through the selected provider. Resolves the provider at call time with the selection rules above; throws FeishuError `FEISHU_RECEIVE_UNSUPPORTED` when the provider has no `startReceivingCardActions`. Card actions share the provider\'s receive channel with startReceiving subscribers.',
         parameters: [{ name: 'handler', description: 'the callback for each received {@link FeishuCardActionEvent}.' }],

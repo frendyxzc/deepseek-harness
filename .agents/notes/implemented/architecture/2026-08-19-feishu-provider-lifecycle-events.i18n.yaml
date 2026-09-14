@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-feishu-provider-lifecycle-events.md
-2026-08-19-feishu-provider-lifecycle-events.md: a871f2d47a94f637c3e45f90d975508a6b81e3b1
-2026-08-19-feishu-provider-lifecycle-events.zh.md: 26b6069def1ac0cd7c7d783b0c96aeff480e7604
+2026-08-19-feishu-provider-lifecycle-events.md: 9cbfac2ffaeafb89db36063eeb11e0586e03dc55
+2026-08-19-feishu-provider-lifecycle-events.zh.md: 6800788f67a533f3e55f670dd9dabe911774f07f

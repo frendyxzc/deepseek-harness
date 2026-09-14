@@ -17,7 +17,7 @@ Status: implemented
 - **`feishu/provider-added(provider)`** —— 提供方提交进 `ctx.feishu` 注册表。由 `registerProvider` 在注册存储提供方之后发出；抛出异常的监听器会回滚已让出的 rollback，注册因此响亮失败。
 - **`feishu/provider-removed(id)`** —— 提供方离开注册表（注册它的 fiber 被处置——卸载或 HMR 重载）。从注册的 disposer 中发出。
 
-两个接收消费方都镜像注册表而不是假设顺序。各自的 `apply` 尝试打开自己的通道；当尚无可用提供方注册时，等待 `feishu/provider-added` 在注册时打开通道。当通道的提供方离开时，`feishu/provider-removed` 关闭通道并在剩余提供方上重新打开——或者恢复等待。等待只吸收 `FEISHU_PROVIDER_UNAVAILABLE` 与 `FEISHU_PROVIDER_CONFIGURED_MISSING` 这两个表示“尚无可用提供方”的错误码；已注册但无法承载通道的提供方（`FEISHU_RECEIVE_UNSUPPORTED` 及一切其他错误）仍在最早可解决的点响亮失败——抛出的 added 监听器回滚该提供方的注册。刻意不再留下任何需要文档化的加载顺序要求：事件让顺序问题消失，而不是把它钉死。
+两个接收消费方都镜像注册表而不是假设顺序。各自的 `apply` 尝试打开自己的通道；当尚无可用提供方注册时，等待 `feishu/provider-added` 在注册时打开通道。当通道的提供方离开时，`feishu/provider-removed` 关闭通道并在剩余提供方上重新打开——或者恢复等待——这适用于卡片动作消费方；而消息消费方改为每个提供方各保留一个订阅，在每个提供方注册时就添加（即使通道已打开），并在提供方离开时只释放该提供方的订阅（[bug-fix Note](../bug-fix/2026-09-14-feishu-receive-late-bot-subscription.zh.md)）。等待只吸收 `FEISHU_PROVIDER_UNAVAILABLE` 与 `FEISHU_PROVIDER_CONFIGURED_MISSING` 这两个表示“尚无可用提供方”的错误码；已注册但无法承载通道的提供方（`FEISHU_RECEIVE_UNSUPPORTED` 及一切其他错误）仍在最早可解决的点响亮失败——抛出的 added 监听器回滚该提供方的注册。刻意不再留下任何需要文档化的加载顺序要求：事件让顺序问题消失，而不是把它钉死。
 
 ## 备选方案
 
@@ -30,5 +30,5 @@ Status: implemented
 ## 后果
 
 - `feishu/provider-added`/`-removed` 补全了 seam 的注册表词汇：从命名提供方派生状态的消费方改为对事件反应，而不是在 `apply` 时读取注册表；`dsh-feishu-approval` 与 `dsh-feishu-receive` 是参考实现。参见[事件目录](../../../../docs/subsystems/feishu.zh.md)与[生产者/消费者映射](../../../../docs/event-producer-consumer.zh.md)。
-- **新增响亮失败；移除被包含。** added 监听器可以回滚注册；removed 监听器在处置期间运行，因此消费方在那里绝不抛出——两个消费方都防御性地关闭并重开，记录日志而不使卸载中的 fiber 失败。
+- **新增响亮失败；移除被包含。** added 监听器可以回滚注册；removed 监听器在处置期间运行，因此消费方在那里绝不抛出——卡片动作消费方防御性地关闭并重开，消息消费方只释放离开提供方的订阅，记录日志而不使卸载中的 fiber 失败。
 - **存在通道关闭的窗口。** 当没有可用提供方注册时，消费方记录警告且无法接收——但此时也不存在任何飞书聊天 agent（接收路由器需要同一个提供方），因此不可能有卡片或消息在途。诚实状态与实际缺席一致。
