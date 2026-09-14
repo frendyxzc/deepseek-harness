@@ -347,6 +347,19 @@ describe('FeishuRuntime multi-provider receive routing', () => {
     stop()
   })
 
+  it('routes a one-on-one (p2p) reply back through the provider that received it', async () => {
+    let aHandler: ((event: FeishuReceiveEvent) => void) | undefined
+    const { feishu } = await mountFeishu()
+    feishu.registerProvider(makeProvider('bot-a', available, req => Promise.resolve(sendResult(`a:${req.content}`)), (h) => { aHandler = h; return () => {} }))
+    feishu.registerProvider(makeProvider('bot-b', available, req => Promise.resolve(sendResult(`b:${req.content}`)), () => () => {}))
+    const stop = feishu.startReceivingAll(() => {})
+
+    // A p2p reply targets the sender's open_id, which differs from the chat id.
+    aHandler!({ eventType: 'im.message.receive_v1', senderId: 'ou_1', senderIdType: 'open_id', chatId: 'oc_1', chatType: 'p2p', content: 'hi', providerId: 'bot-a', raw: {} })
+    await expect(feishu.sendMessage({ receiveId: 'ou_1', receiveIdType: 'open_id', content: 'reply' })).resolves.toMatchObject({ messageId: 'a:reply' })
+    stop()
+  })
+
   it('routes a send carrying an explicit providerId', async () => {
     const { feishu } = await mountFeishu()
     feishu.registerProvider(makeProvider('bot-a', available, req => Promise.resolve(sendResult(`a:${req.content}`))))

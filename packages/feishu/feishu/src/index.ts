@@ -191,9 +191,10 @@ export class FeishuRuntime extends Service {
 
   /**
    * Start receiving from every registered provider that can receive. Each
-   * inbound event is stamped with its provider id and recorded against its chat
-   * id, so a reply to that chat routes back through the same app. Returns a
-   * combined disposer that closes every opened channel.
+   * inbound event is stamped with its provider id and recorded against its
+   * reply target (the chat id, or the sender id for a one-on-one chat), so a
+   * reply always routes back through the same app. Returns a combined disposer
+   * that closes every opened channel.
    * @param handler - the callback for each received {@link FeishuReceiveEvent}.
    * @returns a disposer that stops every channel this call opened.
    */
@@ -221,11 +222,11 @@ export class FeishuRuntime extends Service {
 
   /**
    * Subscribe one registered provider's receive channel, recording each inbound
-   * event's chat → provider binding so a reply routes back through the same app.
-   * Unlike {@link startReceivingAll}, this targets a single provider, so a
-   * consumer can add a provider that registered after the channel opened (e.g. a
-   * bot added through the settings UI after boot) without re-subscribing — and
-   * double-delivering to — the providers already receiving.
+   * event's reply-target → provider binding so a reply routes back through the
+   * same app. Unlike {@link startReceivingAll}, this targets a single provider,
+   * so a consumer can add a provider that registered after the channel opened
+   * (e.g. a bot added through the settings UI after boot) without re-subscribing
+   * — and double-delivering to — the providers already receiving.
    * @param provider - the registered provider to receive from.
    * @param handler - the callback for each received {@link FeishuReceiveEvent}.
    * @returns a disposer that stops this provider's subscription.
@@ -244,9 +245,11 @@ export class FeishuRuntime extends Service {
   }
 
   /**
-   * Record an inbound event's chat → provider binding, then invoke the handler.
-   * Shared by {@link startReceivingAll} and {@link startReceivingProvider} so a
-   * reply to a chat always routes back through the provider that received it.
+   * Record an inbound event's reply-target → provider binding, then invoke the
+   * handler. Shared by {@link startReceivingAll} and {@link startReceivingProvider}
+   * so a reply always routes back through the provider that received it. A reply
+   * targets the chat id for a group chat and the sender's id for a one-on-one
+   * (p2p) chat, so both keys are recorded when the event carries them.
    * @param provider - the provider whose `startReceiving` accepts the handler.
    * @param handler - the callback for each received {@link FeishuReceiveEvent}.
    * @returns the provider's own subscription disposer.
@@ -256,8 +259,15 @@ export class FeishuRuntime extends Service {
     handler: FeishuReceiveHandler,
   ): () => void {
     return provider.startReceiving((event) => {
-      if (event.providerId !== undefined && event.chatId.length > 0) {
+      if (event.providerId === undefined) {
+        handler(event)
+        return
+      }
+      if (event.chatId.length > 0) {
         this.chatProvider.set(event.chatId, event.providerId)
+      }
+      if (event.chatType === 'p2p' && event.senderId.length > 0) {
+        this.chatProvider.set(event.senderId, event.providerId)
       }
       handler(event)
     })
