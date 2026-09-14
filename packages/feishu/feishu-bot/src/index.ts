@@ -155,7 +155,10 @@ interface ResolvedEntry extends FeishuBotEntry {
 
 /**
  * Resolve the credential fields for one bot from the credentials list by id, or
- * the flat single-app fields when there is no per-bot credential list.
+ * the flat single-app fields for the flat single-app provider id. A named bot
+ * without a matching credential entry falls through empty so
+ * {@link resolveOptions} derives its App Secret from the per-id reference
+ * (never the flat app's), matching {@link feishuAppSecretRef}.
  * @param config - the currently authoritative composition config.
  * @param botId - the bot id whose credentials to resolve.
  * @returns the credential fields, possibly empty.
@@ -163,7 +166,7 @@ interface ResolvedEntry extends FeishuBotEntry {
 function credentialFor(config: Config, botId: string): CredentialLike {
   const match = config.credentials?.find(credential => credential.id === botId)
   if (match !== undefined) return match
-  if (botId === FEISHU_BOT_PROVIDER_ID || config.credentials === undefined || config.credentials.length === 0) {
+  if (botId === FEISHU_BOT_PROVIDER_ID) {
     return {
       ...(config.appSecret === undefined ? {} : { appSecret: config.appSecret }),
       ...(config.appIdEnv === undefined ? {} : { appIdEnv: config.appIdEnv }),
