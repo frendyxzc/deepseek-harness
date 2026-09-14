@@ -429,6 +429,19 @@ describe('FeishuBotProvider.startReceiving', () => {
     await expect(provider.status()).resolves.toMatchObject({ state: 'error' })
   })
 
+  it('clears a recorded connection failure when the connection re-establishes (onReady)', async () => {
+    const provider = new FeishuBotProvider(options())
+    provider.startReceiving(() => {})
+    await flush()
+    const params = sdkMock.clients[0]!.params
+    const onError = params.onError as (error: Error) => void
+    const onReady = params.onReady as () => void
+    onError(new Error('connection refused'))
+    await expect(provider.status()).resolves.toMatchObject({ state: 'error' })
+    onReady()
+    await expect(provider.status()).resolves.toMatchObject({ state: 'connected' })
+  })
+
   it('records a setup failure when credential resolution rejects', async () => {
     const errorLogger = vi.fn()
     const provider = new FeishuBotProvider(() => ({

@@ -137,7 +137,7 @@ export class FeishuBotProvider implements FeishuProvider {
 
   private cachedToken: string | undefined
   private tokenExpiresAt = 0
-  /** The most recent recorded operation failure; cleared by a successful send. */
+  /** The most recent recorded operation failure; cleared by a successful send, authentication, or receive connection. */
   private lastError: string | undefined
   /** The App ID resolved by the most recent successful authentication. */
   private lastResolvedAppId: string | undefined
@@ -567,9 +567,15 @@ export class FeishuBotProvider implements FeishuProvider {
         autoReconnect: true,
         loggerLevel: sdk.LoggerLevel.warn,
         source: 'deepseek-harness',
-        onReady: () => logger?.debug('feishu long connection established'),
+        onReady: () => {
+          this.lastError = undefined
+          logger?.debug('feishu long connection established')
+        },
         onReconnecting: () => logger?.warn('feishu long connection reconnecting'),
-        onReconnected: () => logger?.info('feishu long connection reconnected'),
+        onReconnected: () => {
+          this.lastError = undefined
+          logger?.info('feishu long connection reconnected')
+        },
         onError: (error: Error) => {
           this.lastError = `Feishu long connection failed: ${String(error)}`
           logger?.error(`feishu long connection failed: ${String(error)}`)
@@ -642,6 +648,7 @@ export class FeishuBotProvider implements FeishuProvider {
 
     this.cachedToken = body.tenant_access_token
     this.lastResolvedAppId = appId
+    this.lastError = undefined
     // Default to 2 hours when expire is absent; subtract 60s for safety margin.
     this.tokenExpiresAt = Date.now() + ((body.expire ?? 7200) - 60) * 1000
     return this.cachedToken
