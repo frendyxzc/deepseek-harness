@@ -30,8 +30,13 @@ export type { FeishuBotProviderOptions, FeishuLogger, FeishuWsClient } from './p
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'feishu-bot'
 
-/** The Feishu seam this provider registers into. */
-export const inject = ['feishu']
+/**
+ * Services this provider needs before activation: the Feishu seam it registers
+ * into, and the credential store whose file-backed references must finish their
+ * asynchronous initial load before any provider resolves an App Secret (a bot
+ * registered before that load sees an empty store and fails with a missing secret).
+ */
+export const inject = ['feishu', 'credentials']
 
 /** Settings namespace carrying the per-bot identity/mapping (no secrets). */
 export const FEISHU_BOT_SETTINGS_NAMESPACE = 'feishu-bot'

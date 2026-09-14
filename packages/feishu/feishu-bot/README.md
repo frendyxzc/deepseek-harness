@@ -32,6 +32,8 @@ The provider resolves each credential per operation in this order:
 
 When a bot's `credentials` entry names no `appSecretEnv`, `appSecretEnv` defaults to `feishuAppSecretRef(id)` — the flat `FEISHU_APP_SECRET` for `feishu-bot`, or a per-bot `FEISHU_APP_SECRET_<BOT_ID>` derived from the sanitized id otherwise. The Settings IM tab writes each bot's secret under this same reference, so a secret entered there reaches the provider's next operation.
 
+The plugin declares `credentials` in its `inject`, so Cordis finishes the credential store's asynchronous `.credentials.yaml` load before any provider registers; a provider that resolved before that load would read an empty store and fail with a missing App Secret.
+
 The tenant access token is cached and refreshed on expiry, with a 60-second safety margin.
 
 ## Receiving

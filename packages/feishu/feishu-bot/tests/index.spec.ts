@@ -10,6 +10,13 @@ import FeishuRuntime from '@deepseek-ai/dsh-feishu'
 import * as FeishuBot from '../src/index.ts'
 
 describe('feishu-bot multi-bot credential resolution', () => {
+  it('declares credentials in its inject so file-backed secrets load before providers register', () => {
+    // The credential store loads `.credentials.yaml` asynchronously; declaring
+    // the dependency forces Cordis to finish that load before `apply` registers
+    // providers, so a boot-time receive channel never reads an empty store.
+    expect(FeishuBot.inject).toEqual(['feishu', 'credentials'])
+  })
+
   it('resolves a named bot App Secret under its per-id reference, not the flat reference', async () => {
     const ctx = new Context()
     await ctx.plugin(FeishuRuntime, {})

@@ -32,6 +32,8 @@
 
 当某 bot 的 `credentials` 项未命名 `appSecretEnv` 时，`appSecretEnv` 默认取 `feishuAppSecretRef(id)`——`feishu-bot` 为平铺的 `FEISHU_APP_SECRET`，否则为由规范化 id 派生的 `FEISHU_APP_SECRET_<BOT_ID>`。设置里的 IM 页以同一引用保存每个 bot 的 App Secret，因此在此处填写的秘密会到达提供方的下一次操作。
 
+该插件在其 `inject` 中声明了 `credentials`，因此 Cordis 会在任何提供方注册之前完成凭据存储对 `.credentials.yaml` 的异步加载；若在那个加载之前解析，提供方会读到空存储并以缺失 App Secret 失败。
+
 租户 access token 被缓存并在到期时刷新，留 60 秒安全余量。
 
 ## 接收
