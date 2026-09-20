@@ -377,7 +377,7 @@ describe('feishu-approval', () => {
     const child = ctx.sessions.create(SessionId('feishu-child'), { meta: { parentSession: chat.session.id } })
     child.append('turn/start', { turn: 1 })
     const childAgent = { session: child } as unknown as Agent
-    ctx.emit('agent/created', { agent: childAgent })
+    ctx.emit('agent/created', { source: 'startup', agent: childAgent })
 
     const pending = ctx.approval.request(requestOf(childAgent))
     await vi.waitFor(() => { expect(sent).toHaveLength(1) })

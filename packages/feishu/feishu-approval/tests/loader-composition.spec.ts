@@ -86,6 +86,7 @@ async function loadComposition(approvalConfig: string[] = []): Promise<{ ctx: Co
   await writeConfig(configPath, base, approvalConfig)
 
   const ctx = new Context()
+  ctx.provide('credentials', { resolve: async () => undefined } as never)
   context = ctx
   ctx.baseUrl = pathToFileURL(root).href + '/'
   await ctx.plugin(Loader)

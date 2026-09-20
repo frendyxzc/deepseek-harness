@@ -76,6 +76,7 @@ async function loadComposition(): Promise<{ ctx: Context; base: string }> {
   ].join('\n'))
 
   const ctx = new Context()
+  ctx.provide('credentials', { resolve: async () => undefined } as never)
   context = ctx
   ctx.baseUrl = pathToFileURL(root).href + '/'
   await ctx.plugin(Loader)

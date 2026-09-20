@@ -527,7 +527,7 @@ describe('feishu-question', () => {
     child.append('turn/start', { turn: 1 })
     const childAgent = { id: 'feishu-child', session: child } as unknown as Agent
     ctx.agents.enter(childAgent, undefined)
-    ctx.emit('agent/created', { agent: childAgent })
+    ctx.emit('agent/created', { source: 'startup', agent: childAgent })
 
     const pending = ctx.userQuestions.ask({ questions: [singleSelect()], agent: childAgent })
     await vi.waitFor(() => { expect(sent).toHaveLength(1) })
@@ -541,7 +541,7 @@ describe('feishu-question', () => {
     const { ctx, fiber } = await mountQuestion()
     // A created agent without any parent session: nothing to inherit.
     const orphan = chatAgent(ctx, 'feishu-orphan')
-    ctx.emit('agent/created', { agent: orphan })
+    ctx.emit('agent/created', { source: 'startup', agent: orphan })
 
     // A created agent whose parent is not bound to a chat either.
     const unboundParent = ctx.sessions.create(SessionId('feishu-unbound'))
@@ -549,7 +549,7 @@ describe('feishu-question', () => {
     stranger.append('turn/start', { turn: 1 })
     const strangerAgent = { id: 'feishu-stranger', session: stranger } as unknown as Agent
     ctx.agents.enter(strangerAgent, undefined)
-    ctx.emit('agent/created', { agent: strangerAgent })
+    ctx.emit('agent/created', { source: 'startup', agent: strangerAgent })
 
     await expect(ctx.userQuestions.ask({ questions: [singleSelect()], agent: strangerAgent }))
       .rejects.toMatchObject({ name: 'UserQuestionError', code: 'NO_PROVIDER' })
