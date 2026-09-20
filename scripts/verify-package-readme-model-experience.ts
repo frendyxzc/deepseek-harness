@@ -214,6 +214,10 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/feishu/feishu-approval': { kind: 'indirect', reason: 'The answerer renders approval cards to the human in Feishu; ApprovalService owns the model-facing approval policy text and audit pair.' },
   'packages/feishu/feishu-question': { kind: 'indirect', reason: 'The answerer renders question cards to the human in Feishu; parsed answers return through UserQuestionService.ask() to the waiting tool call.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
+  'packages/feishu/feishu-status': { kind: 'none', reason: 'Host-only status projection of the Feishu receive channel; it registers no prompt, tool, message, or provider request.' },
+  'packages/llm/tdai-memory': { kind: 'none', reason: 'The resolved team/agent/task identity reaches the proxy only as model-hidden HTTP request headers; it registers no prompt, tool schema, or session event.' },
+  'packages/client/ui-settings-memory': { kind: 'none', reason: 'Browser-side settings page rendering one fixed panel jump link; registers nothing model-facing.' },
+  'packages/client/ui-settings-im': { kind: 'none', reason: 'Browser-side settings surface editing the feishu-bot team/agent mapping; the stored ids reach a model only as headers another package adds.' },
 }
 
 interface Failure {

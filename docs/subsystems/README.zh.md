@@ -49,6 +49,7 @@
 | [agent-team.md](agent-team.zh.md) | Agent Teams：隐式 Lead 身份、具名 continuable teammate、持久 peer mailbox 与共享任务 DAG |
 | [web.md](web.zh.md) | Web 访问 seam：`WebSearchRequest`/`Result`、`WebFetchRequest`/`Result`、`WebFetchBody`、提供方可用性、`WebError` |
 | [feishu.md](feishu.zh.md) | 飞书（Feishu/Lark）聊天 seam：`FeishuSendRequest`/`Result`、`FeishuReceiveEvent`、提供方可用性、`FeishuError` |
+| [tdai-memory.md](tdai-memory.zh.md) | TDAI MemoryProxy 身份 seam：`ctx.tdaiMemory`、按机器人的团队/智能体请求头、会话绑定、`listTeams` / `listAgents` Remote |
 | [spill.md](spill.zh.md) | spill 存储 seam：`SaveTextSpill`、`SpillOwner`/`SpillSource`、`SpillRef`、品牌类型 `SpillLocator` |
 | [workflow.md](workflow.zh.md) | 工作流 seam：`WorkflowStartRequest`、`WorkflowMeta`、`WorkflowRun`/`Result`、`workflow/*` 事件载荷、`WorkflowError` 致命性 |
 | [jobs.md](jobs.zh.md) | 后台任务运行时：品牌化 `JobId`、producer 约定、消费方视图和 `ctx.jobs` 服务行为 |

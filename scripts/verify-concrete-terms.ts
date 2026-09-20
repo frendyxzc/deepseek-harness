@@ -7,7 +7,8 @@ import { pathToFileURL } from 'node:url'
 
 const root = resolve(import.meta.dirname, '..')
 const blockedTerm = 'prove' + 'nance'
-const excludedPrefixes = ['vendor/', '.agents/notes/archived/'] as const
+// `.qoder/` is the committed Qoder-generated repo wiki: derived content, not maintained prose.
+const excludedPrefixes = ['vendor/', '.agents/notes/archived/', '.qoder/'] as const
 
 /** One blocked term occurrence in a tracked path or text line. */
 export interface ConcreteTermViolation {

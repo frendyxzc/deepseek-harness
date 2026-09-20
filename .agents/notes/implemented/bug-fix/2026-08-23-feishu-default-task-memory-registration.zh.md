@@ -6,7 +6,7 @@ Status: implemented
 
 ## Problem
 
-`dsh-tdai-memory` 原本只发送 `x-team-id` / `x-agent-id`，把任务留给代理按会话决定（如 [per-Feishu-bot 身份 note](../../feature/2026-08-23-per-feishu-app-tdai-memory-identity.md) 所记录）。但代理的头自动选择（`sessionInit.headerAutoSelect`）只有在 team、agent、task 三者都解析出来时（`resolvePresetIdentity.canRegister`）才会直接登记会话；只有 team + agent 时会落入 `agent_select` 表单，而 dsh 表单拒绝单智能体团队（`agent stage requires ≥2 agents`）。于是单智能体团队上的飞书会话会耗尽 `sessionInit.maxRetries`，被封印为 `bypassed` 终态：代理跳过注入、永不写 L0 对话记忆；而同一团队上不带头的 Web 会话却能自动选中唯一智能体与任务 `none`，正常记录记忆。
+`dsh-tdai-memory` 原本只发送 `x-team-id` / `x-agent-id`，把任务留给代理按会话决定（如 [per-Feishu-bot 身份 note](../feature/2026-08-23-per-feishu-app-tdai-memory-identity.zh.md) 所记录）。但代理的头自动选择（`sessionInit.headerAutoSelect`）只有在 team、agent、task 三者都解析出来时（`resolvePresetIdentity.canRegister`）才会直接登记会话；只有 team + agent 时会落入 `agent_select` 表单，而 dsh 表单拒绝单智能体团队（`agent stage requires ≥2 agents`）。于是单智能体团队上的飞书会话会耗尽 `sessionInit.maxRetries`，被封印为 `bypassed` 终态：代理跳过注入、永不写 L0 对话记忆；而同一团队上不带头的 Web 会话却能自动选中唯一智能体与任务 `none`，正常记录记忆。
 
 ## Decision
 
