@@ -1,20 +1,21 @@
 /* Multi-bot configuration card, mirroring the dsh-im Feishu bot cards. */
 
 .card {
-  border: 1px solid var(--dsw-alias-border-l2);
+  --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
+  border: 0;
   border-radius: 14px;
   background: var(--dsw-alias-bg-layer-3);
-  box-shadow: var(--dsw-shadow-lv1);
-  transition: border-color 0.16s ease, background 0.16s ease;
+  box-shadow: var(--dsw-elevation-panel);
+  transition: box-shadow 0.16s ease, background 0.16s ease;
 }
 
 .card:hover {
-  border-color: var(--dsw-alias-label-dimmed);
+  --dsw-elevation-stroke-color: var(--dsw-alias-label-dimmed);
 }
 
 .cardOpen {
+  --dsw-elevation-stroke-color: var(--dsw-alias-label-dimmed);
   background: var(--dsw-alias-bg-layer-2);
-  border-color: var(--dsw-alias-label-dimmed);
 }
 
 .header {
@@ -63,6 +64,7 @@
 .pending {
   flex: none;
   border-radius: 999px;
+  corner-shape: round;
   padding: 1px 8px;
   font-size: 11px;
   line-height: 17px;
@@ -112,7 +114,7 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border: 1px solid var(--dsw-alias-border-l1);
+  border: 0.5px solid var(--dsw-alias-border-l1);
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-1);
 }
@@ -130,7 +132,7 @@
   height: 40px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
   background: var(--dsw-alias-bg-layer-3);
 }
@@ -194,7 +196,7 @@
   box-sizing: border-box;
   height: 34px;
   padding: 0 12px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   background: var(--dsw-alias-bg-layer-3);
   font: inherit;
@@ -230,6 +232,7 @@
   gap: 7px;
   padding: 4px 10px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-secondary);
   font-size: 12px;
@@ -242,6 +245,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  corner-shape: round;
   background: var(--dsw-alias-label-tertiary);
 }
 
@@ -262,7 +266,7 @@
 .discard,
 .save {
   appearance: none;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   padding: 5px 14px;
   font: inherit;
@@ -291,7 +295,7 @@
   align-items: center;
   gap: 8px;
   padding-top: 12px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .failed {
