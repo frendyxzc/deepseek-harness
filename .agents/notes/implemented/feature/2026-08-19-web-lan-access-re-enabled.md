@@ -6,7 +6,7 @@ English | [中文](2026-08-19-web-lan-access-re-enabled.zh.md)
 
 ## Problem
 
-The web app had shipped `--host 0.0.0.0` as the explicit all-interfaces opt-in ([web bind address](2026-07-22-web-bind-address.md)) and built the `/api` trust fence around it ([api browser-trust boundary](../architecture/2026-07-28-api-browser-trust-boundary.md)). A later review made the command provider reject that flag with a remote-code-execution warning and rewrote the READMEs to say the flag is unsupported until authentication exists, but recorded none of that rationale in an Agent Note. Code and docs therefore contradicted the two design notes, while LAN-browser use — the workflow the flag exists for — had no supported path.
+The web app had shipped `--host 0.0.0.0` as the explicit all-interfaces opt-in ([web bind address](../../archived/feature/2026-07-22-web-bind-address.md)) and built the `/api` trust fence around it ([api browser-trust boundary](../architecture/2026-07-28-api-browser-trust-boundary.md)). A later review made the command provider reject that flag with a remote-code-execution warning and rewrote the READMEs to say the flag is unsupported until authentication exists, but recorded none of that rationale in an Agent Note. Code and docs therefore contradicted the two design notes, while LAN-browser use — the workflow the flag exists for — had no supported path.
 
 ## Decision
 
@@ -18,7 +18,7 @@ The web app had shipped `--host 0.0.0.0` as the explicit all-interfaces opt-in (
 
 **Add an authentication layer now.** Rejected as out of scope — it is a separate, larger decision left as deferred work; this change alters only reachability, not the fence.
 
-**Make `0.0.0.0` the default.** Rejected for the same reason as the [web bind address](2026-07-22-web-bind-address.md) decision: same-machine use should not become network-wide implicitly.
+**Make `0.0.0.0` the default.** Rejected for the same reason as the [web bind address](../../archived/feature/2026-07-22-web-bind-address.md) decision: same-machine use should not become network-wide implicitly.
 
 ## Consequences
 

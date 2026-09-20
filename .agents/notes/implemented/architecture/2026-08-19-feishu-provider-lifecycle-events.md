@@ -12,7 +12,7 @@ Resolving the provider at `apply` time creates an implicit load-order requiremen
 
 ## Decision
 
-The Feishu seam announces registry membership as typed events, mirroring the [subagent provider-lifecycle events](2026-07-05-subagent-provider-lifecycle-events.md):
+The Feishu seam announces registry membership as typed events, mirroring the [subagent provider-lifecycle events](../../archived/architecture/2026-07-05-subagent-provider-lifecycle-events.md):
 
 - **`feishu/provider-added(provider)`** — a provider committed to the `ctx.feishu` registry. Emitted by `registerProvider` after the registration stores the provider; a throwing listener unwinds the yielded rollback, so the registration fails loud.
 - **`feishu/provider-removed(id)`** — a provider left the registry (its registering fiber was disposed — an unload or an HMR reload). Emitted from the registration's disposer.

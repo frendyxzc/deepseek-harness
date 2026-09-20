@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-web-lan-access-re-enabled.md
-2026-08-19-web-lan-access-re-enabled.md: 6fc1a95f4cb88760a99c5ef3cfa51fc6d2e978f3
-2026-08-19-web-lan-access-re-enabled.zh.md: 829f755ea830c0040c58160a9d618d5d8d058da5
+2026-08-19-web-lan-access-re-enabled.md: a9ce46731793959f6cb7fbb9e1bdb2df2a3a2a0a
+2026-08-19-web-lan-access-re-enabled.zh.md: 387d82903d21fc89d93b5cc89cac31f38f01100a

@@ -12,7 +12,7 @@ Status: implemented
 
 ## 决策
 
-飞书 seam 以类型化事件公告注册表成员关系，与 [subagent 提供方生命周期事件](2026-07-05-subagent-provider-lifecycle-events.zh.md) 平行：
+飞书 seam 以类型化事件公告注册表成员关系，与 [subagent 提供方生命周期事件](../../archived/architecture/2026-07-05-subagent-provider-lifecycle-events.md) 平行：
 
 - **`feishu/provider-added(provider)`** —— 提供方提交进 `ctx.feishu` 注册表。由 `registerProvider` 在注册存储提供方之后发出；抛出异常的监听器会回滚已让出的 rollback，注册因此响亮失败。
 - **`feishu/provider-removed(id)`** —— 提供方离开注册表（注册它的 fiber 被处置——卸载或 HMR 重载）。从注册的 disposer 中发出。
