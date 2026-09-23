@@ -323,7 +323,6 @@ export function apply(ctx: Context, config: Config = {}): void {
       // Preserve resolveTemplate's exact failure value; the caller owns this
       // rejection and inspects it, and the template closure may throw
       // arbitrary values.
-      // oxlint-disable-next-line typescript/prefer-promise-reject-errors
       return Promise.reject(error)
     }
     const { presetId: preset, agentOptions: options, cwd: workingDir } = template
