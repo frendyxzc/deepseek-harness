@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import FeishuRuntime, {
   FeishuError,
+  isFeishuErrorWithCode,
   type FeishuCardActionEvent,
   type FeishuMessage,
   type FeishuMessageResource,
@@ -374,5 +375,19 @@ describe('FeishuError', () => {
     const error = new FeishuError('boom', 'FEISHU_PROVIDER_ERROR')
     expect(error.code).toBe('FEISHU_PROVIDER_ERROR')
     expect(error.name).toBe('FeishuError')
+  })
+})
+
+describe('isFeishuErrorWithCode', () => {
+  it('matches a listed code on a FeishuError and on a foreign module copy', () => {
+    expect(isFeishuErrorWithCode(new FeishuError('none', 'FEISHU_PROVIDER_UNAVAILABLE'), ['FEISHU_PROVIDER_UNAVAILABLE'])).toBe(true)
+    const foreignCopy = Object.assign(new Error('none'), { name: 'FeishuError', code: 'FEISHU_PROVIDER_UNAVAILABLE' })
+    expect(isFeishuErrorWithCode(foreignCopy, ['FEISHU_PROVIDER_UNAVAILABLE', 'FEISHU_PROVIDER_CONFIGURED_MISSING'])).toBe(true)
+  })
+
+  it('rejects other errors and unlisted codes', () => {
+    expect(isFeishuErrorWithCode('FEISHU_PROVIDER_UNAVAILABLE', ['FEISHU_PROVIDER_UNAVAILABLE'])).toBe(false)
+    expect(isFeishuErrorWithCode(new Error('plain'), ['FEISHU_PROVIDER_UNAVAILABLE'])).toBe(false)
+    expect(isFeishuErrorWithCode(new FeishuError('boom', 'FEISHU_PROVIDER_ERROR'), ['FEISHU_PROVIDER_UNAVAILABLE'])).toBe(false)
   })
 })

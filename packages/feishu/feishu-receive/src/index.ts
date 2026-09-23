@@ -19,7 +19,7 @@ import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-presets'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
-import { FeishuError } from '@deepseek-ai/dsh-feishu'
+import { isFeishuErrorWithCode, FeishuError } from '@deepseek-ai/dsh-feishu'
 import type { FeishuProvider, FeishuReceiveEvent, FeishuReceiveIdType } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
@@ -178,7 +178,7 @@ async function collectImageBlocks(ctx: Context, images: readonly DownloadImage[]
       blocks.push({ type: 'image', attachment: ref })
     } catch (error: unknown) {
       // A provider without getMessageResource is a capability gap, not a failure.
-      if (error instanceof FeishuError && error.code === 'FEISHU_RESOURCE_UNSUPPORTED') continue
+      if (isFeishuErrorWithCode(error, ['FEISHU_RESOURCE_UNSUPPORTED'])) continue
       ctx.logger.warn('feishu-receive: failed to read image %s from message %s: %s', image.fileKey, image.messageId, String(error))
     }
   }
@@ -229,7 +229,7 @@ async function resolveReferencedContent(ctx: Context, event: FeishuReceiveEvent)
   } catch (error: unknown) {
     // A provider without getMessage is a capability gap, not a delivery
     // failure; any other failure is logged but must not block the reply.
-    if (!(error instanceof FeishuError && error.code === 'FEISHU_GET_UNSUPPORTED')) {
+    if (!isFeishuErrorWithCode(error, ['FEISHU_GET_UNSUPPORTED'])) {
       ctx.logger.warn('feishu-receive: failed to read referenced message %s: %s', referencedId, String(error))
     }
     console.log(`feishu-receive: referenced ${referencedId} read failed: ${String(error)}`)

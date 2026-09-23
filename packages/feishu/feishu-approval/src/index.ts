@@ -21,7 +21,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-feishu'
-import { FeishuError, type FeishuCardActionEvent } from '@deepseek-ai/dsh-feishu'
+import { isFeishuErrorWithCode, type FeishuCardActionEvent } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu-receive'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
@@ -221,8 +221,7 @@ export function apply(ctx: Context, config: Config): void {
         return true
       } catch (error: unknown) {
         // Not registered (yet) — a provider fiber may still be loading.
-        if (error instanceof FeishuError
-          && (error.code === 'FEISHU_PROVIDER_UNAVAILABLE' || error.code === 'FEISHU_PROVIDER_CONFIGURED_MISSING')) {
+        if (isFeishuErrorWithCode(error, ['FEISHU_PROVIDER_UNAVAILABLE', 'FEISHU_PROVIDER_CONFIGURED_MISSING'])) {
           return false
         }
         throw error

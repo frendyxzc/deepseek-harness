@@ -67,6 +67,22 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/**
+ * Decide whether a caught failure is a {@link FeishuError} carrying one of
+ * `codes`. Route on the stable `code` and class `name` rather than
+ * `instanceof`, because a dsh profile boot can hold two copies of this seam
+ * at once (the Loader imports plugin entries from the built artifact plane
+ * while tsx's source-launch path rewrite pulls consumers to the source
+ * plane), and a class check across those copies is always false.
+ * @param error - the caught failure.
+ * @param codes - the machine codes that count as a match.
+ * @returns whether the error is a FeishuError with one of these codes.
+ */
+export function isFeishuErrorWithCode(error: unknown, codes: readonly string[]): boolean {
+  return error instanceof Error && (error as FeishuError).name === 'FeishuError'
+    && codes.includes((error as FeishuError).code)
+}
+
 /** Selection inputs for execution-time provider resolution. */
 interface Selection<P> {
   /** The configured provider id for this capability, if any. */
