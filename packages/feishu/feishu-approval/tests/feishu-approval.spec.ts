@@ -25,6 +25,8 @@ interface SentMessage {
 
 interface CardControls {
   failSend: boolean
+  /** When set, every card repaint fails, exercising the best-effort catches. */
+  failUpdate: boolean
 }
 
 interface Mounted {
@@ -41,7 +43,7 @@ interface Mounted {
  * provider (records sends/updates, captures the card-action handler) + the
  * approval answerer under test.
  */
-async function mountApproval(config: FeishuApproval.Config = {}): Promise<Mounted> {
+async function mountApproval(config: FeishuApproval.Config = {}, opts: { updateMessage?: false } = {}): Promise<Mounted> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(ApprovalService)
@@ -50,7 +52,7 @@ async function mountApproval(config: FeishuApproval.Config = {}): Promise<Mounte
   const sent: SentMessage[] = []
   const updates: Array<{ messageId: string; content: string }> = []
   const handlers: Array<(event: FeishuCardActionEvent) => void> = []
-  const controls: CardControls = { failSend: false }
+  const controls: CardControls = { failSend: false, failUpdate: false }
   let counter = 0
   ctx.feishu.registerProvider({
     id: 'scripted',
@@ -70,9 +72,12 @@ async function mountApproval(config: FeishuApproval.Config = {}): Promise<Mounte
       handlers.push(handler)
       return () => {}
     },
-    updateMessage: async (messageId, content) => {
-      updates.push({ messageId, content })
-    },
+    ...(opts.updateMessage === false ? {} : {
+      updateMessage: async (messageId, content) => {
+        if (controls.failUpdate) throw new FeishuError('scripted update failure', 'FEISHU_PROVIDER_ERROR')
+        updates.push({ messageId, content })
+      },
+    }),
   })
 
   const fiber = await ctx.plugin(FeishuApproval, config)
@@ -396,6 +401,42 @@ describe('feishu-approval', () => {
 
     await expect(ctx.approval.request(requestOf(agent))).resolves.toBe('allowed-once')
     expect(sent).toHaveLength(0)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('keeps the decision when the settling repaint and the direct redraw both fail', async () => {
+    const { ctx, fiber, sent, updates, tap, controls } = await mountApproval()
+    controls.failUpdate = true
+    const agent = chatAgent(ctx)
+    bindChat(ctx, agent, 'oc_1')
+
+    const pending = ctx.approval.request(requestOf(agent))
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    const card = parseCard(sent[0]!)
+    tap({ value: { action: 'allow', session_id: card.sessionId, nonce: card.allowNonce } })
+    await expect(pending).resolves.toBe('allowed-once')
+    // Both repaint paths failed; nothing reached the wire and the decision stands.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(updates).toHaveLength(0)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('warns without redrawing when neither the seam nor the stamped provider can update', async () => {
+    const { ctx, fiber, sent, updates, tap } = await mountApproval({}, { updateMessage: false })
+    const agent = chatAgent(ctx)
+    bindChat(ctx, agent, 'oc_1')
+
+    const pending = ctx.approval.request(requestOf(agent))
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    const card = parseCard(sent[0]!)
+    tap({ value: { action: 'deny', session_id: card.sessionId, nonce: card.denyNonce } })
+    // The provider cannot update messages: the seam rejects, the direct
+    // redraw is impossible, and the decision still stands.
+    await expect(pending).resolves.toBe('rejected')
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(updates).toHaveLength(0)
     await fiber.dispose()
     await ctx.fiber.dispose()
   })

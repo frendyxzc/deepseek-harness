@@ -1,6 +1,61 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/tool-feishu/README.md
-README.md: c4c8bd84774107e384f10171a557e2eca7647772
-README.zh.md: b7eb36c8a9da425affff47bb6b6d518ecc44e081
+/:
+  en: 420f54775294f720
+  zh: 98cf876af0162261
+/deepseek-ai-dsh-tool-feishu:
+  en: ae104f0c0454a079
+  zh: d4ab9bfeb507b873
+/deepseek-ai-dsh-tool-feishu/summary:
+  en: fbb073d74d5d9765
+  zh: 217bf901617e3e53
+/deepseek-ai-dsh-tool-feishu/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 405b30feaf48c087
+/deepseek-ai-dsh-tool-feishu/use-this-package:
+  en: 5a9beafa9f7e61f2
+  zh: 7e388d63e45605cd
+/deepseek-ai-dsh-tool-feishu/use-this-package/when-to-choose-it:
+  en: 58c6cffa31d9f3c0
+  zh: c72507e906c29d10
+/deepseek-ai-dsh-tool-feishu/use-this-package/minimal-configuration:
+  en: 0e82e18940e4ba51
+  zh: d62f534b76b2ec3f
+/deepseek-ai-dsh-tool-feishu/use-this-package/what-the-tools-do:
+  en: f23d44bf5b507941
+  zh: a1978c79d086ba61
+/deepseek-ai-dsh-tool-feishu/understand-the-implementation:
+  en: bbceab82d198871f
+  zh: ca933f0273150fce
+/deepseek-ai-dsh-tool-feishu/further-exploration:
+  en: ac2293a7ca1113c6
+  zh: 70435f04ea7d8e5c
+/deepseek-ai-dsh-tool-feishu/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-feishu/model-experience/request-context-and-condition:
+  en: cd8530c72534ee6b
+  zh: 16dbf6046e7e51fd
+/deepseek-ai-dsh-tool-feishu/model-experience/request-context-and-condition/what-the-model-sees:
+  en: 076878c3720ab457
+  zh: 9a33577cec310c88
+/deepseek-ai-dsh-tool-feishu/model-experience/request-context-and-condition/what-the-model-sees/system-prompt-guidance-feishu-send-message:
+  en: b16416d3221099c6
+  zh: ab7a45988ad91ed2
+/deepseek-ai-dsh-tool-feishu/model-experience/request-context-and-condition/what-the-model-sees/system-prompt-guidance-feishu-update-message:
+  en: 893eaf07fccba67d
+  zh: 5cd2b5093c5048ae
+/deepseek-ai-dsh-tool-feishu/model-experience/request-context-and-condition/token-effect:
+  en: aa1e7c16c7ce24e7
+  zh: d9c354323cfbb968
+/deepseek-ai-dsh-tool-feishu/model-experience/request-context-and-condition/kv-cache-effect:
+  en: a5aa0cd481fcfce3
+  zh: e913af60cb11a397
+/deepseek-ai-dsh-tool-feishu/known-limitations-and-deferred-work:
+  en: 9d83c00ab1abb51f
+  zh: 80a14905e1cb43c7
+/deepseek-ai-dsh-tool-feishu/known-limitations-and-deferred-work/dev-note:
+  en: f0391d0a4aeaf453
+  zh: f6de0cca6cfe407a

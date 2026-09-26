@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-feishu-approval-cards.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-feishu-approval-cards.md
-2026-08-18-feishu-approval-cards.md: c5e6b5b23ab772b0865212b7381dca57babd162b
-2026-08-18-feishu-approval-cards.zh.md: 05b2f22aa726b0151ddceb78333c39e2c058c0d1
+/agent-note-feishu-approval-cards-remote-tool-approval-for-feishu-chat-agents:
+  en: 52a12a3ff98b92c7
+  zh: 029da333fc304ab0
+/agent-note-feishu-approval-cards-remote-tool-approval-for-feishu-chat-agents/problem:
+  en: 30defc891bb3a54a
+  zh: 2bde2350541e48aa
+/agent-note-feishu-approval-cards-remote-tool-approval-for-feishu-chat-agents/decision:
+  en: d7d61426d99c4563
+  zh: 5bb8c128af77e094
+/agent-note-feishu-approval-cards-remote-tool-approval-for-feishu-chat-agents/alternatives-considered:
+  en: 5ab12336bd77541c
+  zh: c7b9cf5628ed26ac
+/agent-note-feishu-approval-cards-remote-tool-approval-for-feishu-chat-agents/consequences:
+  en: 32ec0631bf85e106
+  zh: 3c7ec6f216a22722

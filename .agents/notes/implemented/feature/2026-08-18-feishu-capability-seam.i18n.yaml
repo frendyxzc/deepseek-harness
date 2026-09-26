@@ -1,6 +1,28 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-feishu-capability-seam.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-feishu-capability-seam.md
-2026-08-18-feishu-capability-seam.md: 6a0192544af36763b5200303c38a5e6c4a770261
-2026-08-18-feishu-capability-seam.zh.md: a617e339bdafd44046e0cd1887894cc64b4431eb
+/agent-note-feishu-capability-seam-send-and-receive-chat:
+  en: 91647e51e28c4049
+  zh: 6369224693cd183a
+/agent-note-feishu-capability-seam-send-and-receive-chat/problem:
+  en: 6515bc51af64b5b6
+  zh: 8507ac6dffda36dc
+/agent-note-feishu-capability-seam-send-and-receive-chat/decision:
+  en: beefb5cb8a0b6609
+  zh: 122568169db9f036
+/agent-note-feishu-capability-seam-send-and-receive-chat/decision/receive-is-startreceiving-not-publisher-subscriber:
+  en: e543e0e44a4fb42f
+  zh: ea8dd8abc3b7eef8
+/agent-note-feishu-capability-seam-send-and-receive-chat/decision/inbound-delivery-routes-each-chat-to-its-own-agent:
+  en: 795ee9072c4a603f
+  zh: 89a7a3f1e129d068
+/agent-note-feishu-capability-seam-send-and-receive-chat/decision/credentials-resolve-per-operation:
+  en: 79f11bfbc8b41713
+  zh: afe90e21da44462a
+/agent-note-feishu-capability-seam-send-and-receive-chat/alternatives-considered:
+  en: c6e50a80a26c13e3
+  zh: 4bc76e887afb3fd6
+/agent-note-feishu-capability-seam-send-and-receive-chat/consequences:
+  en: 67354b35d30fb278
+  zh: 883eebf4792b6a80

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-setup-dsh-memory-stack-node-match.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-setup-dsh-memory-stack-node-match.md
-2026-08-25-setup-dsh-memory-stack-node-match.md: b3e558c0a468f15cc0d7f92dfb11ecb06c7ce840
-2026-08-25-setup-dsh-memory-stack-node-match.zh.md: 246b7853deee45afb5773ca14f74ec3135150bcf
+/agent-note-install-the-memory-stack-under-the-node-the-services-start-on:
+  en: 091b9a400732f711
+  zh: 3653a8c8629323d3
+/agent-note-install-the-memory-stack-under-the-node-the-services-start-on/problem:
+  en: 587e9ee9b21af112
+  zh: cc92729102402634
+/agent-note-install-the-memory-stack-under-the-node-the-services-start-on/decision:
+  en: edaf4e8c4eafd9a3
+  zh: 77d887132dbff060
+/agent-note-install-the-memory-stack-under-the-node-the-services-start-on/alternatives-considered:
+  en: c248a6df00e5994a
+  zh: d30f3d721a05502f
+/agent-note-install-the-memory-stack-under-the-node-the-services-start-on/verification:
+  en: 6afbc55966b657df
+  zh: 0aeb1f84ec2ebbae
+/agent-note-install-the-memory-stack-under-the-node-the-services-start-on/consequences:
+  en: 92228596d712c2ca
+  zh: 1cd2479f94f4a132

@@ -9,6 +9,12 @@
   ],
   "references": [
     {
+      "path": "../tdai-memory"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    },
+    {
       "path": "../../util/launch-environment"
     },
     {
@@ -39,19 +45,16 @@
       "path": "../../credentials/authorization"
     },
     {
-      "path": "../../settings/settings"
-    },
-    {
-      "path": "../tdai-memory"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
-    },
-    {
       "path": "../../util/timeout"
     },
     {
       "path": "../../util/http-proxy"
+    },
+    {
+      "path": "../../../vendor/loader"
+    },
+    {
+      "path": "../../settings/settings"
     }
   ]
 }

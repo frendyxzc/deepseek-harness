@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/feishu-receive/README.md
-README.md: cc772565f8402a17789984c6cf51848138810382
-README.zh.md: 462d30a3184208d6eb77f7920cec1aa1f939146c
+/:
+  en: cbcc164c73494321
+  zh: 6b7862671523ff33
+/deepseek-ai-dsh-feishu-receive:
+  en: 12803128b8962ab2
+  zh: 29e12ff249543169
+/deepseek-ai-dsh-feishu-receive/summary:
+  en: 00576f8d255776a6
+  zh: fead12054c30e257
+/deepseek-ai-dsh-feishu-receive/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 405b30feaf48c087
+/deepseek-ai-dsh-feishu-receive/use-this-package:
+  en: 2e2e788a4a94163f
+  zh: 473517c35d036fb6
+/deepseek-ai-dsh-feishu-receive/use-this-package/when-to-choose-it:
+  en: 184d55e632dd41fc
+  zh: 0b49bf0cf908b03a
+/deepseek-ai-dsh-feishu-receive/use-this-package/minimal-configuration:
+  en: 233039ec6966aa18
+  zh: 6a39578fe0153bb2
+/deepseek-ai-dsh-feishu-receive/use-this-package/one-agent-per-chat:
+  en: e70e9eeda7201fe0
+  zh: 2eeb622e8079f82c
+/deepseek-ai-dsh-feishu-receive/use-this-package/how-a-message-is-delivered:
+  en: 12ab0595db4e8175
+  zh: cfe3fb4a0d45bca4
+/deepseek-ai-dsh-feishu-receive/use-this-package/what-the-agent-is-told:
+  en: 465c4c59786f731b
+  zh: 75dcf36012e71978
+/deepseek-ai-dsh-feishu-receive/understand-the-implementation:
+  en: d407f714939efab9
+  zh: d2c6efc9c8e48d0e
+/deepseek-ai-dsh-feishu-receive/further-exploration:
+  en: dbb0c72043fe93e9
+  zh: 5e10cd28c99e4c10
+/deepseek-ai-dsh-feishu-receive/model-experience:
+  en: 96d1c212ffa1c65a
+  zh: 070781045687d3f9
+/deepseek-ai-dsh-feishu-receive/model-experience/kv-cache-effect:
+  en: 0bd34983e69ed5b1
+  zh: 8634bdeddb3a7d20
+/deepseek-ai-dsh-feishu-receive/known-limitations-and-deferred-work:
+  en: 7eefb558aeb1c03f
+  zh: c6a6ace4b0e9d787
+/deepseek-ai-dsh-feishu-receive/known-limitations-and-deferred-work/dev-note:
+  en: 8ec24f76f04a0a6c
+  zh: 0808888ebbcc2c68

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-feishu-stale-status-error.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-14-feishu-stale-status-error.md
-2026-09-14-feishu-stale-status-error.md: 58503ccd4a65a7db8124452f31295a2037915de2
-2026-09-14-feishu-stale-status-error.zh.md: df7292d8376b5c3856d69f25ae0f82c78d8a8390
+/agent-note-a-feishu-bot-s-status-stays-error-after-its-receive-long-connection-recovers:
+  en: 4688ab8cb8a6d5d4
+  zh: 5ebb651fa5de8f8a
+/agent-note-a-feishu-bot-s-status-stays-error-after-its-receive-long-connection-recovers/problem:
+  en: 35fe3e8581cd61ca
+  zh: d615bf807a71e5c5
+/agent-note-a-feishu-bot-s-status-stays-error-after-its-receive-long-connection-recovers/decision:
+  en: 2fd70aca31d1080d
+  zh: a3bc4e6210461f28
+/agent-note-a-feishu-bot-s-status-stays-error-after-its-receive-long-connection-recovers/alternatives-considered:
+  en: ea5b7a9d41eec49d
+  zh: 795806695f3ae4c8
+/agent-note-a-feishu-bot-s-status-stays-error-after-its-receive-long-connection-recovers/consequences:
+  en: a75221db7faf63e5
+  zh: 7ed88a803417870d
+/agent-note-a-feishu-bot-s-status-stays-error-after-its-receive-long-connection-recovers/testing:
+  en: a37145566ecbb4a0
+  zh: 71f5e4a02c133aea

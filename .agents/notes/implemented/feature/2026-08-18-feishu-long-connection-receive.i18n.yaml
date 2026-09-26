@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-feishu-long-connection-receive.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-feishu-long-connection-receive.md
-2026-08-18-feishu-long-connection-receive.md: c382eb5350a97c44f836bd1de864ed65a86956c1
-2026-08-18-feishu-long-connection-receive.zh.md: 23fa468fb2e00bdd49c87e8803974f76fc8b7e0e
+/agent-note-feishu-receive-over-the-official-long-connection-client:
+  en: be6efc0f274bc07b
+  zh: c0a62efebb80be8a
+/agent-note-feishu-receive-over-the-official-long-connection-client/problem:
+  en: 2fd9d610120d9a4a
+  zh: 90348e7e5602ec0b
+/agent-note-feishu-receive-over-the-official-long-connection-client/decision:
+  en: dcf8379a86ad2a54
+  zh: 15020c777b6919ad
+/agent-note-feishu-receive-over-the-official-long-connection-client/alternatives-considered:
+  en: ffd31ff8434a9ec0
+  zh: c72a8b3733f12eb0
+/agent-note-feishu-receive-over-the-official-long-connection-client/consequences:
+  en: 41179261b1d02192
+  zh: 8417aefa955d8d19

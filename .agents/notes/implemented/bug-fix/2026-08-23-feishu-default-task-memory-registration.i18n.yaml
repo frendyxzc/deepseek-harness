@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-feishu-default-task-memory-registration.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-23-feishu-default-task-memory-registration.md
-2026-08-23-feishu-default-task-memory-registration.md: 4ef8f29f28d701ec9edcded04d4ffbf94fefef34
-2026-08-23-feishu-default-task-memory-registration.zh.md: 5ec01cd6757734969183da1219a68502ffe4ddd7
+/agent-note-send-a-default-x-task-id-so-single-agent-feishu-sessions-register-memory:
+  en: 9647c740085a0c12
+  zh: af71136234ddd241
+/agent-note-send-a-default-x-task-id-so-single-agent-feishu-sessions-register-memory/problem:
+  en: 4f7e4506decab1f6
+  zh: 989d5276a811a808
+/agent-note-send-a-default-x-task-id-so-single-agent-feishu-sessions-register-memory/decision:
+  en: 2de5901727261dec
+  zh: 1032a7175fd0b36c
+/agent-note-send-a-default-x-task-id-so-single-agent-feishu-sessions-register-memory/alternatives-considered:
+  en: d6422faaafb39e6c
+  zh: 27716d35691c301e
+/agent-note-send-a-default-x-task-id-so-single-agent-feishu-sessions-register-memory/consequences:
+  en: 4126ce84e6cbfb35
+  zh: 9b558a30a4850cb6

@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-per-feishu-app-tdai-memory-identity.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-23-per-feishu-app-tdai-memory-identity.md
-2026-08-23-per-feishu-app-tdai-memory-identity.md: 8b7ea98ca647565cf0f8fe469473751d91bb9390
-2026-08-23-per-feishu-app-tdai-memory-identity.zh.md: d4a6a2b737795649a885cf80fe7ee11091a29b66
+/agent-note-per-feishu-bot-tdai-memory-identity:
+  en: d1b6173560ae1517
+  zh: b0cd9fd7076cea5b
+/agent-note-per-feishu-bot-tdai-memory-identity/problem:
+  en: 1a3e1efa82a26f68
+  zh: bb389c0c4bccd614
+/agent-note-per-feishu-bot-tdai-memory-identity/decision:
+  en: e1a88c5cab3500d2
+  zh: 7ca0150603388ef1
+/agent-note-per-feishu-bot-tdai-memory-identity/alternatives-considered:
+  en: d473a2aa3387efd1
+  zh: 95d47c2e3a7fef84
+/agent-note-per-feishu-bot-tdai-memory-identity/consequences:
+  en: 0f8ecf2cb2da759a
+  zh: 18ab397c00b67b70

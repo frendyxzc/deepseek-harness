@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-feishu-provider-lifecycle-events.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-19-feishu-provider-lifecycle-events.md
-2026-08-19-feishu-provider-lifecycle-events.md: 134546f5ecb91380922b9153b7249c17827bbb1b
-2026-08-19-feishu-provider-lifecycle-events.zh.md: 67bf55b00feaf2bad3127611fcf431f5c3dbfccf
+/agent-note-feishu-provider-lifecycle-events-feishu-provider-added-feishu-provider-removed:
+  en: 981e7a022ab93d5c
+  zh: c7f95c1c9d3513f8
+/agent-note-feishu-provider-lifecycle-events-feishu-provider-added-feishu-provider-removed/problem:
+  en: c0af2cc4bb542a40
+  zh: 5c77d3d201566d52
+/agent-note-feishu-provider-lifecycle-events-feishu-provider-added-feishu-provider-removed/decision:
+  en: 611e16551b9518d6
+  zh: b59914154c131763
+/agent-note-feishu-provider-lifecycle-events-feishu-provider-added-feishu-provider-removed/alternatives-considered:
+  en: 8d4d4be94cca8704
+  zh: 225278448e3888fb
+/agent-note-feishu-provider-lifecycle-events-feishu-provider-added-feishu-provider-removed/consequences:
+  en: 53ace4477bf26a5c
+  zh: a56ac777ff2a5744

@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write scripts/setup-dsh/README.md
-README.md: 67c8b8f9c0dce3f9ecdc8a11d02437e63f147aac
-README.zh.md: b6f4d1091fdee27cd973b9730eeeb315e80f7748
+/setup-dsh-one-click-local-environment-bootstrap:
+  en: e7231ab6055342ce
+  zh: a55a8138973f3db4
+/setup-dsh-one-click-local-environment-bootstrap/run:
+  en: 60efab9a112b4a25
+  zh: d615603f0a89b5a4
+/setup-dsh-one-click-local-environment-bootstrap/one-key-config-driven-run:
+  en: 162f40048d85afce
+  zh: 8ccbe92014dfcf0a
+/setup-dsh-one-click-local-environment-bootstrap/upgrading-an-existing-deployment:
+  en: a7109dd56e5722af
+  zh: caaddadb2243ed51
+/setup-dsh-one-click-local-environment-bootstrap/what-it-writes:
+  en: b1fc094ee6023e0e
+  zh: 898918514194625d
+/setup-dsh-one-click-local-environment-bootstrap/gitlab-mr-integration-optional:
+  en: 52cc384eea1a3654
+  zh: cbf50763c8044b97
+/setup-dsh-one-click-local-environment-bootstrap/better-harness-skill-optional:
+  en: b3bc5f1e2fd44f9b
+  zh: 1265a1b2446ca613
+/setup-dsh-one-click-local-environment-bootstrap/start-the-services-after-setup:
+  en: c0909c965616bb38
+  zh: 7b445bb57e5c5b27
+/setup-dsh-one-click-local-environment-bootstrap/ports:
+  en: 1deb7b073f95d7e8
+  zh: 91c9d74bc042835e

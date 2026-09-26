@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
 import { FeishuLogo } from './FeishuLogo.tsx'
 import { feishuAppSecretRef } from './secret-ref.ts'
@@ -92,7 +92,6 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
       () => {},
     )
     return () => { current = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadBots, listTeams])
 
   const reseed = (view: TdaiBotsView): void => {
@@ -131,7 +130,7 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
   }
 
   const save = (): void => {
-    if (load.status !== 'ready' || load.view.writable === false) return
+    if (load.status !== 'ready' || !load.view.writable) return
     void (async () => {
       setSaving(true)
       setFailed(false)
@@ -160,7 +159,7 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
 
   if (load.status === 'loading') return <p className={css.state}>{t('botsLoading')}</p>
   if (load.status === 'error') return <p className={css.state} role="alert">{t('botsError')}</p>
-  if (load.view.available === false) return null
+  if (!load.view.available) return null
   const writable = load.view.writable
   const blocked = !dirty || saving || !writable
 
@@ -172,7 +171,7 @@ export function TdaiBotsEditor({ t, loadBots, saveBots, listTeams, listAgents, s
           <span className={css.description}>{t('botsHint')}</span>
         </span>
         {dirty ? <span className={css.pending}>{t('botsUnsaved')}</span> : null}
-        <IconChevronDownOutline14 className={clsx(css.chevron, open && css.chevronOpen)} />
+        <IconChevronDownOutlineRegular className={clsx(css.chevron, open && css.chevronOpen)} />
       </button>
       {open
         ? (

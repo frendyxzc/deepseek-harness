@@ -1,6 +1,34 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for feishu.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/feishu.md
-feishu.md: 084c07036d347adcd61ff1d5e45e724da9a1be22
-feishu.zh.md: 38e80dc035424f7825f0c111ee3e382a538a74cf
+/feishu-chat:
+  en: f98539ef5f96c27f
+  zh: 8d23ed2ab4cf1555
+/feishu-chat/send-request-and-result:
+  en: 394082000e583b9d
+  zh: d098c4777abf6663
+/feishu-chat/message-images:
+  en: ca42928b6f2097d8
+  zh: 5b4267e23ba5dd85
+/feishu-chat/receive-event:
+  en: d5983228542a1e06
+  zh: 18675fe6a8f89e60
+/feishu-chat/reading-a-referenced-message:
+  en: be3a376201b01db1
+  zh: baf3e96621536b27
+/feishu-chat/card-action-event:
+  en: 840c20fd4542145e
+  zh: 41306fd31f89ad6b
+/feishu-chat/updating-a-sent-message:
+  en: c092972e07ce7d0b
+  zh: bb6de63eb4f22bc3
+/feishu-chat/provider-availability:
+  en: 77ebacb8c6306c18
+  zh: 44ad61e141f59648
+/feishu-chat/errors:
+  en: 49363ea18f8661e1
+  zh: 6d256c79b538efa5
+/feishu-chat/the-service:
+  en: 058fa66b1619c161
+  zh: 5c4728c0e7a09d2c

@@ -62,7 +62,7 @@ App Secret 只写不读。它的占位文案说明宿主是否已为该 bot 保�
 
 ### 标签页注册
 
-`apply()` 注入 `slots`、`locale`、`remote`、它实际调用的三个 Remote 面（`remote.feishuStatus`、`remote.tdaiMemory`、`remote.credentials`）与 `settingsScope`；它注册 `settings.im` 字典，并等待 `settings.plugins.tab` 声明完成后才注册 `{ id: 'im', order: 20 }` 与 `FeishuStatusTab`，于是该标签页排在 `order: 10` 的插件列表标签之后。label 是 `t('tab')` 的 thunk，因此标签页会随当前语言自行改名。
+`apply()` 注入 `slots`、`locale`、`remote`、它实际调用的三个 Remote 面（`remote.feishuStatus`、`remote.tdaiMemory`、`remote.credentials`）与 `configForms`；它注册 `settings.im` 字典，并等待 `settings.plugins.tab` 声明完成后才注册 `{ id: 'im', order: 20 }` 与 `FeishuStatusTab`，于是该标签页排在 `order: 10` 的插件列表标签之后。label 是 `t('tab')` 的 thunk，因此标签页会随当前语言自行改名。
 
 ### 读取与写入路径
 

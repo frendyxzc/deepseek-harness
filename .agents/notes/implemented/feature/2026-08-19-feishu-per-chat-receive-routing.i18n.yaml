@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-feishu-per-chat-receive-routing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-feishu-per-chat-receive-routing.md
-2026-08-19-feishu-per-chat-receive-routing.md: 5eb071abfa7961aca6d860494610ac4541f49ca7
-2026-08-19-feishu-per-chat-receive-routing.zh.md: 34f9f41ab86ff6ea0b03d749f810cc8c65001248
+/agent-note-feishu-receive-routing-one-agent-session-per-chat:
+  en: 3e5e714e02a6e20b
+  zh: 1ba78ee678b9eb21
+/agent-note-feishu-receive-routing-one-agent-session-per-chat/problem:
+  en: 691d384167fc3699
+  zh: 247512a5983cbf04
+/agent-note-feishu-receive-routing-one-agent-session-per-chat/decision:
+  en: 68975bb1dd34d834
+  zh: a3d1a1d256fb5470
+/agent-note-feishu-receive-routing-one-agent-session-per-chat/alternatives-considered:
+  en: 9903e253db828487
+  zh: 4b85e89b7c5f3808
+/agent-note-feishu-receive-routing-one-agent-session-per-chat/consequences:
+  en: 8af541624c04d139
+  zh: 9e47cdea30458013

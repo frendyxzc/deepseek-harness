@@ -21,7 +21,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-feishu'
-import { isFeishuErrorWithCode, type FeishuCardActionEvent } from '@deepseek-ai/dsh-feishu'
+import { isFeishuErrorWithCode, type FeishuCardActionEvent, type FeishuProvider } from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu-receive'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type { ApprovalRequest } from '@deepseek-ai/dsh-user-approval'
@@ -95,6 +95,12 @@ interface PendingCard {
   readonly sessionId: string
   /** The card message id once delivery succeeds; unset before then. */
   messageId: string | undefined
+  /**
+   * The usable provider stamped at ask time — the one that will deliver this
+   * card. A settling repaint falls back to its object directly when the seam
+   * no longer routes, because sibling fibers may tear down before this one.
+   */
+  provider: FeishuProvider | undefined
   /** Resolves the waterfall promise; assigned before the card is armed. */
   settle: ((outcome: ApprovalOutcome) => void) | undefined
   /** The timeout that denies an unanswered card. */
@@ -156,6 +162,10 @@ export function apply(ctx: Context, config: Config): void {
    * Settle one card: resolve its approval exactly once, retire both nonces,
    * stop its timer and abort listener, and repaint the card with the outcome
    * on a best-effort basis — a failed repaint never reopens the decision.
+   * The seam routes by current registrations, but sibling fibers tear down
+   * in an order nobody guarantees: when the seam can no longer route, the
+   * card is redrawn through the provider stamped at ask time, whose object
+   * outlives its seam entry.
    */
   const settleCard = (card: PendingCard, outcome: ApprovalOutcome, note: string): void => {
     if (card.settled) return
@@ -167,9 +177,19 @@ export function apply(ctx: Context, config: Config): void {
     if (card.onAbort !== undefined) card.signal?.removeEventListener('abort', card.onAbort)
     card.settle?.(outcome)
     if (card.messageId !== undefined) {
-      void ctx.feishu.updateMessage(card.messageId, noteCard(note)).catch((error: unknown) => {
-        ctx.logger.warn('feishu-approval: settling card %s failed: %s', card.messageId, String(error))
-      })
+      const messageId = card.messageId
+      const content = noteCard(note)
+      const fallback = (error: unknown): void => {
+        const provider = card.provider
+        if (provider?.updateMessage === undefined) {
+          ctx.logger.warn('feishu-approval: settling card %s failed: %s', messageId, String(error))
+          return
+        }
+        void provider.updateMessage(messageId, content).catch((directError: unknown) => {
+          ctx.logger.warn('feishu-approval: settling card %s failed: %s', messageId, String(directError))
+        })
+      }
+      void ctx.feishu.updateMessage(messageId, content).catch(fallback)
     }
   }
 
@@ -285,12 +305,17 @@ export function apply(ctx: Context, config: Config): void {
         return next()
       }
 
+      // The channels only open on a sole usable provider, so at most one
+      // provider can serve this send; stamp that object on the card so a
+      // settling repaint survives the seam losing its route (see settleCard).
+      const [delivering] = ctx.feishu.listProviders().filter(provider => provider.available())
       const card: PendingCard = {
         allowNonce: mintNonce(),
         denyNonce: mintNonce(),
         chatId,
         sessionId: req.agent.session.id,
         messageId: undefined,
+        provider: delivering,
         settle: undefined,
         timer: undefined,
         onAbort: undefined,

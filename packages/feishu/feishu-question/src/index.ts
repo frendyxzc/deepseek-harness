@@ -20,7 +20,12 @@ import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-feishu'
-import { isFeishuErrorWithCode, type FeishuCardActionEvent, type FeishuReceiveEvent } from '@deepseek-ai/dsh-feishu'
+import {
+  isFeishuErrorWithCode,
+  type FeishuCardActionEvent,
+  type FeishuProvider,
+  type FeishuReceiveEvent,
+} from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-feishu-receive'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import {
@@ -89,6 +94,12 @@ interface PendingQuestion {
   readonly questions: AskUserQuestionItem[]
   /** The card message id once delivery succeeds; unset before then. */
   messageId: string | undefined
+  /**
+   * The usable provider stamped at ask time — the one that will deliver this
+   * card. A settling repaint falls back to its object directly when the seam
+   * no longer routes, because sibling fibers may tear down before this one.
+   */
+  provider: FeishuProvider | undefined
   /** Resolves the ask promise; assigned before the card is armed. */
   resolve: ((answer: AskUserQuestionAnswer) => void) | undefined
   /** Rejects the ask promise; assigned before the card is armed. */
@@ -141,12 +152,24 @@ export function apply(ctx: Context, config: Config): void {
 
   /**
    * Repaint one card best-effort — a failed repaint never reopens the
-   * settlement that triggered it.
+   * settlement that triggered it. The seam routes by current registrations,
+   * but sibling fibers tear down in an order nobody guarantees: when the seam
+   * can no longer route, the card is redrawn through the provider stamped at
+   * ask time. That object outlives its seam entry, and only the provider that
+   * delivered a message can update it.
    */
-  const repaint = (messageId: string, content: string): void => {
-    void ctx.feishu.updateMessage(messageId, content).catch((error: unknown) => {
-      ctx.logger.warn('feishu-question: settling card %s failed: %s', messageId, String(error))
-    })
+  const repaint = (pending: PendingQuestion, messageId: string, content: string): void => {
+    const fallback = (error: unknown): void => {
+      const provider = pending.provider
+      if (provider?.updateMessage === undefined) {
+        ctx.logger.warn('feishu-question: settling card %s failed: %s', messageId, String(error))
+        return
+      }
+      void provider.updateMessage(messageId, content).catch((directError: unknown) => {
+        ctx.logger.warn('feishu-question: settling card %s failed: %s', messageId, String(directError))
+      })
+    }
+    void ctx.feishu.updateMessage(messageId, content).catch(fallback)
   }
 
   /**
@@ -158,7 +181,7 @@ export function apply(ctx: Context, config: Config): void {
    */
   const repaintSettled = (pending: PendingQuestion, content: string): void => {
     if (pending.messageId === undefined) pending.finalContent = content
-    else repaint(pending.messageId, content)
+    else repaint(pending, pending.messageId, content)
   }
 
   /**
@@ -291,12 +314,17 @@ export function apply(ctx: Context, config: Config): void {
     }
 
     const nonce = mintNonce()
+    // The channels only open on a sole usable provider, so at most one
+    // provider can serve this send; stamp that object on the card so a
+    // settling repaint survives the seam losing its route (see repaint).
+    const [delivering] = ctx.feishu.listProviders().filter(provider => provider.available())
     const pending: PendingQuestion = {
       nonce,
       answers: [],
       chatId,
       questions: request.questions,
       messageId: undefined,
+      provider: delivering,
       resolve: undefined,
       reject: undefined,
       timer: undefined,
@@ -329,7 +357,7 @@ export function apply(ctx: Context, config: Config): void {
       // The id is recorded even when a settlement raced the delivery, so the
       // recorded final content can still repaint the delivered card.
       pending.messageId = sent.messageId
-      if (pending.finalContent !== undefined) repaint(pending.messageId, pending.finalContent)
+      if (pending.finalContent !== undefined) repaint(pending, pending.messageId, pending.finalContent)
       if (pending.settled) return await answer
     } catch (error: unknown) {
       if (!pending.settled) {

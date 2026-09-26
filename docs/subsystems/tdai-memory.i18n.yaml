@@ -1,6 +1,13 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for tdai-memory.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/tdai-memory.md
-tdai-memory.md: 2d903c522af4da62c66613111714813aa08c2d9f
-tdai-memory.zh.md: af0bda01604566aae16c62d4d6e0ceb091ef98ef
+/tdai-memory-identity:
+  en: 4afea6cee471d7ef
+  zh: 8f61b4acf55b8f6c
+/tdai-memory-identity/session-binding:
+  en: 2a8ad04ddb3440f9
+  zh: b4a274ac01598f06
+/tdai-memory-identity/behavior:
+  en: e56296a359e751a2
+  zh: 9a3d39b0351adadf

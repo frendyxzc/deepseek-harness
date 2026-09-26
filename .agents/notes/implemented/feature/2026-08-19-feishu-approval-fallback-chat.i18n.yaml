@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-feishu-approval-fallback-chat.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-feishu-approval-fallback-chat.md
-2026-08-19-feishu-approval-fallback-chat.md: 1500049b7efbd6ee9d0aaad5cf301a1d11a598bd
-2026-08-19-feishu-approval-fallback-chat.zh.md: e9e6115cc081cef5fb622e9307fd6d84a6a155c4
+/agent-note-feishu-approval-fallback-chat-answering-approvals-from-non-feishu-triggered-sessions:
+  en: 40bd8f83eeaf0c3a
+  zh: cf2b0b7601da91a6
+/agent-note-feishu-approval-fallback-chat-answering-approvals-from-non-feishu-triggered-sessions/problem:
+  en: 7e772e51f18d40a6
+  zh: fa08c901b59815cd
+/agent-note-feishu-approval-fallback-chat-answering-approvals-from-non-feishu-triggered-sessions/decision:
+  en: 1c4ad97cb2f79aba
+  zh: bd458cdd452df2ab
+/agent-note-feishu-approval-fallback-chat-answering-approvals-from-non-feishu-triggered-sessions/alternatives-considered:
+  en: 2640c089997a91e5
+  zh: c18781f3c518fea2
+/agent-note-feishu-approval-fallback-chat-answering-approvals-from-non-feishu-triggered-sessions/consequences:
+  en: 2559156016f67e26
+  zh: 3df940ecf55246b8

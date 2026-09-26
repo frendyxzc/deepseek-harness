@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-web-lan-access-re-enabled.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-web-lan-access-re-enabled.md
-2026-08-19-web-lan-access-re-enabled.md: a9ce46731793959f6cb7fbb9e1bdb2df2a3a2a0a
-2026-08-19-web-lan-access-re-enabled.zh.md: 387d82903d21fc89d93b5cc89cac31f38f01100a
+/agent-note-re-enable-lan-access-with-host-0-0-0-0:
+  en: d98a2e42615b69bf
+  zh: 8be6095e427b38f2
+/agent-note-re-enable-lan-access-with-host-0-0-0-0/problem:
+  en: 8374b166e84b07b3
+  zh: ff11bee460e2a562
+/agent-note-re-enable-lan-access-with-host-0-0-0-0/decision:
+  en: b02e475c9447221e
+  zh: dae9791fd291f297
+/agent-note-re-enable-lan-access-with-host-0-0-0-0/alternatives-considered:
+  en: 872c255f22c4a9eb
+  zh: a4c3ad26d8f042de
+/agent-note-re-enable-lan-access-with-host-0-0-0-0/consequences:
+  en: 9fbb395d91c7764d
+  zh: c08b3296495cd28b

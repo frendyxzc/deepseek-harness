@@ -35,12 +35,13 @@ async function bench() {
   ctx.provide('remote.feishuStatus', { list: status })
   ctx.provide('remote.tdaiMemory', { listTeams: async () => [], listAgents: async () => [] })
   ctx.provide('remote.credentials', { set: setSecret })
-  ctx.provide('settingsScope', {
-    bind: () => ({
+  ctx.provide('configForms', {
+    get: () => ({
       getSnapshot: () => ({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'memory' }),
       subscribe: () => () => {},
-      set: async () => {},
-      unset: async () => {},
+      set: async () => true,
+      unset: async () => true,
+      mutate: async () => true,
     }),
   })
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale, status, setSecret }
@@ -55,7 +56,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-im browser plugin', () => {
   it('declares only the services used by the Settings Remote contribution', () => {
-    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'remote.credentials', 'settingsScope'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'remote.credentials', 'configForms'])
   })
 
   it('registers a localized tab without reading the Remote eagerly', async () => {

@@ -71,7 +71,7 @@ kind: "package-reference"
 
 卡片点击通道与消息通道是该功能的前提，并且成对打开：先 `startReceivingCardActions()`，再 `startReceiving()`，若第二次调用报告尚未注册任何提供方，则回滚第一次。当本插件激活时尚无可用提供方——同级插件并发加载——它记录日志并等待 `feishu/provider-added`；而注册了却无法接收卡片动作的提供方会让自己那次注册显式失败。当这两个通道的提供方离开时，effect 会关闭并在剩余提供方上重新打开，或重新开始等待，且这次重开绝不会抛进正在卸载的 fiber。消息通道正是防止过期卡片活得比对话更久的机制：聊天里的任何新消息都会超越（supersede）该聊天的所有挂起卡片。
 
-次序安排保护决定不被竞态吞掉。待决记录与应答 promise 在发送卡片之前就已存在，而返回的 promise 带有一个临时拒绝守卫，因此投递过程中的中止、超越或销毁仍能结算这个监听器返回的 promise。早于发送响应到达的结算会记下最终内容，并在 message id 一到手就重绘。`questionCard()`、`answerSummaryCard()` 与 `noteCard()` 是基于 v1 schema 的纯构建函数，`parseOptionAnswer()` 把攻击者可控的选项下标映射为至多一条 `{ id, selected: [label] }` 记录，因此伪造或越界的下标什么都答不了；这四者都被导出以供测试。
+次序安排保护决定不被竞态吞掉。待决记录与应答 promise 在发送卡片之前就已存在，而返回的 promise 带有一个临时拒绝守卫，因此投递过程中的中止、超越或销毁仍能结算这个监听器返回的 promise。早于发送响应到达的结算会记下最终内容，并在 message id 一到手就重绘。每次询问都会把唯一的可用 provider 盖在卡片上，因此即便兄弟 fiber 的销毁次序无人保证，结算重绘仍能送达投递它的那个应用。`questionCard()`、`answerSummaryCard()` 与 `noteCard()` 是基于 v1 schema 的纯构建函数，`parseOptionAnswer()` 把攻击者可控的选项下标映射为至多一条 `{ id, selected: [label] }` 记录，因此伪造或越界的下标什么都答不了；这四者都被导出以供测试。
 
 | 文件 | 作用 |
 |---|---|

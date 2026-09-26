@@ -8,7 +8,7 @@
  * @module @deepseek-ai/dsh-feishu-question/answers
  */
 
-import type { AskUserQuestionAnswerItem, AskUserQuestionItem, AskUserQuestionOption } from '@deepseek-ai/dsh-user-questions'
+import type { AskUserQuestionAnswerItem, AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
 
 /**
  * Map a tapped option index to one question's answer record. A malformed or
@@ -21,6 +21,6 @@ export function parseOptionAnswer(question: AskUserQuestionItem, sel: unknown): 
   const options = question.options ?? []
   const index = typeof sel === 'string' ? Number(sel) : NaN
   if (!Number.isInteger(index) || index < 0 || index >= options.length) return undefined
-  const option = options[index] as AskUserQuestionOption | undefined
+  const option = options[index]
   return option === undefined ? undefined : { id: question.id, selected: [option.label] }
 }

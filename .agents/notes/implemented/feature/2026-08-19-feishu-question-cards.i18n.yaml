@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-feishu-question-cards.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-19-feishu-question-cards.md
-2026-08-19-feishu-question-cards.md: 161521bfc62f9a5d037fb03efecdfdf89cb375aa
-2026-08-19-feishu-question-cards.zh.md: d7610fc4c6add403f828ee266f0130ce92638d03
+/agent-note-feishu-question-cards-interactive-answers-and-prompt-feedback-for-feishu-chat-agents:
+  en: 24e1c97cf2bf147a
+  zh: 11589b39ef1e7ef2
+/agent-note-feishu-question-cards-interactive-answers-and-prompt-feedback-for-feishu-chat-agents/problem:
+  en: 66bd69c397f826bd
+  zh: ecee9d7e8ba3e144
+/agent-note-feishu-question-cards-interactive-answers-and-prompt-feedback-for-feishu-chat-agents/decision:
+  en: 5252eec152288606
+  zh: 997e1286ea855a59
+/agent-note-feishu-question-cards-interactive-answers-and-prompt-feedback-for-feishu-chat-agents/alternatives-considered:
+  en: 40e5357d70cb084f
+  zh: d2d50f35d701a3d5
+/agent-note-feishu-question-cards-interactive-answers-and-prompt-feedback-for-feishu-chat-agents/consequences:
+  en: bdc0b84d934f38c5
+  zh: 5c44f9e1b6c6b4d8

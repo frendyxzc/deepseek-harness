@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/feishu/README.md
-README.md: 22e0ea06289ef8c2d48230280142350f4dec6e11
-README.zh.md: 954ff212b329c16cec8c52d81a03cc25f554c8c9
+/:
+  en: 14d83384c7eecac7
+  zh: c9cc8fd61b3fa6c5
+/deepseek-ai-dsh-feishu:
+  en: c2f049d8a79ea924
+  zh: 4e8a78468eacc19c
+/deepseek-ai-dsh-feishu/summary:
+  en: aee1019144cafccd
+  zh: dc05a06800a1e87d
+/deepseek-ai-dsh-feishu/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 405b30feaf48c087
+/deepseek-ai-dsh-feishu/use-this-package:
+  en: 9c300d6f4af7a8fd
+  zh: 6d5854430c821825
+/deepseek-ai-dsh-feishu/use-this-package/when-to-choose-it:
+  en: fdb28d6c78fa7fe8
+  zh: 60f3e80553364265
+/deepseek-ai-dsh-feishu/use-this-package/minimal-configuration:
+  en: 9b73c81b9d7bf46d
+  zh: 0c268244b3114144
+/deepseek-ai-dsh-feishu/use-this-package/provider-selection:
+  en: fa3e8f121ddf5ca7
+  zh: 9015b008a3758051
+/deepseek-ai-dsh-feishu/use-this-package/what-a-consumer-can-do:
+  en: 524eba3effac59ad
+  zh: 6ec9d9ec01f1956e
+/deepseek-ai-dsh-feishu/understand-the-implementation:
+  en: 74f7feddbc47549d
+  zh: fe3cec021db8adb3
+/deepseek-ai-dsh-feishu/further-exploration:
+  en: c149f62b21c8ef44
+  zh: df00979b2f1174cb
+/deepseek-ai-dsh-feishu/model-experience:
+  en: d1834139b690afa9
+  zh: 17b5b1b877201984
+/deepseek-ai-dsh-feishu/model-experience/kv-cache-effect:
+  en: 559bdccd9245bf8b
+  zh: cb0b7fae1db3282a
+/deepseek-ai-dsh-feishu/known-limitations-and-deferred-work:
+  en: 9ebd2eb8abab9c03
+  zh: 4e776b67e079cecb
+/deepseek-ai-dsh-feishu/known-limitations-and-deferred-work/dev-note:
+  en: 7cff3235bd2fc697
+  zh: 34510be1f30384e3

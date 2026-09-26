@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-19-pi-ai-session-headers.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-19-pi-ai-session-headers.md
-2026-08-19-pi-ai-session-headers.md: af8c5ee76b33a3cb73f954009b86b12735ccb6ac
-2026-08-19-pi-ai-session-headers.zh.md: a7fb8fbe1545cfcaa2d088d71ab1b5b96006e58f
+/agent-note-pi-ai-sends-harness-session-identity-headers-on-chat-completions-requests:
+  en: 665489b3a13b931c
+  zh: f96b6bd1f4b366e0
+/agent-note-pi-ai-sends-harness-session-identity-headers-on-chat-completions-requests/problem:
+  en: f6e5e410838f11a0
+  zh: 6e30a53cf862312c
+/agent-note-pi-ai-sends-harness-session-identity-headers-on-chat-completions-requests/decision:
+  en: 68a94da07d72e28a
+  zh: 732634156d72610e
+/agent-note-pi-ai-sends-harness-session-identity-headers-on-chat-completions-requests/alternatives-considered:
+  en: 218cc8e07a289b64
+  zh: 72491dc9506c2912
+/agent-note-pi-ai-sends-harness-session-identity-headers-on-chat-completions-requests/consequences:
+  en: e5c7502c822d1ae7
+  zh: e1ee9f139eb0408d

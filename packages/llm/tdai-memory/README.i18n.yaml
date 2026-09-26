@@ -1,6 +1,52 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/llm/tdai-memory/README.md
-README.md: 3aafdf48b0c02d4a6ae38bcd8cdca3e7dcbffdce
-README.zh.md: e2d31920eebbfb2e738bdee02942a9c5a7de5815
+/:
+  en: 2150960f6963449a
+  zh: 9dd01802bff118c4
+/deepseek-ai-dsh-tdai-memory:
+  en: 8c752f37e9643524
+  zh: f29948d332b18f2d
+/deepseek-ai-dsh-tdai-memory/summary:
+  en: fc4eaa91eeef8ba3
+  zh: facefd01beedb257
+/deepseek-ai-dsh-tdai-memory/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-tdai-memory/use-this-package:
+  en: 7754b5f9c3a0a3e8
+  zh: e53ce5215b0d594d
+/deepseek-ai-dsh-tdai-memory/use-this-package/when-to-choose-it:
+  en: a83ac6b14c0c7d63
+  zh: 3e46f7c385ad0946
+/deepseek-ai-dsh-tdai-memory/use-this-package/minimal-configuration:
+  en: 4d9952ee9798f1f2
+  zh: d2ea8197f2d543cd
+/deepseek-ai-dsh-tdai-memory/understand-the-implementation:
+  en: a88597f23678cc26
+  zh: 5b5edf481dedb401
+/deepseek-ai-dsh-tdai-memory/understand-the-implementation/identity-resolution:
+  en: da82b0cf4246635b
+  zh: 7f410bb0ae8dc0e3
+/deepseek-ai-dsh-tdai-memory/understand-the-implementation/session-bindings:
+  en: ae533ec7a801f481
+  zh: ff855cb6dfecafd5
+/deepseek-ai-dsh-tdai-memory/understand-the-implementation/core-catalog:
+  en: e71daf6640843713
+  zh: 3e779a57c733caf7
+/deepseek-ai-dsh-tdai-memory/further-exploration:
+  en: 1781a13e7b3b7b40
+  zh: 245348e7855dbcbe
+/deepseek-ai-dsh-tdai-memory/model-experience:
+  en: f798a26b01f6839e
+  zh: 7813a040541a8f94
+/deepseek-ai-dsh-tdai-memory/model-experience/kv-cache-effect:
+  en: 184fa53d1c8d2490
+  zh: 48d40169cbde9ade
+/deepseek-ai-dsh-tdai-memory/known-limitations-and-deferred-work:
+  en: 27192da646986d14
+  zh: 4cbaf0ae36140a73
+/deepseek-ai-dsh-tdai-memory/known-limitations-and-deferred-work/dev-note:
+  en: 67b4d36e63e13c88
+  zh: 57382d15baa2a61b

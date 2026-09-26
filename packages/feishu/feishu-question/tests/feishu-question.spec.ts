@@ -52,7 +52,7 @@ interface Mounted {
  * with a scripted provider (records sends/updates, captures the card-action
  * and message handlers) + the question answerer under test.
  */
-async function mountQuestion(config: FeishuQuestion.Config = {}): Promise<Mounted> {
+async function mountQuestion(config: FeishuQuestion.Config = {}, opts: { updateMessage?: false } = {}): Promise<Mounted> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(AgentRegistry)
@@ -88,10 +88,12 @@ async function mountQuestion(config: FeishuQuestion.Config = {}): Promise<Mounte
       cardHandlers.push(handler)
       return () => {}
     },
-    updateMessage: async (messageId, content) => {
-      if (controls.failUpdate) throw new FeishuError('scripted update failure', 'FEISHU_PROVIDER_ERROR')
-      updates.push({ messageId, content })
-    },
+    ...(opts.updateMessage === false ? {} : {
+      updateMessage: async (messageId, content) => {
+        if (controls.failUpdate) throw new FeishuError('scripted update failure', 'FEISHU_PROVIDER_ERROR')
+        updates.push({ messageId, content })
+      },
+    }),
   })
 
   const fiber = await ctx.plugin(FeishuQuestion, config)
@@ -448,6 +450,24 @@ describe('feishu-question', () => {
     await expect(pending).resolves.toEqual({ answers: [{ id: 'q1', selected: ['Alpha'] }] })
     // The best-effort repaint failed; nothing reached the wire and the
     // settlement stands.
+    await new Promise(resolve => setTimeout(resolve, 10))
+    expect(updates).toHaveLength(0)
+    await fiber.dispose()
+    await ctx.fiber.dispose()
+  })
+
+  it('warns without redrawing when neither the seam nor the stamped provider can update', async () => {
+    const { ctx, fiber, sent, updates, tap } = await mountQuestion({}, { updateMessage: false })
+    const agent = chatAgent(ctx)
+    bindChat(ctx, agent, 'oc_1')
+
+    const pending = ctx.userQuestions.ask({ questions: [singleSelect()], agent })
+    await vi.waitFor(() => { expect(sent).toHaveLength(1) })
+    const nonce = parseQuestionCard(sent[0]!)
+    tap({ value: { nonce, pq: nonce, qid: 'q1', sel: '0' } })
+    // The provider cannot update messages: the seam rejects, the direct
+    // redraw is impossible, and the settlement still stands.
+    await expect(pending).resolves.toEqual({ answers: [{ id: 'q1', selected: ['Alpha'] }] })
     await new Promise(resolve => setTimeout(resolve, 10))
     expect(updates).toHaveLength(0)
     await fiber.dispose()

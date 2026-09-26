@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-feishu-multi-bot-reply-routing.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-14-feishu-multi-bot-reply-routing.md
-2026-09-14-feishu-multi-bot-reply-routing.md: 10dde92af4f54f28605e0be2a33c15547aa4b930
-2026-09-14-feishu-multi-bot-reply-routing.zh.md: 5f64c5a03b74f9f4b3fe2029c397b15b5819d54d
+/agent-note-a-p2p-reply-in-a-multi-bot-setup-routes-through-the-wrong-provider:
+  en: c72c9977a43f42dd
+  zh: be2d7384e9cffe8c
+/agent-note-a-p2p-reply-in-a-multi-bot-setup-routes-through-the-wrong-provider/problem:
+  en: 159dd722ef4df3e9
+  zh: 19fc2a8a0b755cae
+/agent-note-a-p2p-reply-in-a-multi-bot-setup-routes-through-the-wrong-provider/decision:
+  en: 619cd18f87da565d
+  zh: efa5bf1ade3ab9c3
+/agent-note-a-p2p-reply-in-a-multi-bot-setup-routes-through-the-wrong-provider/alternatives-considered:
+  en: 207638cd6cc70115
+  zh: 7a9bbc1d1ee5a6f1
+/agent-note-a-p2p-reply-in-a-multi-bot-setup-routes-through-the-wrong-provider/consequences:
+  en: ba4bf61e050bd374
+  zh: f2857e1b7c5cd3ec
+/agent-note-a-p2p-reply-in-a-multi-bot-setup-routes-through-the-wrong-provider/testing:
+  en: 252ee433762cdfb6
+  zh: d365b65d89047fbf

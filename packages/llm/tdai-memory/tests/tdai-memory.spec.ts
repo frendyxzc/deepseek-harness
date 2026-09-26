@@ -2,9 +2,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { SettingsProvider } from '@deepseek-ai/dsh-settings'
-import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
-import { Config as FeishuBotConfig, FEISHU_BOT_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-feishu-bot'
+import { FEISHU_BOT_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-feishu-bot'
 import TdaiMemoryService, {
   AGENT_HEADER,
   Config,
@@ -12,24 +10,6 @@ import TdaiMemoryService, {
   tdaiMemoryHeaders,
   TEAM_HEADER,
 } from '../src/index.ts'
-
-/** The smallest real provider: one in-memory document, always writable. */
-class MemorySettings extends SettingsProvider {
-  doc: Record<string, unknown> = {}
-
-  get writable(): boolean {
-    return true
-  }
-
-  protected load(): Promise<Record<string, unknown>> {
-    return Promise.resolve(structuredClone(this.doc))
-  }
-
-  protected persist(ns: SettingsNamespace, section: Record<string, unknown>): Promise<void> {
-    this.doc = { ...this.doc, [ns]: structuredClone(section) }
-    return Promise.resolve()
-  }
-}
 
 describe('tdaiMemoryHeaders', () => {
   it('omits an absent identity entirely', () => {
@@ -80,8 +60,11 @@ describe('TdaiMemoryService', () => {
     config: Record<string, unknown> = {},
   ) {
     const ctx = new Context()
-    await ctx.plugin(MemorySettings)
-    await ctx.settings.register(FEISHU_BOT_SETTINGS_NAMESPACE, FeishuBotConfig, { base: { bots } })
+    // Stub of the Host settings form projection: identityFor reads the
+    // `feishu-bot` entry's volatile form value.
+    ctx.provide('settings', {
+      describe: () => [{ ns: FEISHU_BOT_SETTINGS_NAMESPACE, value: { bots } }],
+    } as never)
     await ctx.plugin(TdaiMemoryService, config)
     return ctx
   }

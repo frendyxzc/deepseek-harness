@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write gitlab-mr/README.md
-README.md: aac8d9bd4dd6a7b3415aeecd01e0de89c433c70f
-README.zh.md: 3a8648226a5be3c08f2ec525e595f19b270cc770
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh:
+  en: dcba4017528f8b8f
+  zh: f72308bde32d2c28
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/0-one-click-install-recommended-via-setup-dsh:
+  en: b3e23061ad8c7c25
+  zh: fc876ccb4b1eeb4b
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/1-install-the-skill-manual-deployment:
+  en: e3f9225fe41dec29
+  zh: b7972e04379e4ceb
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/2-mount-the-poller-plugin:
+  en: a510ea458af374eb
+  zh: d6a2201105bade01
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/3-environment-variables:
+  en: 2393beed4e9cd446
+  zh: 0217418b39e0eb9c
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/4-registration-mechanism-replaces-manual-session-binding:
+  en: 2ec95b8f6ce02031
+  zh: 46abe5d4c0e60aa9
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/5-configuration-fields:
+  en: f6dacf6fcc2a30a0
+  zh: f0a33e5e625b12d5
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/6-semantics-and-limits:
+  en: beaee5dcbd0185af
+  zh: 53cd05d1754072df
+/dsh-gitlab-mr-gitlab-mr-closed-loop-for-intranet-dsh/7-quick-verification:
+  en: de689b2a50e7598f
+  zh: fbde81a1ef5c055f

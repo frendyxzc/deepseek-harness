@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-23-setup-dsh-admin-bootstrap-after-core-start.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-23-setup-dsh-admin-bootstrap-after-core-start.md
-2026-08-23-setup-dsh-admin-bootstrap-after-core-start.md: 6b7d00b118d5d34009049763bca6cf738d606349
-2026-08-23-setup-dsh-admin-bootstrap-after-core-start.zh.md: 5f3bde9d98a68879995a361f648f60587c75e4e5
+/agent-note-bootstrap-the-memory-admin-user-once-memorycore-starts:
+  en: c6f64ba21daa7a9d
+  zh: e6563b50b659f8a9
+/agent-note-bootstrap-the-memory-admin-user-once-memorycore-starts/problem:
+  en: de0fb835a6074d6b
+  zh: a4990018fbfffab7
+/agent-note-bootstrap-the-memory-admin-user-once-memorycore-starts/decision:
+  en: fd22face01f22dec
+  zh: bc4d6bb24aab13a4
+/agent-note-bootstrap-the-memory-admin-user-once-memorycore-starts/alternatives-considered:
+  en: 82327f712b944762
+  zh: 6a38189405bb9883
+/agent-note-bootstrap-the-memory-admin-user-once-memorycore-starts/verification:
+  en: bad8fe5c8fc85b84
+  zh: 511bfa671568bfee
+/agent-note-bootstrap-the-memory-admin-user-once-memorycore-starts/consequences:
+  en: 290eb576723031e4
+  zh: 5203b0aaedb71085

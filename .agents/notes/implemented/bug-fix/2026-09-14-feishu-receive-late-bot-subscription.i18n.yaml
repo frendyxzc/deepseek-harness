@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-14-feishu-receive-late-bot-subscription.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-14-feishu-receive-late-bot-subscription.md
-2026-09-14-feishu-receive-late-bot-subscription.md: d5a16d0c3332edb3363430762156e8f722d8ba6a
-2026-09-14-feishu-receive-late-bot-subscription.zh.md: 33680233f4c660e5ed535d23d9fc5c49bd801b00
+/agent-note-a-feishu-bot-added-after-the-receive-channel-opens-never-receives-messages:
+  en: 77225ee8e350533f
+  zh: 02f8d45e65168cc7
+/agent-note-a-feishu-bot-added-after-the-receive-channel-opens-never-receives-messages/problem:
+  en: 207cf9e1d6182c72
+  zh: de351633658a914f
+/agent-note-a-feishu-bot-added-after-the-receive-channel-opens-never-receives-messages/decision:
+  en: 66d4b466b0072ac6
+  zh: c4eb0c424df05684
+/agent-note-a-feishu-bot-added-after-the-receive-channel-opens-never-receives-messages/alternatives-considered:
+  en: 936d13a8aebb903f
+  zh: 935b7ae2df231fae
+/agent-note-a-feishu-bot-added-after-the-receive-channel-opens-never-receives-messages/consequences:
+  en: 01e54af1c0995d5a
+  zh: 24fa80a01df96e76
+/agent-note-a-feishu-bot-added-after-the-receive-channel-opens-never-receives-messages/testing:
+  en: 19d580bb0bc5b109
+  zh: f7a83c8d62ce7aa6

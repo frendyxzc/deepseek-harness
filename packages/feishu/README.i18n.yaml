@@ -1,6 +1,25 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/README.md
-README.md: 439affbab6f0740fdbf7d6ad6f2e07c24d4da52d
-README.zh.md: dd302cb2e748ba416578234bc2d30aa1ed7a9b0f
+/:
+  en: 53aeef935ccaf3fb
+  zh: f7f0d95270ccbb3a
+/feishu-feishu-chat-capability-family:
+  en: 24c7755921bdb736
+  zh: b2ed7aaa32b0409f
+/feishu-feishu-chat-capability-family/summary:
+  en: 4486b99b99375ae9
+  zh: f35ed4e5ad7c30a2
+/feishu-feishu-chat-capability-family/table-of-contents:
+  en: 1eb35b015a6c423f
+  zh: a8a3dceee2c9e943
+/feishu-feishu-chat-capability-family/packages:
+  en: 837329f7e30c2642
+  zh: 2e035b8db7ed0467
+/feishu-feishu-chat-capability-family/related-documentation:
+  en: 465e553945884caf
+  zh: 7034994dbcb27373
+/feishu-feishu-chat-capability-family/dev-note:
+  en: 1dff84c341d48535
+  zh: 99b7a8c6ea4e217e

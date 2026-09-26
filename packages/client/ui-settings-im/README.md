@@ -62,7 +62,7 @@ The browser half owns everything; the host entry is an empty `apply()` placehold
 
 ### Tab registration
 
-`apply()` injects `slots`, `locale`, `remote`, the three Remote faces it calls (`remote.feishuStatus`, `remote.tdaiMemory`, `remote.credentials`), and `settingsScope`; it registers the `settings.im` dictionaries and waits for `settings.plugins.tab` to be declared before registering `{ id: 'im', order: 20 }` with `FeishuStatusTab`, which puts the tab after the plugin-list tab at `order: 10`. The label is a `t('tab')` thunk, so the tab renames itself with the active locale.
+`apply()` injects `slots`, `locale`, `remote`, the three Remote faces it calls (`remote.feishuStatus`, `remote.tdaiMemory`, `remote.credentials`), and `configForms`; it registers the `settings.im` dictionaries and waits for `settings.plugins.tab` to be declared before registering `{ id: 'im', order: 20 }` with `FeishuStatusTab`, which puts the tab after the plugin-list tab at `order: 10`. The label is a `t('tab')` thunk, so the tab renames itself with the active locale.
 
 ### Read and write paths
 

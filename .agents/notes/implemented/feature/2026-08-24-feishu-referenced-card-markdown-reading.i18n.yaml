@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-feishu-referenced-card-markdown-reading.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-feishu-referenced-card-markdown-reading.md
-2026-08-24-feishu-referenced-card-markdown-reading.md: 820c6315cb86734fb4f514e2935e48e0a2086ec0
-2026-08-24-feishu-referenced-card-markdown-reading.zh.md: e4f1254093c0b9f6be6c2831721fd811f4850eed
+/agent-note-feishu-referenced-card-markdown-reading:
+  en: 920a062889868fb8
+  zh: 9c1a120b0207000c
+/agent-note-feishu-referenced-card-markdown-reading/problem:
+  en: dfcb14d54c616c57
+  zh: e8d1934ccdc17889
+/agent-note-feishu-referenced-card-markdown-reading/decision:
+  en: fe924281956e3c4e
+  zh: 6dc5de81a08d4afd
+/agent-note-feishu-referenced-card-markdown-reading/alternatives-considered:
+  en: 179bb81c1d5083ee
+  zh: b76e1bbc8e5f2c1d
+/agent-note-feishu-referenced-card-markdown-reading/consequences:
+  en: b15286799da003b9
+  zh: 0b3526e3ddd1bdb2
+/agent-note-feishu-referenced-card-markdown-reading/related:
+  en: ff97b0b69e101cb1
+  zh: 201cc8e6ac36a10c

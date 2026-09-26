@@ -155,13 +155,14 @@ export class TdaiMemoryService extends TypertRemoteService {
   }
 
   /**
-   * Resolved team/agent identity for one bot, read from the `feishu-bot` section.
+   * Resolved team/agent identity for one bot, read from the `feishu-bot` entry's live form.
    * @param botId - the Feishu bot id whose identity to resolve.
    * @returns the bot's team/agent identity, or undefined when the bot is unmapped.
    */
   identityFor(botId: string): TdaiIdentity | undefined {
     const settings = this.ctx.get('settings')
-    const section = settings?.get(FEISHU_BOT_SETTINGS_NAMESPACE) as { bots?: FeishuBotEntry[] } | undefined
+    const form = settings?.describe().find(descriptor => descriptor.ns === FEISHU_BOT_SETTINGS_NAMESPACE)
+    const section = form?.value as { bots?: FeishuBotEntry[] } | undefined
     return section?.bots?.find(bot => bot.id === botId)
   }
 

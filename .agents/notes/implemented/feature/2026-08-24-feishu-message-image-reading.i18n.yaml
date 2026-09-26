@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-24-feishu-message-image-reading.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-24-feishu-message-image-reading.md
-2026-08-24-feishu-message-image-reading.md: b341a644bc35639d0693f6bcb4f5f29745b73cc2
-2026-08-24-feishu-message-image-reading.zh.md: f46aa88d0183feeb47f1e319977324fb600919c0
+/agent-note-feishu-message-image-reading:
+  en: 179b75e04bf33ebd
+  zh: 5110bebee617fc38
+/agent-note-feishu-message-image-reading/problem:
+  en: 71145cfe9477f706
+  zh: 5dfcf96fd2530163
+/agent-note-feishu-message-image-reading/decision:
+  en: 1450a15848fa40eb
+  zh: ea467bf15c23f60b
+/agent-note-feishu-message-image-reading/alternatives-considered:
+  en: 6e954c3d558f01a8
+  zh: 8b1e085792ca1f00
+/agent-note-feishu-message-image-reading/consequences:
+  en: ed67d90c1854cb5f
+  zh: 31fc874cf7789e4b

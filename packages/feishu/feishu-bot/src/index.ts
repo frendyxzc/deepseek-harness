@@ -10,13 +10,14 @@
  * @module @deepseek-ai/dsh-feishu-bot
  */
 
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { CredentialRef } from '@deepseek-ai/dsh-credentials'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { launchEnvironmentOf } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-feishu'
 import type {} from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { FeishuBotProvider, FEISHU_BOT_PROVIDER_ID, FEISHU_DEFAULT_BASE_URL } from './provider.ts'
 import type { FeishuBotProviderOptions } from './provider.ts'
 
@@ -104,8 +105,8 @@ export interface Config {
   appSecretEnv?: string
   /** Feishu Open API base URL (flat single app). */
   baseURL?: string
-  /** Bot apps; when non-empty these replace the flat single-app fields. */
-  bots?: FeishuBotEntry[]
+  /** Bot apps; when non-empty these replace the flat single-app fields. Volatile so the Settings form edits it live. */
+  bots: Volatile<FeishuBotEntry[]>
   /** Secrets and endpoint per bot; composition-only, no settings exposure. */
   credentials?: FeishuBotCredential[]
 }
@@ -125,24 +126,14 @@ const credentialSchema: z<FeishuBotCredential> = z.object({
   baseURL: z.string(),
 })
 
-export const Config: z<Config> = z.object({
+export const Config = z.object({
   appId: z.string().role('secret'),
   appSecret: z.string().role('secret'),
   appIdEnv: z.string().role('credential-ref').default(DEFAULT_APP_ID_ENV),
   appSecretEnv: z.string().role('credential-ref').default(DEFAULT_APP_SECRET_ENV),
   baseURL: z.string(),
-  bots: z.array(botEntrySchema),
+  bots: z.array(botEntrySchema).default([]).volatile(),
   credentials: z.array(credentialSchema),
-})
-
-/** Settings-section shape: identity/mapping only, so the UI never writes secrets. */
-export interface FeishuBotSettings {
-  bots?: FeishuBotEntry[]
-}
-
-/** Zod schema for the `feishu-bot` settings section (identity/mapping only). */
-export const FeishuBotSettingsConfig: z<FeishuBotSettings> = z.object({
-  bots: z.array(botEntrySchema),
 })
 
 /** Credential-shaped fields shared by the flat config and per-bot credentials. */
@@ -224,19 +215,18 @@ interface Registration {
 }
 
 /**
- * Register the Feishu Bot provider(s), re-registering live as the `feishu-bot`
- * settings section changes. The composition entry stays usable without a
- * settings provider; when one is mounted its user layer is read live.
+ * Register the Feishu Bot provider(s), re-registering live as the volatile
+ * `bots` config changes. The composition entry stays usable without a
+ * settings service; the volatile reference carries the merged composition
+ * and profile-patch values either way.
  */
 export function apply(ctx: Context, config: Config): void {
-  let currentSettings: () => FeishuBotSettings = () => ({ bots: config.bots ?? [] })
   const registrations = new Map<string, Registration>()
 
   const sync = (): void => {
-    const settings = currentSettings()
-    const bots = (settings.bots ?? []).length > 0 ? settings.bots : config.bots
+    const bots = config.bots.get()
     const desired = new Map<string, ResolvedEntry>()
-    if (bots !== undefined && bots.length > 0) {
+    if (bots.length > 0) {
       for (const bot of bots) {
         desired.set(bot.id, { ...bot, credential: credentialFor(config, bot.id) })
       }
@@ -259,15 +249,14 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
+  // The Settings > Plugins > IM tab owns this entry's page; no auto-generated form.
   ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, FEISHU_BOT_SETTINGS_NAMESPACE, FeishuBotSettingsConfig, { bots: config.bots ?? [] }, {
-      setSource: (source) => {
-        currentSettings = source
-      },
-      onChange: sync,
-    })
+    settingsCtx.effect(() => settingsCtx.settings.configure({ auto: false }, ctx.fiber))
   })
-  // Register from the composition entry up front; the settings section, when
-  // mounted, re-syncs from its live user layer.
+  // Register from the composition entry up front; volatile edits re-sync providers.
   sync()
+  ctx.on('loader/volatile-update', () => {
+    try { sync() }
+    catch (error) { ctx.logger.error(error) }
+  })
 }

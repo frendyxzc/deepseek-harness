@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-feishu-im-status-tab.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-08-18-feishu-im-status-tab.md
-2026-08-18-feishu-im-status-tab.md: 19930619c6de0184b965a4aa4d06814503387d13
-2026-08-18-feishu-im-status-tab.zh.md: 3ff1038ae787a6a7574e703b82a6916f991e8448
+/agent-note-feishu-im-status-tab:
+  en: 26bef5ae2f4ec095
+  zh: 952e43de8eeb8140
+/agent-note-feishu-im-status-tab/problem:
+  en: 1a2d5781286417fd
+  zh: 3237e54dcf87d8c4
+/agent-note-feishu-im-status-tab/decision:
+  en: 249d803c66a6d96d
+  zh: 863bfbf5c07594dd
+/agent-note-feishu-im-status-tab/alternatives-considered:
+  en: d4b85c3104edff07
+  zh: 864848cf07b39e07
+/agent-note-feishu-im-status-tab/consequences:
+  en: 6ec56374a14f3b27
+  zh: 71723eb1588db3ee

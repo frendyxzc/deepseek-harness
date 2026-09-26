@@ -17,7 +17,7 @@ import { randomUUID } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent'
-import type {} from '@deepseek-ai/dsh-agent-presets'
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
 import { isFeishuErrorWithCode, FeishuError } from '@deepseek-ai/dsh-feishu'
 import type { FeishuProvider, FeishuReceiveEvent, FeishuReceiveIdType } from '@deepseek-ai/dsh-feishu'
@@ -323,6 +323,7 @@ export function apply(ctx: Context, config: Config = {}): void {
       // Preserve resolveTemplate's exact failure value; the caller owns this
       // rejection and inspects it, and the template closure may throw
       // arbitrary values.
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors
       return Promise.reject(error)
     }
     const { presetId: preset, agentOptions: options, cwd: workingDir } = template

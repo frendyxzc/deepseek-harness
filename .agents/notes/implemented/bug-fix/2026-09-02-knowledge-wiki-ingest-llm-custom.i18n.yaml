@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-02-knowledge-wiki-ingest-llm-custom.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-09-02-knowledge-wiki-ingest-llm-custom.md
-2026-09-02-knowledge-wiki-ingest-llm-custom.md: 5adfe2965817c97700e74c63c8986ec864a8dfa2
-2026-09-02-knowledge-wiki-ingest-llm-custom.zh.md: 0245d3a5eaa5593b1cbc5b9564d29c2cb2844ba7
+/agent-note-provision-the-knowledge-wiki-ingest-llm-as-custom-in-setup-dsh:
+  en: 52fba6571083e8e4
+  zh: 84b8e3519025e0de
+/agent-note-provision-the-knowledge-wiki-ingest-llm-as-custom-in-setup-dsh/problem:
+  en: ae57be1645f77111
+  zh: ec1625470a6c90e8
+/agent-note-provision-the-knowledge-wiki-ingest-llm-as-custom-in-setup-dsh/decision:
+  en: c45c87304a76090a
+  zh: c10658fcf3a505c8
+/agent-note-provision-the-knowledge-wiki-ingest-llm-as-custom-in-setup-dsh/alternatives-considered:
+  en: fb619df4f595c48d
+  zh: 4313f27684e9d14d
+/agent-note-provision-the-knowledge-wiki-ingest-llm-as-custom-in-setup-dsh/verification:
+  en: f239f4c787b3f4e9
+  zh: a225c9f627d192b4
+/agent-note-provision-the-knowledge-wiki-ingest-llm-as-custom-in-setup-dsh/consequences:
+  en: fddc52cbef1763fa
+  zh: b1e5eb8b3f74f756

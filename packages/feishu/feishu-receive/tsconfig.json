@@ -30,7 +30,7 @@
       "path": "../../llm/tdai-memory"
     },
     {
-      "path": "../../preset/agent-presets"
+      "path": "../../preset/agent-preset-registry"
     },
     {
       "path": "../feishu"

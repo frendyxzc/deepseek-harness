@@ -28,9 +28,6 @@ describe('feishu-bot multi-bot credential resolution', () => {
         return ref === 'FEISHU_APP_SECRET_QA' ? { value: 'qa-secret', source: 'file' } : undefined
       },
     } as never)
-    ctx.provide('settings', {
-      installSection: () => {},
-    } as never)
 
     const fiber = await ctx.plugin(FeishuBot, { bots: [{ id: 'qa', appId: 'cli_aa2d297272b85d0c' }] })
 

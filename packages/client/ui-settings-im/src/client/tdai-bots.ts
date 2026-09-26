@@ -8,7 +8,7 @@
  * branch, so a save cannot overwrite them.
  */
 
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 /** Settings namespace the owning Host plugin (`dsh-feishu-bot`) registers. */
 export const FEISHU_BOT_SETTINGS_NAMESPACE = 'feishu-bot'
@@ -46,9 +46,9 @@ export interface TdaiBotsView {
  */
 export class TdaiBotsController {
   /**
-   * @param scope - the bound settings scope for `feishu-bot`.
+   * @param scope - the shared configuration form for `feishu-bot`.
    */
-  constructor(private readonly scope: SettingsScope<TdaiBotsSection>) {}
+  constructor(private readonly scope: ConfigForm<TdaiBotsSection>) {}
 
   /**
    * Load the current section, waiting out the mirror's first describe when it

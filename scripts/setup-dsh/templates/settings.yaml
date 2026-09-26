@@ -1,6 +1,6 @@
 ui-onboarding:
   welcomeNoticeVersion: 2026-08-13.1
-agent-presets:
+agent-preset-registry:
   default: standard
 llm-pi-ai:
   providers:

@@ -7,7 +7,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type { FeishuBotStatusView, TdaiAgentOption, TdaiTeamOption } from '@deepseek-ai/dsh-api-remotes/client'
 import { FeishuStatusTab, type FeishuStatusTabInjected } from './FeishuStatusTab.tsx'
-import { TdaiBotsController, FEISHU_BOT_SETTINGS_NAMESPACE } from './tdai-bots.ts'
+import { TdaiBotsController, FEISHU_BOT_SETTINGS_NAMESPACE, type TdaiBotsSection } from './tdai-bots.ts'
 import { en, zh, type ImStatusLocaleKey } from './locales.ts'
 
 export type { FeishuStatusTabInjected, FeishuStatusTabProps } from './FeishuStatusTab.tsx'
@@ -24,14 +24,14 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 export const NS = 'settings.im'
 
 /** Services required by the Settings registration and generated Remote face. */
-export const inject = ['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'remote.credentials', 'settingsScope']
+export const inject = ['slots', 'locale', 'remote', 'remote.feishuStatus', 'remote.tdaiMemory', 'remote.credentials', 'configForms']
 
 /** Contribute the lazy IM settings tab to the Plugins settings section. */
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-im: dictionaries')
 
   const t = ctx.locale.bind(NS)
-  const bots = new TdaiBotsController(ctx.settingsScope.bind({ namespace: FEISHU_BOT_SETTINGS_NAMESPACE }))
+  const bots = new TdaiBotsController(ctx.configForms.get<TdaiBotsSection>(FEISHU_BOT_SETTINGS_NAMESPACE))
   const listStatus = async (): Promise<FeishuBotStatusView[]> => {
     const result = await ctx.remote.feishuStatus.list()
     return result.ok ? result.value : []
@@ -48,7 +48,7 @@ export function apply(ctx: ClientContext): void {
     const result = await ctx.remote.credentials.set(ref, value)
     if (!result.ok) {
       const error = result.error as { message?: unknown }
-      throw new Error(typeof error?.message === 'string' ? error.message : 'credential write failed')
+      throw new Error(typeof error.message === 'string' ? error.message : 'credential write failed')
     }
   }
   const injected = (): FeishuStatusTabInjected => ({

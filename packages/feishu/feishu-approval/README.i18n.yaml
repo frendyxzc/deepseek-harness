@@ -1,6 +1,49 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/feishu/feishu-approval/README.md
-README.md: 1ef9c48e0da17e74c291632b8f8a52c701a8313a
-README.zh.md: 3a78abd3482d3e53664e1d633dd4eb48c859af9b
+/:
+  en: 8d39c5cafeda3304
+  zh: 0e52738e94d672a5
+/deepseek-ai-dsh-feishu-approval:
+  en: 90ab96388cd1e7ff
+  zh: d2dc186d99e7bcc1
+/deepseek-ai-dsh-feishu-approval/summary:
+  en: 4da8662d33fd52a7
+  zh: d3c010a936b69e14
+/deepseek-ai-dsh-feishu-approval/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 405b30feaf48c087
+/deepseek-ai-dsh-feishu-approval/use-this-package:
+  en: 4f56a1a351573887
+  zh: 545c02a20cb04801
+/deepseek-ai-dsh-feishu-approval/use-this-package/when-to-choose-it:
+  en: c082b25e6be84a18
+  zh: e8bcf1ad85b55ca3
+/deepseek-ai-dsh-feishu-approval/use-this-package/minimal-configuration:
+  en: c6cf5c461ae953d3
+  zh: 90f2b0684926b046
+/deepseek-ai-dsh-feishu-approval/use-this-package/which-chat-answers:
+  en: af09d3863b40d5cb
+  zh: 2bd49585ba1879ba
+/deepseek-ai-dsh-feishu-approval/use-this-package/what-a-tap-does:
+  en: d6da4ebebc713a95
+  zh: 01815bff5bd64702
+/deepseek-ai-dsh-feishu-approval/understand-the-implementation:
+  en: 3e4d790b15d5b120
+  zh: 5f57a8c770c160f3
+/deepseek-ai-dsh-feishu-approval/further-exploration:
+  en: 178f1e418eec03f7
+  zh: 2e761fd095ffc9e2
+/deepseek-ai-dsh-feishu-approval/model-experience:
+  en: 51f29356135b856f
+  zh: 511f9e207d083ef5
+/deepseek-ai-dsh-feishu-approval/model-experience/kv-cache-effect:
+  en: dacb57c1e239c1a2
+  zh: 83afa410fb017275
+/deepseek-ai-dsh-feishu-approval/known-limitations-and-deferred-work:
+  en: fa201f432bd37b12
+  zh: b28196b397800f8a
+/deepseek-ai-dsh-feishu-approval/known-limitations-and-deferred-work/dev-note:
+  en: 79ea67d3aebb1cf8
+  zh: ab6de8c4003505f2
