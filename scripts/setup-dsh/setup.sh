@@ -5,15 +5,16 @@
 # under $DSH_HOME (default ~/.dsh) — plus the TencentDB-Agent-Memory stack
 # that the local dsh Web profile talks to:
 #
-#   ~/.dsh/settings.yaml                LLM providers / models (copied from template)
 #   ~/.dsh/.credentials.yaml            PROXY_USER_KEY (prompted, never committed)
 #   ~/.dsh/profiles/web/{package.json, cordis.yml, cordis.patch.yml, pnpm-workspace.yaml}
+#                                       cordis.patch.yml carries the entry mounts
+#                                       plus the model routes and defaults
 #   ~/.dsh/tdai-stack/TencentDB-Agent-Memory   git clone + per-service config
 #   ~/.dsh/tdai-stack/config/{proxy-config,tdai-gateway}.yaml   generated from templates/tdai-stack/
-#   ~/.dsh/skills/gitlab-mr-workflow           optional GitLab MR workflow skill (see §7)
-#   ~/.dsh/better-harness                  optional better-harness checkout (see §8)
-#   ~/.dsh/skills/better-harness           wrapper skill delegating to that checkout (§8)
-#   <repo>/.env                         DEEPSEEK_API_KEY + FEISHU_* (prompted) + GITLAB_TOKEN (§7)
+#   ~/.dsh/skills/gitlab-mr-workflow           optional GitLab MR workflow skill (see §6)
+#   ~/.dsh/better-harness                  optional better-harness checkout (see §7)
+#   ~/.dsh/skills/better-harness           wrapper skill delegating to that checkout (§7)
+#   <repo>/.env                         DEEPSEEK_API_KEY + FEISHU_* (prompted) + GITLAB_TOKEN (§6)
 #
 # Idempotent: existing files are kept unless --force is passed. Secrets are
 # prompted interactively (or read from the DSH_* env vars below); pass
@@ -25,14 +26,15 @@
 #   --branch REF        TencentDB-Agent-Memory branch (default: feat/server_team)
 #   --skip-memory       do not clone/configure the memory stack
 #   --skip-install      do not run pnpm/npm install in the memory services
-#   --skip-better-harness  do not clone/refresh the better-harness skill (§8)
+#   --skip-better-harness  do not clone/refresh the better-harness skill (§7)
 #   --upgrade           migrate an EXISTING deployment in place: append the
 #                       feishu-bot bots/credentials patch, add the
-#                       qwen3-vl-plus vision model to settings.yaml, refresh
+#                       qwen3-vl-plus vision model to the web profile's
+#                       llm-pi-ai dashscope models, refresh
 #                       the memory stack deps + rebuild the panel web UI,
 #                       provision the Knowledge wiki-ingest LLM from the existing
 #                       core LLM config, refresh dsh deps + rebuild, refresh
-#                       the better-harness skill checkout + deps (§8). Never
+#                       the better-harness skill checkout + deps (§7). Never
 #                       prompts for or regenerates a secret (no --force); safe to run.
 #   --force             overwrite existing generated files
 #   --non-interactive   never prompt; fail if a required value is missing
@@ -367,7 +369,7 @@ upgrade_knowledge_llm_config() {
 
 # upgrade_feishu_bot_config — migrate a flat single-app `feishu-bot` profile to
 # the multi-bot bots/credentials split by APPENDING a config-override patch entry
-# (the same idempotent pattern §7b uses), never rewrites the insert block. The
+# (the same idempotent pattern §6b uses), never rewrites the insert block. The
 # override is keyed by the marker comment, so a re-run is a no-op; it assumes the
 # setup-generated flat entry (no prior feishu-bot `config`), so a hand-customized
 # feishu-bot config that already carries `bots:`/`credentials:` is left alone.
@@ -416,60 +418,68 @@ upgrade_feishu_bot_config() {
 }
 
 # upgrade_vision_model_config — add the `qwen3-vl-plus` vision model to the
-# `llm-pi-ai.providers.dashscope.models` list of an EXISTING settings.yaml, so
-# a text-only deployment gains one image-capable route in place. Idempotent and
-# non-destructive: the awk pass re-emits every line and injects the entry only
-# as the last item of the dashscope `models:` list, leaving every other section
-# (and any hand edit) byte-for-byte intact. A settings.yaml without the
-# llm-pi-ai/dashscope block is left alone.
+# `llm-pi-ai` entry's `providers.dashscope.models` list in the EXISTING web
+# profile patch, so a text-only deployment gains one image-capable route in
+# place. Idempotent and non-destructive: the awk pass re-emits every line and
+# injects the entry only as the last item of the dashscope `models:` list, at
+# that list's own indentation, leaving every other row (and any hand edit)
+# byte-for-byte intact. A patch without the llm-pi-ai/dashscope block is left
+# alone.
 upgrade_vision_model_config() {
-  local settings="$DSH_HOME/settings.yaml"
-  if [[ ! -f "$settings" ]]; then
-    warn "settings.yaml missing ($settings); run a full ./scripts/setup-dsh/setup.sh first"
+  local patch="$PROFILE_DIR/cordis.patch.yml"
+  if [[ ! -f "$patch" ]]; then
+    warn "web profile patch missing ($patch); run a full ./scripts/setup-dsh/setup.sh first"
     return 0
   fi
-  if grep -q "id: qwen3-vl-plus" "$settings"; then
-    ok "qwen3-vl-plus already present in settings.yaml; skipping"
+  if grep -q "id: qwen3-vl-plus" "$patch"; then
+    ok "qwen3-vl-plus already present in the profile patch; skipping"
     return 0
   fi
-  if ! grep -q "^llm-pi-ai:" "$settings" || ! grep -q "dashscope:" "$settings"; then
-    warn "settings.yaml has no llm-pi-ai/dashscope block; skipping vision model migration"
+  if ! grep -q "^- id: llm-pi-ai$" "$patch" || ! grep -q "dashscope:" "$patch"; then
+    warn "profile patch has no llm-pi-ai/dashscope block ($patch); skipping vision model migration"
+    warn "if this deployment still has a legacy ~/.dsh/settings.yaml, boot the web profile once to import it, then re-run --upgrade"
     return 0
   fi
 
   awk '
-    BEGIN { phase = 0 }
-    /^llm-pi-ai:$/                 { phase = 1; print; next }
-    phase == 1 && /^    dashscope:$/ { phase = 2; print; next }
-    phase == 2 && /^      models:$/  { phase = 3; print; next }
+    function spaces(n,   s, i) { s = ""; for (i = 0; i < n; i++) s = s " "; return s }
+    function emit_model() {
+      print pad "- id: qwen3-vl-plus"
+      print pad "  name: Qwen3 VL Plus"
+      print pad "  input: [text, image]"
+      flush_gap()
+    }
+    # Blank lines inside the models list are held so the entry lands beside the
+    # last model and the row separator stays above the next patch entry.
+    function flush_gap() { if (gap != "") { printf "%s", gap; gap = "" } }
+    BEGIN { phase = 0; pad = ""; gap = "" }
+    $0 == "- id: llm-pi-ai" { phase = 1; print; next }
+    phase >= 1 && /^- / { if (phase == 3) emit_model(); phase = 0; print; next }
+    phase == 1 && /^ *dashscope:$/ { dash = match($0, /[^ ]/) - 1; phase = 2; print; next }
+    phase == 2 && /^[[:space:]]*$/ { print; next }
+    phase == 2 && match($0, /[^ ]/) - 1 <= dash { phase = 1; print; next }
+    phase == 2 && $0 ~ "^" spaces(dash + 2) "models:$" {
+      pad = spaces(dash + 4); phase = 3; print; next
+    }
     phase == 3 {
-      if (/^[[:space:]]*$/) { print; next }
-      if (/^        /)      { print; next }
-      print "        - id: qwen3-vl-plus"
-      print "          name: Qwen3 VL Plus"
-      print "          input: [text, image]"
-      phase = 0
-      print
-      next
+      col = match($0, /[^ ]/)
+      if (col == 0) { gap = gap "\n"; next }
+      flush_gap()
+      if (col - 1 >= dash + 4) { print; next }
+      emit_model(); phase = 1; print; next
     }
     { print }
-    END {
-      if (phase == 3) {
-        print "        - id: qwen3-vl-plus"
-        print "          name: Qwen3 VL Plus"
-        print "          input: [text, image]"
-      }
-    }
-  ' "$settings" > "$settings.tmp"
+    END { if (phase == 3) emit_model(); flush_gap() }
+  ' "$patch" > "$patch.tmp"
 
-  if ! grep -q "id: qwen3-vl-plus" "$settings.tmp"; then
-    warn "could not locate the dashscope models list; leaving settings.yaml unchanged"
-    rm -f "$settings.tmp"
+  if ! grep -q "id: qwen3-vl-plus" "$patch.tmp"; then
+    warn "could not locate the dashscope models list; leaving $patch unchanged"
+    rm -f "$patch.tmp"
     return 0
   fi
-  chmod 600 "$settings.tmp"
-  mv "$settings.tmp" "$settings"
-  ok "qwen3-vl-plus vision model added -> $settings (llm-pi-ai dashscope models)"
+  chmod 600 "$patch.tmp"
+  mv "$patch.tmp" "$patch"
+  ok "qwen3-vl-plus vision model added -> $patch (llm-pi-ai dashscope models)"
 }
 
 # ensure_better_harness — clone/refresh the better-harness checkout under the
@@ -608,14 +618,7 @@ info "harness home: $DSH_HOME  ·  workspace: $WORKSPACE"
 mkdir -p "$DSH_HOME"
 chmod 700 "$DSH_HOME"
 
-# ── 2. settings.yaml ───────────────────────────────────────────────────────
-if write_if_absent "$DSH_HOME/settings.yaml"; then
-  cp "$TEMPLATES/settings.yaml" "$DSH_HOME/settings.yaml"
-  chmod 600 "$DSH_HOME/settings.yaml"
-  ok "settings.yaml -> $DSH_HOME/settings.yaml"
-fi
-
-# ── 3. .credentials.yaml ───────────────────────────────────────────────────
+# ── 2. .credentials.yaml ───────────────────────────────────────────────────
 # The proxy user key is a durable identity: MemoryCore's admin user is
 # bootstrapped with it, so once it exists it must never be regenerated — not
 # even under --force — or the proxy stops authenticating the agent. Create it
@@ -641,7 +644,7 @@ else
   ok ".credentials.yaml -> $DSH_HOME/.credentials.yaml"
 fi
 
-# ── 4. web profile ─────────────────────────────────────────────────────────
+# ── 3. web profile ─────────────────────────────────────────────────────────
 PROFILE_DIR="$DSH_HOME/profiles/web"
 mkdir -p "$PROFILE_DIR"
 
@@ -670,7 +673,7 @@ if write_if_absent "$PROFILE_DIR/cordis.patch.yml"; then
   ok "profile cordis.patch.yml -> $PROFILE_DIR/cordis.patch.yml"
 fi
 
-# ── 5. repo .env (gitignored) ──────────────────────────────────────────────
+# ── 4. repo .env (gitignored) ──────────────────────────────────────────────
 if [[ -e "$REPO_ROOT/.env" && "$FORCE" != "1" ]]; then
   warn "already exists, skipping: $REPO_ROOT/.env"
 else
@@ -689,7 +692,7 @@ else
   ok ".env -> $REPO_ROOT/.env"
 fi
 
-# ── 6. TencentDB-Agent-Memory stack ─────────────────────────────────────────
+# ── 5. TencentDB-Agent-Memory stack ─────────────────────────────────────────
 MEMORY_ROOT="$DSH_HOME/tdai-stack/TencentDB-Agent-Memory"
 # Shared install target for the two generated stack configs (proxy + gateway);
 # start-all.sh passes proxy's config with --config, and MemoryCore's .env.local
@@ -848,7 +851,7 @@ else
   if [[ -f "$MEMORY_DB" ]]; then
     ADMIN_EXISTS=$(sqlite3 "$MEMORY_DB" "SELECT COUNT(*) FROM meta_users WHERE user_type='system_admin';" 2>/dev/null || echo 0)
     if [[ "$ADMIN_EXISTS" == "0" ]]; then
-      # §3 always leaves PROXY_USER_KEY set (existing file read back or freshly
+      # §2 always leaves PROXY_USER_KEY set (existing file read back or freshly
       # generated); re-read defensively in case the file changed since then.
       if [[ -z "${PROXY_USER_KEY:-}" ]]; then
         PROXY_USER_KEY="$(awk '/^[[:space:]]*PROXY_USER_KEY:/{gsub(/"/,"",$2); print $2; exit}' "$DSH_HOME/.credentials.yaml" 2>/dev/null || true)"
@@ -876,7 +879,7 @@ else
   fi
 fi
 
-# ── 7. GitLab MR integration (optional) ──────────────────────────────────────
+# ── 6. GitLab MR integration (optional) ──────────────────────────────────────
 # Enabled only when a bot username is supplied (env or prompt); an empty value
 # skips the whole section. The integration mirrors the Feishu pattern: a skill
 # teaches the agent the git/glab outbound workflow, and a poller plugin watches
@@ -942,7 +945,7 @@ else
   info "GitLab MR integration skipped (no bot username)"
 fi
 
-# ── 8. better-harness skill (optional) ───────────────────────────────────────
+# ── 7. better-harness skill (optional) ───────────────────────────────────────
 # Clones/refreshes the open-source better-harness checkout under the harness
 # home and installs its root runtime deps, then drops a wrapper skill into the
 # user skills root so the agent can run /better-harness workflow reviews in any

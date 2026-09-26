@@ -56,3 +56,72 @@
       name: '@deepseek-ai/dsh-feishu-question'
       config:
         timeoutMs: 300000
+
+# ── Model routes and defaults ────────────────────────────────────────────────
+# These id-targeted config rows are the deployment's settings. A pre-0.1.7
+# deployment kept them in `~/.dsh/settings.yaml`, which the first boot imports
+# into the active profile and renames to `settings.yaml.imported`; this layer is
+# the only file to edit afterwards.
+# Both LLM entries route through the local TDAI MemoryProxy (team memory
+# injection + L0 capture). The proxy authenticates with PROXY_USER_KEY
+# (~/.dsh/.credentials.yaml) and forwards to the MaaS upstream with its own
+# server-side key, so no key is written here. See TencentDB-Agent-Memory
+# INSTALL.md, "Using Proxy with DeepSeek Harness".
+- id: ui-settings-general
+  config:
+    # Records the shipped welcome notice as already read, so a freshly
+    # bootstrapped profile boots quiet. The web-app bundle already pins
+    # `agent-preset-registry.default: standard`, so no preset row is repeated here.
+    welcomeNoticeVersion: 2026-08-13.1
+
+- id: llm-pi-ai
+  config:
+    providers:
+      dashscope:
+        displayName: DashScope Qwen
+        apiKeyEnv: PROXY_USER_KEY
+        api: openai-completions
+        # No trailing /v1: the client appends /chat/completions, matching the
+        # proxy route /dsh/<spaceId>/chat/completions.
+        baseURL: http://127.0.0.1:8096/dsh/default
+        models:
+          - id: qwen3.7-plus
+            name: Qwen3.7 Plus
+          - id: qwen3.8-max
+            name: Qwen3.8 Max
+          - id: deepseek-v4-pro
+            name: DeepSeek V4 Pro
+          - id: deepseek-v4-pro-0813
+            name: deepseek-v4-pro-0813
+          - id: qwen3-vl-plus
+            name: Qwen3 VL Plus
+            input: [text, image]
+
+- id: agent-default-model
+  # llm-deepseek registers under provider id "deepseek-official". Both routes
+  # send x-deepseek-harness-session-id, which the MemoryProxy uses to bind the
+  # session (picker + injection + L0 capture); deepseek-official additionally
+  # sends the anonymous x-deepseek-harness-user-id, which the pi-ai route has no
+  # source for.
+  config:
+    provider: deepseek-official
+    model: deepseek-v4-pro-0813
+
+- id: llm-deepseek
+  config:
+    apiKeyEnv: PROXY_USER_KEY
+    baseURL: http://127.0.0.1:8096/dsh/default
+    reasoningEffort: high
+    models:
+      - id: deepseek-v4-pro-0813
+        name: DeepSeek V4 Pro 0813
+        contextWindow: 1000000
+        maxTokens: 32768
+      - id: qwen3.8-max
+        name: Qwen3.8 Max
+        contextWindow: 262144
+        maxTokens: 32768
+      - id: deepseek-v4-pro
+        name: DeepSeek V4 Pro
+        contextWindow: 1000000
+        maxTokens: 32768

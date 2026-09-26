@@ -31,7 +31,7 @@
 `--upgrade` 是非破坏性的、可安全重复运行：它从不提示或重新生成密钥，从不覆盖已生成文件，也绝不隐含 `--force`。它做五件事：
 
 1. **迁移 profile 的 `feishu-bot` 补丁** —— 追加一条幂等的 config-override（以 marker 注释为键，重跑即 no-op），把扁平单应用条目换成 `bots` + `credentials` 分离，使 Settings → Plugins → IM 选项卡能按 bot 映射 team/agent。扁平部署在本次运行前仍能正常工作（扁平字段保持向后兼容）；密钥仍留在 `FEISHU_APP_ID` / `FEISHU_APP_SECRET`。
-2. **新增图片能力模型** —— 把 `qwen3-vl-plus`（声明 `input: [text, image]`）追加到 `settings.yaml` 里 `llm-pi-ai` dashscope 的 `models` 列表，使部署可以选一条视觉路由来原生读取粘贴图片。幂等 —— 模型已在列表里时该步即 no-op，缺少 `llm-pi-ai`/dashscope 块的 `settings.yaml` 则原样保留。
+2. **新增图片能力模型** —— 把 `qwen3-vl-plus`（声明 `input: [text, image]`）追加到 `~/.dsh/profiles/web/cordis.patch.yml` 里 `llm-pi-ai` dashscope 的 `models` 列表，使部署可以选一条视觉路由来原生读取粘贴图片。幂等 —— 模型已在列表里时该步即 no-op，缺少 `llm-pi-ai`/dashscope 块的补丁文件则原样保留。
 3. **修复缺失的 MemoryProxy 绑定** —— 校验 `better-sqlite3` 可加载，缺失时重装（缺失绑定会让代理存储静默降级 `sqlite -> fs -> memory`，并使 memory bridge 返回 `40101`）。内存栈钉在 Node v22 上，因此安装与校验都在 `start-all.sh` 启动服务所用的同一个 Node 下运行（捆绑的 node22，其次 Homebrew node@22，否则环境里的 Node）：换成别的 Node 时检查两头都会撒谎——npm 11 会静默省略安装脚本未获批准的 `better-sqlite3`（可选依赖），而不同 ABI 下构建的绑定无法加载。`MemoryProxy/package.json` 里幂等的 `allowScripts` 补丁覆盖 npm 11 回退场景。
 4. **刷新并重建** —— 在 checkout 里运行 `pnpm install` + `pnpm run build`（链接新增的工作区包，并重建 host libs、client bundles 与 Web 前端），随后在 profile 里运行 `pnpm install`。
 5. **刷新 better-harness 技能** —— fetch 并把 `~/.dsh/better-harness` 的 checkout 重置到钉住的分支，重装其根运行时依赖，保持 `/better-harness` 工作流评审技能最新（见 [better-harness skill](#better-harness-skill-optional) 一节）。
@@ -44,9 +44,8 @@
 
 | 目标 | 来源 | 密钥？ |
 |---|---|---|
-| `~/.dsh/settings.yaml` | `templates/settings.yaml` | 否 |
 | `~/.dsh/.credentials.yaml` | 提示输入的 `PROXY_USER_KEY` | 是（0600） |
-| `~/.dsh/profiles/web/*` | `templates/profile-web/*` | 否（`cwd`/`fallbackChatId` 由参数填入） |
+| `~/.dsh/profiles/web/*` | `templates/profile-web/*` | 否（`cwd`/`fallbackChatId` 由参数填入；模型路由与默认值是 `cordis.patch.yml` 里的 config 行） |
 | `<repo>/.env` | 提示输入的 `DEEPSEEK_API_KEY`、`FEISHU_*` | 是（gitignored） |
 | `~/.dsh/tdai-stack/TencentDB-Agent-Memory` | git clone `feat/server_team` | — |
 | `~/.dsh/tdai-stack/config/proxy-config.yaml` | `templates/tdai-stack/proxy-config.yaml` + 提示输入的上游 URL/key | 是（0600） |
@@ -60,9 +59,9 @@
 | `…/metadata.db` → `meta_users` + `meta_user_keys` | 数据库存在但没有 admin 用户时，用 `PROXY_USER_KEY` 引导 MemoryCore admin 用户（使 agent 能通过代理认证） | 是 |
 | `~/.dsh/skills/gitlab-mr-workflow/` | `gitlab-mr/gitlab-mr-workflow/*`（仓库）—— GitLab MR 工作流 skill | 否 |
 | `~/.dsh/better-harness/` | git clone [QoderAI/better-harness](https://github.com/QoderAI/better-harness) 的 `main` + `npm ci`（根运行时依赖） | 否 |
-| `~/.dsh/skills/better-harness/` | 指向该 checkout 的包装 SKILL.md（由 §8 生成） | 否 |
+| `~/.dsh/skills/better-harness/` | 指向该 checkout 的包装 SKILL.md（由 §7 生成） | 否 |
 | `~/.dsh/profiles/web/cordis.patch.yml`（+`gitlab-mr` 条目） | `gitlab-mr/gitlab-mr-poller.mjs`（仓库）—— poller 插件挂载 | 否 |
-| `<repo>/.env`（+`GITLAB_TOKEN`） | 提示输入的 `DSH_GITLAB_TOKEN` | 是（gitignored，由 §7 追加） |
+| `<repo>/.env`（+`GITLAB_TOKEN`） | 提示输入的 `DSH_GITLAB_TOKEN` | 是（gitignored，由 §6 追加） |
 
 `templates/` 下的模板是非密钥 DSH 配置的事实来源。改它们并用 `--force` 重新运行以重新部署。
 
