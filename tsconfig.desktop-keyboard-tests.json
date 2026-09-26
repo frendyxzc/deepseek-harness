@@ -3,7 +3,9 @@
   "extends": "./tsconfig.base.client.json",
   "compilerOptions": {
     "rootDir": ".",
-    "outDir": "lib/desktop-keyboard-test-types",
+    // `pnpm run clean` deletes each emitting project's build root and requires the
+    // `lib/types` outDir convention, so this declaration output stays at `lib/types`.
+    "outDir": "lib/types",
     "emitDeclarationOnly": true,
     "types": ["node"]
   },
