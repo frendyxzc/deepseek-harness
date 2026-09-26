@@ -1227,7 +1227,8 @@ export interface Config {
 ## `@deepseek-ai/dsh-feishu-bot`
 
 - `inject`: `feishu` · `credentials`
-- `source`: [`packages/feishu/feishu-bot/src/index.ts:96`](../packages/feishu/feishu-bot/src/index.ts)
+- `refs`: `Volatile` (`@deepseek-ai/cordis`)
+- `source`: [`packages/feishu/feishu-bot/src/index.ts:97`](../packages/feishu/feishu-bot/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config: the flat single app, plus the multi-app `bots` + `credentials`. */
@@ -1242,8 +1243,8 @@ export interface Config {
   appSecretEnv?: string
   /** Feishu Open API base URL (flat single app). */
   baseURL?: string
-  /** Bot apps; when non-empty these replace the flat single-app fields. */
-  bots?: FeishuBotEntry[]
+  /** Bot apps; when non-empty these replace the flat single-app fields. Volatile so the Settings form edits it live. */
+  bots: Volatile<FeishuBotEntry[]>
   /** Secrets and endpoint per bot; composition-only, no settings exposure. */
   credentials?: FeishuBotCredential[]
 }
@@ -1282,7 +1283,7 @@ export interface FeishuBotCredential {
 ## `@deepseek-ai/dsh-feishu-question`
 
 - `inject`: `feishu` · `userQuestions`
-- `source`: [`packages/feishu/feishu-question/src/index.ts:55`](../packages/feishu/feishu-question/src/index.ts)
+- `source`: [`packages/feishu/feishu-question/src/index.ts:60`](../packages/feishu/feishu-question/src/index.ts)
 
 ```ts config-catalog
 /** Plugin config. */

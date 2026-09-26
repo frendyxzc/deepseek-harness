@@ -3,7 +3,7 @@
 .card {
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l2);
   border: 0;
-  border-radius: 14px;
+  border-radius: var(--dsw-radius-lg);
   background: var(--dsw-alias-bg-layer-3);
   box-shadow: var(--dsw-elevation-panel);
   transition: box-shadow 0.16s ease, background 0.16s ease;
@@ -31,13 +31,8 @@
   align-items: center;
   gap: 12px;
   padding: 16px;
-  border-radius: 14px;
+  border-radius: var(--dsw-radius-lg);
   box-sizing: border-box;
-}
-
-.header:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: -2px;
 }
 
 .headText {
@@ -115,7 +110,7 @@
   gap: 12px;
   padding: 14px;
   border: 0.5px solid var(--dsw-alias-border-l1);
-  border-radius: 12px;
+  border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-1);
 }
 
@@ -133,7 +128,7 @@
   display: grid;
   place-items: center;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 10px;
+  border-radius: var(--dsw-radius-md);
   background: var(--dsw-alias-bg-layer-3);
 }
 
@@ -197,7 +192,7 @@
   height: 34px;
   padding: 0 12px;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-bg-layer-3);
   font: inherit;
   font-size: 13px;
@@ -267,7 +262,7 @@
 .save {
   appearance: none;
   border: 0.5px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   padding: 5px 14px;
   font: inherit;
   font-size: 13px;
@@ -335,14 +330,6 @@
 .save:disabled {
   opacity: 0.4;
   cursor: default;
-}
-
-.add:focus-visible,
-.discard:focus-visible,
-.remove:focus-visible,
-.save:focus-visible {
-  outline: 2px solid var(--dsw-alias-brand-primary);
-  outline-offset: 1px;
 }
 
 .state {

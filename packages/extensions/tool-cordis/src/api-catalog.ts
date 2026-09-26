@@ -3076,7 +3076,7 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     methods: [
       {
         signature: 'identityFor(botId: string): TdaiIdentity | undefined',
-        description: 'Resolved team/agent identity for one bot, read from the `feishu-bot` section.',
+        description: 'Resolved team/agent identity for one bot, read from the `feishu-bot` entry\'s live form.',
         parameters: [{ name: 'botId', description: 'the Feishu bot id whose identity to resolve.' }],
         returns: 'the bot\'s team/agent identity, or undefined when the bot is unmapped.',
       },

@@ -31,7 +31,7 @@ Owns the session → bot bindings the Feishu receive channel writes, the team/ag
 
 ```ts cordis-catalog
 /**
- * Resolved team/agent identity for one bot, read from the `feishu-bot` section.
+ * Resolved team/agent identity for one bot, read from the `feishu-bot` entry's live form.
  * @param botId - the Feishu bot id whose identity to resolve.
  * @returns the bot's team/agent identity, or undefined when the bot is unmapped.
  */

@@ -92,6 +92,8 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-client-ui-settings-account` | yes | Manage DeepSeek login and open Platform billing pages |
 | `@deepseek-ai/dsh-client-ui-settings-agent-loop` | no | Settings page of the agent loop on the dsh web client's Plugins page: the parallel tool-call cap of the agent-loop namespace |
 | `@deepseek-ai/dsh-client-ui-settings-general` | no | Settings ownerless-copy and product onboarding plugin: the General section, shell trigger/header chrome content, settings dictionaries, and the versioned welcome notice |
+| `@deepseek-ai/dsh-client-ui-settings-im` | no | Feishu integration status tab in Web IM settings |
+| `@deepseek-ai/dsh-client-ui-settings-memory` | no | Settings section that links to the running TencentDB-Agent-Memory (Memory Hub) panel |
 | `@deepseek-ai/dsh-client-ui-settings-models` | yes | Models settings and shared product-onboarding dialogs over existing settings and credential joins |
 | `@deepseek-ai/dsh-client-ui-settings-plugin-inventory` | no | Read-only Cordis Loader inventory tab in Web Plugins settings |
 | `@deepseek-ai/dsh-client-ui-settings-plugins` | no | Built-in plugins settings section for the dsh web client: the Settings navigation entry and the tab chrome feature-owned tabs register into |
@@ -208,6 +210,18 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-command-feedback` | no | Log-only session feedback: the record event, the sessionFeedback Host Remote, and the human-facing slash command |
 | `@deepseek-ai/dsh-message-feedback` | yes | Canonical Session-log ratings and notes for finalized assistant messages |
 
+## feishu
+
+| Package | Config | Description |
+|---|---|---|
+| `@deepseek-ai/dsh-feishu` | yes | Feishu (Lark) chat capability seam (ctx.feishu) for the DeepSeek Harness — provider registry, send-message execution, and the FeishuError taxonomy |
+| `@deepseek-ai/dsh-feishu-approval` | yes | Feishu approval-card answerer for the DeepSeek Harness — settles tool-approval requests from Feishu chat agents through interactive Allow/Deny cards |
+| `@deepseek-ai/dsh-feishu-bot` | yes | Feishu Bot API provider for the DeepSeek Harness Feishu chat capability seam (ctx.feishu) — sends messages through the Feishu Open API |
+| `@deepseek-ai/dsh-feishu-question` | yes | Feishu question-card answerer for the DeepSeek Harness — answers user-questions asks from Feishu chat agents through interactive form cards |
+| `@deepseek-ai/dsh-feishu-receive` | yes | Feishu long-connection receive consumer for the DeepSeek Harness — routes each Feishu chat into its own agent session |
+| `@deepseek-ai/dsh-feishu-status` | no | Read-only Remote projection of the Feishu capability's effective connection status for status surfaces |
+| `@deepseek-ai/dsh-tool-feishu` | yes | Model-facing `feishu_send_message` and `feishu_update_message` tools for the DeepSeek Harness Feishu chat capability seam (ctx.feishu) |
+
 ## fs
 
 | Package | Config | Description |
@@ -283,6 +297,7 @@ Every package below exports a Cordis plugin that a bundle patch can name in a Lo
 | `@deepseek-ai/dsh-llm-pi-ai` | yes | pi-ai-backed DeepSeek adapter for the DeepSeek Harness LLM seam (design-verification twin of dsh-llm-deepseek) |
 | `@deepseek-ai/dsh-llm-retry` | yes | Provider-routed LLM request retry policy for the DeepSeek Harness |
 | `@deepseek-ai/dsh-plugin-package-inventory-deepseek` | yes | Active Loader-backed plugin package inventory for official DeepSeek LLM API requests |
+| `@deepseek-ai/dsh-tdai-memory` | yes | Per-Feishu-app TDAI MemoryProxy team/agent identity headers, session bindings, and the core catalog Remote |
 | `@deepseek-ai/dsh-token-meter` | yes | Replay-aware token measurement service (ctx.tokenMeter) for the DeepSeek Harness |
 
 ## lsp

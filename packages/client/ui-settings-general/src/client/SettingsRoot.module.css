@@ -239,7 +239,7 @@
   flex: none;
   margin: 0 24px 12px;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--dsw-radius-sm);
   background: var(--dsw-alias-state-warn-tertiary);
   color: var(--dsw-alias-state-warn-label);
   font-size: 13px;
