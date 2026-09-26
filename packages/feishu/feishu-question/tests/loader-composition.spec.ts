@@ -107,7 +107,7 @@ async function loadComposition(questionConfig: string[] = []): Promise<{ ctx: Co
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
-  } as unknown as NonNullable<typeof ctx.loader.internal>
+  } as object as NonNullable<typeof ctx.loader.internal>
   await ctx.loader.create({
     name: 'cordis:include',
     config: { path: pathToFileURL(configPath).href },
@@ -143,7 +143,7 @@ async function writeConfig(configPath: string, base: string, questionConfig: str
 function chatAgent(ctx: Context, id: string): Agent {
   const session = ctx.sessions.create(SessionId(id))
   session.append('turn/start', { turn: 1 })
-  const agent = { id, session } as unknown as Agent
+  const agent = { id, session } as object as Agent
   ctx.agents.enter(agent, undefined)
   return agent
 }

@@ -150,7 +150,7 @@ async function mountDeferred(
 function chatAgent(ctx: Context, id = 'feishu-chat-1'): Agent {
   const session = ctx.sessions.create(SessionId(id))
   session.append('turn/start', { turn: 1 })
-  return { session } as unknown as Agent
+  return { session } as object as Agent
 }
 
 /** Bind one agent to one Feishu chat the way feishu-receive announces it. */
@@ -381,7 +381,7 @@ describe('feishu-approval', () => {
 
     const child = ctx.sessions.create(SessionId('feishu-child'), { meta: { parentSession: chat.session.id } })
     child.append('turn/start', { turn: 1 })
-    const childAgent = { session: child } as unknown as Agent
+    const childAgent = { session: child } as object as Agent
     ctx.emit('agent/created', { source: 'startup', agent: childAgent })
 
     const pending = ctx.approval.request(requestOf(childAgent))

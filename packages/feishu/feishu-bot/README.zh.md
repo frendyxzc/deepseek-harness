@@ -95,7 +95,6 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件配置、bot 列表、设置节、凭据引用与提供方注册 |
 | [`src/provider.ts`](src/provider.ts) | 开放接口调用、令牌缓存以及共享长连接接收通道 |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 </details>
 
@@ -136,6 +135,6 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，其安装函数为空，因为在 seam 已保障的契约之外不存在独立的事件序列或可变关系。`feishuAppSecretRef` 的规则在 Web 设置 IM 客户端中被镜像了一份，因此这里的改动必须与客户端那份同批提交。
+本包不发布不变式伴随插件，因为在 seam 已保障的契约之外不存在独立的事件序列或可变关系。`feishuAppSecretRef` 的规则在 Web 设置 IM 客户端中被镜像了一份，因此这里的改动必须与客户端那份同批提交。
 
 </details>

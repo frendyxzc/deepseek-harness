@@ -118,4 +118,4 @@ The intro line still enumerates the external console's feature list (chat memori
 
 </details>
 
-**Runtime invariant:** The `./invariant` companion registers an intentionally empty installer: the section emits no events and owns no cross-plugin mutable relation, so the slot ledger and the component tests own its behavior.
+**Runtime invariant:** No companion is published: the section emits no events and owns no cross-plugin mutable relation, so the slot ledger and the component tests own its behavior.

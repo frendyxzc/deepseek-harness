@@ -80,7 +80,6 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 服务、注册表、选择、接收订阅及状态投影 |
 | [`src/types.ts`](src/types.ts) | `FeishuProvider` 契约、请求与结果词汇、状态视图、`FeishuError` |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 类型词汇——接收 id 类型、消息类型、连接状态、脱敏后的 `FeishuProviderStatus`——定义于此，并由[飞书子系统](../../../docs/subsystems/feishu.zh.md)页面承载说明；本 README 不复述字段清单。
 
@@ -123,6 +122,6 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，但其安装函数为空：提供方映射始终私有，而 `feishu/provider-added` 与 `feishu/provider-removed` 这一对事件只在唯一的写入与删除点发出，因此不存在需要额外断言的独立关系。
+本包不发布不变式伴随插件：提供方映射始终私有，而 `feishu/provider-added` 与 `feishu/provider-removed` 这一对事件只在唯一的写入与删除点发出，因此不存在需要额外断言的独立关系。
 
 </details>

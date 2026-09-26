@@ -127,4 +127,4 @@ The settings namespace and the secret-reference rule are both deliberate client 
 
 </details>
 
-**Runtime invariant:** The `./invariant` companion registers an intentionally empty installer: the namespace and its schema belong to `dsh-feishu-bot`, and this tab's behavior is covered by its controller and component tests.
+**Runtime invariant:** No companion is published: the namespace and its schema belong to `dsh-feishu-bot`, and this tab's behavior is covered by its controller and component tests.

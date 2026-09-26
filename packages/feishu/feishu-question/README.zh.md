@@ -78,7 +78,6 @@ kind: "package-reference"
 | [`src/index.ts`](src/index.ts) | 配置校验、聊天绑定、卡片生命周期、点击与消息处理，以及 waterfall 监听器 |
 | [`src/card.ts`](src/card.ts) | v1 提问、答案摘要与结果说明三类卡片构建函数 |
 | [`src/answers.ts`](src/answers.ts) | 从一次被点击按钮的值解析选项下标的纯函数 |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 </details>
 
@@ -124,7 +123,7 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，其安装函数为空：nonce → 待决问题的关系是私有的运行期状态，没有属于自己的权威事件序列，而已被回答的问题经由 `@deepseek-ai/dsh-user-questions` 与请求会话自己的工具结果呈现。
+本包不发布不变式伴随插件：nonce → 待决问题的关系是私有的运行期状态，没有属于自己的权威事件序列，而已被回答的问题经由 `@deepseek-ai/dsh-user-questions` 与请求会话自己的工具结果呈现。
 
 `MAX_PENDING_QUESTIONS`（256）与 `MAX_DETAIL_CHARS`（8000）是固定的安全上限，而不是 `Config` 字段，因为提高任一数值改变的是上文记录的失败模式，而不是表达某种部署偏好。提供方移除之后的重开与聊天绑定跟踪刻意与 [`feishu-approval`](../feishu-approval/README.zh.md) 保持一致；在第三个消费方证明值得共享一个 seam 之前，每个应答器都把自己的生命周期内联保留。
 

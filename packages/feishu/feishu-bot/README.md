@@ -95,7 +95,6 @@ The receive channel is the only stateful part: one handler list per app, opened 
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin config, bot list, settings section, credential references, and provider registration |
 | [`src/provider.ts`](src/provider.ts) | Open API calls, token cache, and the shared long-connection receive channel |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 </details>
 
@@ -136,6 +135,6 @@ None from this package: it contributes no request-prefix content, and a credenti
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-The package reserves its invariant companion through `./invariant`, whose installer is empty because no independent event sequence or mutable relation exists beyond what the seam enforces. `feishuAppSecretRef` is mirrored by the Web Settings IM client, so a change here must land in the same commit as the client's copy of the rule.
+No invariant companion is published because no independent event sequence or mutable relation exists beyond what the seam enforces. `feishuAppSecretRef` is mirrored by the Web Settings IM client, so a change here must land in the same commit as the client's copy of the rule.
 
 </details>

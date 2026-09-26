@@ -68,7 +68,6 @@ kind: "package-reference"
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 配置、两个工具的注册、提示词指导与呈现 |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 </details>
 
@@ -127,6 +126,6 @@ Use the feishu_update_message tool to replace the content of a Feishu (飞书) m
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，其安装函数为空：工具自身不持有任何可变注册表或事件序列，每个请求级别的不变式都属于执行它们的 `ctx.feishu` seam。
+本包不发布不变式伴随插件：工具自身不持有任何可变注册表或事件序列，每个请求级别的不变式都属于执行它们的 `ctx.feishu` seam。
 
 </details>

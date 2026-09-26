@@ -71,7 +71,7 @@ describe('ui-settings-im browser plugin', () => {
     expect(resolveSlotLabel(entry.options.label)).toBe('IM')
     expect(b.status).not.toHaveBeenCalled()
 
-    const injected = (entry.inject as unknown as () => FeishuStatusTabInjected)()
+    const injected = entry.inject!() as object as FeishuStatusTabInjected
     await expect(injected.listStatus()).resolves.toEqual([{ id: 'bot', state: 'connected', receiveActive: false }])
     expect(b.status).toHaveBeenCalledOnce()
     b.status.mockResolvedValueOnce({ ok: false, error: { code: 'REMOTE_ERROR', message: 'unavailable' } })

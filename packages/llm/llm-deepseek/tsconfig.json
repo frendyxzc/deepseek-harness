@@ -58,9 +58,6 @@
     },
     {
       "path": "../tdai-memory"
-    },
-    {
-      "path": "../../runtime-diagnostics/invariants"
     }
   ]
 }

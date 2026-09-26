@@ -80,7 +80,6 @@ Registration is the only mutation, and it is transactional. `registerProvider()`
 |---|---|
 | [`src/index.ts`](src/index.ts) | Service, registry, selection, receive subscription, and status projection |
 | [`src/types.ts`](src/types.ts) | `FeishuProvider` contract, request and result vocabulary, status views, `FeishuError` |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 The type vocabulary — receive-id types, message types, connection states, the masked `FeishuProviderStatus` — is defined here and documented on the [Feishu subsystem](../../../docs/subsystems/feishu.md) page, which owns it; nothing in this README restates a field list.
 
@@ -123,6 +122,6 @@ No request-prefix content of its own; the consuming tool and the per-chat system
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-The package reserves its invariant companion through `./invariant`, whose installer is empty: the provider map stays private and the `feishu/provider-added` / `feishu/provider-removed` pair is emitted at the single set and delete sites, so no independent relation remains for an invariant to assert.
+No invariant companion is published: the provider map stays private and the `feishu/provider-added` / `feishu/provider-removed` pair is emitted at the single set and delete sites, so no independent relation remains for an invariant to assert.
 
 </details>

@@ -78,7 +78,6 @@ kind: "package-reference"
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 配置校验、聊天绑定、nonce 记录、点击校验、卡片构建函数与 waterfall 监听器 |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 </details>
 
@@ -123,7 +122,7 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，其安装函数为空：nonce → 决定的关系是私有的运行期状态，没有属于自己的权威事件序列，而持久的 `approval/asked` / `approval/decided` 配对属于 `@deepseek-ai/dsh-user-approval`，由它在那一侧断言。
+本包不发布不变式伴随插件：nonce → 决定的关系是私有的运行期状态，没有属于自己的权威事件序列，而持久的 `approval/asked` / `approval/decided` 配对属于 `@deepseek-ai/dsh-user-approval`，由它在那一侧断言。
 
 `MAX_PENDING_CARDS`（256）与 `MAX_REASON_CHARS`（2000）是固定的安全上限，而不是 `Config` 字段，因为提高任一数值改变的是上文记录的失败模式，而不是表达某种部署偏好。提供方移除之后的重开与聊天绑定跟踪刻意与 [`feishu-question`](../feishu-question/README.zh.md) 保持一致；在第三个消费方证明值得共享一个 seam 之前，每个应答者都把自己的生命周期内联保留。
 

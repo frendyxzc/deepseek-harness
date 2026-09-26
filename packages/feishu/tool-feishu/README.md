@@ -68,7 +68,6 @@ The package is one thin Consumer over `ctx.feishu`: each tool validates its argu
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Config, both tool registrations, prompt guidance, and presentation |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 </details>
 
@@ -127,6 +126,6 @@ Append-only — each section is prefix-stable and does not invalidate KV cache r
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package reserves its invariant companion through `./invariant`, whose installer is empty: the tools hold no mutable registry or event sequence of their own, and every request-level invariant belongs to the `ctx.feishu` seam that executes them.
+No invariant companion is published: the tools hold no mutable registry or event sequence of their own, and every request-level invariant belongs to the `ctx.feishu` seam that executes them.
 
 </details>

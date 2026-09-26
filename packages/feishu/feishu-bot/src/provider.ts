@@ -903,7 +903,7 @@ function visitImageKeys(node: unknown, out: string[]): void {
 function safeParseJson(raw: string | undefined): Record<string, unknown> | undefined {
   if (raw === undefined) return undefined
   try {
-    const value = JSON.parse(raw) as unknown
+    const value: unknown = JSON.parse(raw)
     return isRecord(value) ? value : undefined
   } catch {
     return undefined

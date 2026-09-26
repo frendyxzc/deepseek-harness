@@ -77,7 +77,6 @@ incoming 事件在模型运行之前就被回应。回执发往解析出的回�
 | 文件 | 作用 |
 |---|---|
 | [`src/index.ts`](src/index.ts) | 配置、提供方订阅生命周期、按聊天 agent 创建与消息组装 |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 </details>
 
@@ -119,6 +118,6 @@ incoming 事件在模型运行之前就被回应。回执发往解析出的回�
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，其安装函数为空，因为它所参与的接收顺序在 seam 处强制执行。投递诊断刻意使用 `console.log` 而非 `ctx.logger`：默认 logger 缓冲在内存里且从不进入 Web 进程日志，而这些行正是区分"引用缺失"与"读取失败"的手段。
+本包不发布不变式伴随插件，因为它所参与的接收顺序在 seam 处强制执行。投递诊断刻意使用 `console.log` 而非 `ctx.logger`：默认 logger 缓冲在内存里且从不进入 Web 进程日志，而这些行正是区分"引用缺失"与"读取失败"的手段。
 
 </details>

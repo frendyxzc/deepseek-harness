@@ -78,7 +78,6 @@ Ordering protects the decision against races. The pending record and the answer 
 | [`src/index.ts`](src/index.ts) | Config validation, chat bindings, card lifecycle, tap and message handling, and the waterfall listener |
 | [`src/card.ts`](src/card.ts) | v1 question, answer-summary, and outcome-note card builders |
 | [`src/answers.ts`](src/answers.ts) | Pure option-index parsing for one tapped button value |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 </details>
 
@@ -124,7 +123,7 @@ None from this package: it appends nothing to any session log, and the answer th
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package reserves its invariant companion through `./invariant`, whose installer is empty: the nonce → pending-question relation is private operational state with no authoritative event stream of its own, and answered questions surface through `@deepseek-ai/dsh-user-questions` and the requesting session's tool results.
+No invariant companion is published: the nonce → pending-question relation is private operational state with no authoritative event stream of its own, and answered questions surface through `@deepseek-ai/dsh-user-questions` and the requesting session's tool results.
 
 `MAX_PENDING_QUESTIONS` (256) and `MAX_DETAIL_CHARS` (8000) are fixed safety limits rather than `Config` fields, because raising either changes the failure mode documented above instead of expressing a deployment preference. The provider-removed reopen and the chat-binding tracking deliberately mirror [`feishu-approval`](../feishu-approval/README.md); each answerer keeps its own lifecycle inline until a third consumer earns a shared seam.
 

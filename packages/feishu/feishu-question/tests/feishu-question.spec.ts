@@ -127,7 +127,7 @@ async function mountQuestion(config: FeishuQuestion.Config = {}, opts: { updateM
 function chatAgent(ctx: Context, id = 'feishu-chat-1'): Agent {
   const session = ctx.sessions.create(SessionId(id))
   session.append('turn/start', { turn: 1 })
-  const agent = { id, session } as unknown as Agent
+  const agent = { id, session } as object as Agent
   ctx.agents.enter(agent, undefined)
   return agent
 }
@@ -545,7 +545,7 @@ describe('feishu-question', () => {
 
     const child = ctx.sessions.create(SessionId('feishu-child'), { meta: { parentSession: chat.session.id } })
     child.append('turn/start', { turn: 1 })
-    const childAgent = { id: 'feishu-child', session: child } as unknown as Agent
+    const childAgent = { id: 'feishu-child', session: child } as object as Agent
     ctx.agents.enter(childAgent, undefined)
     ctx.emit('agent/created', { source: 'startup', agent: childAgent })
 
@@ -567,7 +567,7 @@ describe('feishu-question', () => {
     const unboundParent = ctx.sessions.create(SessionId('feishu-unbound'))
     const stranger = ctx.sessions.create(SessionId('feishu-stranger'), { meta: { parentSession: unboundParent.id } })
     stranger.append('turn/start', { turn: 1 })
-    const strangerAgent = { id: 'feishu-stranger', session: stranger } as unknown as Agent
+    const strangerAgent = { id: 'feishu-stranger', session: stranger } as object as Agent
     ctx.agents.enter(strangerAgent, undefined)
     ctx.emit('agent/created', { source: 'startup', agent: strangerAgent })
 

@@ -78,7 +78,6 @@ Delivery and settlement are ordered so no race loses a decision. The pending rec
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Config validation, chat bindings, nonce records, tap validation, card builders, and the waterfall listener |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 </details>
 
@@ -123,7 +122,7 @@ None from this package: it appends nothing to any session log, and the outcome t
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package reserves its invariant companion through `./invariant`, whose installer is empty: the nonce → decision relation is private operational state with no authoritative event stream of its own, and the durable `approval/asked` / `approval/decided` pair belongs to `@deepseek-ai/dsh-user-approval`, which asserts it there.
+No invariant companion is published: the nonce → decision relation is private operational state with no authoritative event stream of its own, and the durable `approval/asked` / `approval/decided` pair belongs to `@deepseek-ai/dsh-user-approval`, which asserts it there.
 
 `MAX_PENDING_CARDS` (256) and `MAX_REASON_CHARS` (2000) are fixed safety limits rather than `Config` fields, because raising either changes the failure mode documented above instead of expressing a deployment preference. The provider-removed reopen and the chat-binding tracking deliberately mirror [`feishu-question`](../feishu-question/README.md); each answerer keeps its own lifecycle inline until a third consumer earns a shared seam.
 

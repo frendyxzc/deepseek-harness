@@ -77,7 +77,6 @@ Each message runs its own asynchronous chain outside the receive callback, so a 
 | File | Role |
 |---|---|
 | [`src/index.ts`](src/index.ts) | Config, provider subscription lifecycle, per-chat agent creation, and message assembly |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 </details>
 
@@ -119,6 +118,6 @@ One addition per chat conversation: the injected user messages follow the sessio
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package reserves its invariant companion through `./invariant`, whose installer is empty because the receive order it participates in is enforced at the seam. Delivery diagnostics deliberately use `console.log` rather than `ctx.logger`: the default logger buffers in memory and never reaches the Web process log, where these lines are the way to tell a missing reference from a failed read.
+No invariant companion is published because the receive order it participates in is enforced at the seam. Delivery diagnostics deliberately use `console.log` rather than `ctx.logger`: the default logger buffers in memory and never reaches the Web process log, where these lines are the way to tell a missing reference from a failed read.
 
 </details>

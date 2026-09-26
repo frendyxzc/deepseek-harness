@@ -94,7 +94,7 @@ async function loadComposition(): Promise<{ ctx: Context; base: string }> {
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
-  } as unknown as NonNullable<typeof ctx.loader.internal>
+  } as object as NonNullable<typeof ctx.loader.internal>
   await ctx.loader.create({
     name: 'cordis:include',
     config: { path: pathToFileURL(configPath).href },

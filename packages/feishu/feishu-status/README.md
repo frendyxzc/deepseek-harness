@@ -76,7 +76,6 @@ One class, one service key: `FeishuStatusGateway` extends `TypertRemoteService` 
 |---|---|
 | [`src/index.ts`](src/index.ts) | The gateway class, its service key, and the two `@Remote` projections |
 | [`src/types.ts`](src/types.ts) | `FeishuStatusView` and `FeishuBotStatusView`, the payload types clients import |
-| [`src/invariant.ts`](src/invariant.ts) | Invariant companion reserved for this package, empty with its reason documented |
 
 </details>
 
@@ -122,7 +121,7 @@ None from this package: it never assembles model input and writes nothing to any
 <details>
 <summary>Working context for maintainers — click to expand</summary>
 
-This package reserves its invariant companion through `./invariant`, whose installer is empty: every view here is projected directly from seam-owned state, so there is no relation this package could assert beyond what [`@deepseek-ai/dsh-feishu`](../feishu/README.md) already owns.
+No invariant companion is published: every view here is projected directly from seam-owned state, so there is no relation this package could assert beyond what [`@deepseek-ai/dsh-feishu`](../feishu/README.md) already owns.
 
 Keep the payload changes on both sides together. `src/types.ts` is what clients import, while the wire model comes from the `@Remote` return types, so a field added to one without the other produces a client that cannot see it; the `./typert` and `./remote` artifacts are generated and must never be edited by hand. `zod` is a runtime dependency only because those generated artifacts import it — nothing under `src/` validates with it.
 

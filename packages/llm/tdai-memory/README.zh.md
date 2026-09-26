@@ -125,4 +125,4 @@ base bundle 已经挂载了本包，因此基于 base 的 profile 无需再加�
 
 </details>
 
-**运行时不变式：** `./invariant` 伴生入口注册的是刻意留空的 installer：settings schema 会在 `identityFor` 观察到 bot 列表之前完成校验，而内存内绑定的唯一后果——请求头——由适配器测试钉住。
+**运行时不变式：** 不发布 `./invariant` 伴生入口：settings schema 会在 `identityFor` 观察到 bot 列表之前完成校验，而内存内绑定的唯一后果——请求头——由适配器测试钉住。

@@ -127,4 +127,4 @@ settings 命名空间与密钥引用规则都是刻意复刻宿主事实的客�
 
 </details>
 
-**运行时不变式：** `./invariant` 伴生入口注册的是刻意留空的 installer：命名空间及其 schema 归 `dsh-feishu-bot` 所有，本标签页的行为由其控制器与组件测试覆盖。
+**运行时不变式：** 不发布 `./invariant` 伴生入口：命名空间及其 schema 归 `dsh-feishu-bot` 所有，本标签页的行为由其控制器与组件测试覆盖。

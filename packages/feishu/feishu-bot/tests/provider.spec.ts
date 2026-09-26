@@ -69,7 +69,7 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 function expectFetchUrls(urls: string[]): void {
   const calls = vi.mocked(fetch).mock.calls
-  expect(calls.map(call => call[0] as unknown as string)).toEqual(urls)
+  expect(calls.map(call => call[0] as string)).toEqual(urls)
 }
 
 describe('FeishuBotProvider.available', () => {
@@ -626,7 +626,7 @@ describe('FeishuBotProvider.getMessage', () => {
       content: 'quoted text',
       parentId: 'om_0',
       rootId: 'om_0',
-      raw: expect.objectContaining({ message_id: 'om_1' }) as unknown,
+      raw: expect.objectContaining({ message_id: 'om_1' }),
     })
     expectFetchUrls([
       'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
@@ -667,7 +667,7 @@ describe('FeishuBotProvider.getMessage', () => {
       messageId: 'om_card',
       msgType: 'interactive',
       content: '✅ Answered\nThe agent has a question[help](https://feishu.cn/help)\n是,关联团队资产',
-      raw: expect.objectContaining({ message_id: 'om_card' }) as unknown,
+      raw: expect.objectContaining({ message_id: 'om_card' }),
     })
   })
 

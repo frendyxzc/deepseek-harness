@@ -76,7 +76,6 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | gateway 类、其服务键，以及两个 `@Remote` 投影 |
 | [`src/types.ts`](src/types.ts) | `FeishuStatusView` 与 `FeishuBotStatusView`，客户端导入的载荷类型 |
-| [`src/invariant.ts`](src/invariant.ts) | 本包预留的不变式伴随插件，安装函数为空并记录原因 |
 
 </details>
 
@@ -122,7 +121,7 @@ kind: "package-reference"
 <details>
 <summary>维护者工作上下文 — 点击展开</summary>
 
-本包通过 `./invariant` 预留了不变式伴随插件，其安装函数为空：这里的每个视图都直接投影自 seam 持有的状态，因此除 [`@deepseek-ai/dsh-feishu`](../feishu/README.zh.md) 已经拥有的关系之外，本包没有可断言的东西。
+本包不发布不变式伴随插件：这里的每个视图都直接投影自 seam 持有的状态，因此除 [`@deepseek-ai/dsh-feishu`](../feishu/README.zh.md) 已经拥有的关系之外，本包没有可断言的东西。
 
 让两侧载荷改动保持同批。`src/types.ts` 是客户端导入的内容，而线上模型来自 `@Remote` 的返回类型，因此只改一处就会出现看不见该字段的客户端；`./typert` 与 `./remote` 是生成产物，绝不可手工编辑。`zod` 之所以是运行时依赖，只是因为那些生成产物会导入它——`src/` 之下没有任何代码用它做校验。
 

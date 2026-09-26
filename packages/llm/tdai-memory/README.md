@@ -125,4 +125,4 @@ The `defaultTaskId` value is the easy thing to break: `none` mirrors the proxy's
 
 </details>
 
-**Runtime invariant:** The `./invariant` companion publishes an intentionally empty installer: the settings schema validates the bot list before `identityFor` can observe it, and the in-memory binding's only consequence — the request headers — is pinned by the adapter tests.
+**Runtime invariant:** No companion is published: the settings schema validates the bot list before `identityFor` can observe it, and the in-memory binding's only consequence — the request headers — is pinned by the adapter tests.

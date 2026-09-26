@@ -104,7 +104,7 @@ async function loadComposition(approvalConfig: string[] = []): Promise<{ ctx: Co
       if (!modules.has(specifier)) throw new Error(`unexpected Loader import: ${specifier}`)
       return modules.get(specifier)
     },
-  } as unknown as NonNullable<typeof ctx.loader.internal>
+  } as object as NonNullable<typeof ctx.loader.internal>
   await ctx.loader.create({
     name: 'cordis:include',
     config: { path: pathToFileURL(configPath).href },
@@ -138,7 +138,7 @@ async function writeConfig(configPath: string, base: string, approvalConfig: str
 function chatAgent(ctx: Context, id: string): Agent {
   const session = ctx.sessions.create(SessionId(id))
   session.append('turn/start', { turn: 1 })
-  return { session } as unknown as Agent
+  return { session } as object as Agent
 }
 
 describe('feishu-approval real composition', () => {

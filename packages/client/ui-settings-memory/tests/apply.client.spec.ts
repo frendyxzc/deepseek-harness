@@ -51,7 +51,7 @@ describe('ui-settings-memory apply', () => {
     // The nav label is a locale-following thunk; owners resolve at read time.
     expect(resolveSlotLabel(entry.options.label)).toBe('记忆')
     const injected = (
-      entry.inject as unknown as () => import('../src/client/MemorySection.tsx').MemorySectionInjected
+      entry.inject as object as () => import('../src/client/MemorySection.tsx').MemorySectionInjected
     )()
     expect(injected.t('nav')).toBe('记忆')
 
@@ -72,7 +72,7 @@ describe('ui-settings-memory apply', () => {
     b.locale.setLocale('en')
     expect(resolveSlotLabel(b.slots.entries('settings.section')[0]!.options.label)).toBe('Memory')
     const injected = (
-      b.slots.entries('settings.section')[0]!.inject as unknown as
+      b.slots.entries('settings.section')[0]!.inject as object as
       () => import('../src/client/MemorySection.tsx').MemorySectionInjected
     )
     expect(injected().t('open')).toBe('Open memory panel')
