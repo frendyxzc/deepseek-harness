@@ -458,9 +458,13 @@ export interface ToolRuntimeScheduler {
 
 /**
  * Scheduler entry point omitted from the generated named service API.
+ * `Symbol.for` keeps the key one value per process even when the Loader and
+ * a source-launch path rewrite each load their own copy of this module; a
+ * per-copy `Symbol()` would make `ctx.tools[TOOL_RUNTIME_SCHEDULER]`
+ * undefined for the consumer holding the other copy.
  * @internal
  */
-export const TOOL_RUNTIME_SCHEDULER: unique symbol = Symbol('@deepseek-ai/dsh-tools.scheduler')
+export const TOOL_RUNTIME_SCHEDULER: unique symbol = Symbol.for('@deepseek-ai/dsh-tools.scheduler')
 
 /** Canonical error code for cancellation after a tool body was invoked. */
 export const TOOL_ABORTED = 'ABORTED'
