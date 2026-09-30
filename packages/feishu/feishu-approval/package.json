@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu-approval",
   "description": "Feishu approval-card answerer for the DeepSeek Harness — settles tool-approval requests from Feishu chat agents through interactive Allow/Deny cards",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },

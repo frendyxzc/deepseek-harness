@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu-status",
   "description": "Read-only Remote projection of the Feishu capability's effective connection status for status surfaces",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu-question",
   "description": "Feishu question-card answerer for the DeepSeek Harness — answers user-questions asks from Feishu chat agents through interactive form cards",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },

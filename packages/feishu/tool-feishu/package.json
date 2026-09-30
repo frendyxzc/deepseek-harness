@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-feishu",
   "description": "Model-facing `feishu_send_message` and `feishu_update_message` tools for the DeepSeek Harness Feishu chat capability seam (ctx.feishu)",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },

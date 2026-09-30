@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu-bot",
   "description": "Feishu Bot API provider for the DeepSeek Harness Feishu chat capability seam (ctx.feishu) \u2014 sends messages through the Feishu Open API",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },

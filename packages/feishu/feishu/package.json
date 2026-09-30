@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu",
   "description": "Feishu (Lark) chat capability seam (ctx.feishu) for the DeepSeek Harness — provider registry, send-message execution, and the FeishuError taxonomy",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },

@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu-receive",
   "description": "Feishu long-connection receive consumer for the DeepSeek Harness — routes each Feishu chat into its own agent session",
-  "version": "0.1.7-rc.2",
+  "version": "0.2.0-rc.2",
   "publishConfig": {
     "access": "public"
   },
