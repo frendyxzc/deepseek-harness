@@ -619,15 +619,15 @@ describe('FeishuBotProvider.getMessage', () => {
         },
       })))
     const provider = new FeishuBotProvider(options())
-    const result = await provider.getMessage('om_1')
-    expect(result).toEqual({
+    const { raw, ...fields } = await provider.getMessage('om_1')
+    expect(fields).toEqual({
       messageId: 'om_1',
       msgType: 'text',
       content: 'quoted text',
       parentId: 'om_0',
       rootId: 'om_0',
-      raw: expect.objectContaining({ message_id: 'om_1' }),
     })
+    expect(raw).toEqual(expect.objectContaining({ message_id: 'om_1' }))
     expectFetchUrls([
       'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
       'https://open.feishu.cn/open-apis/im/v1/messages/om_1?card_msg_content_type=user_card_content',
@@ -662,13 +662,13 @@ describe('FeishuBotProvider.getMessage', () => {
         },
       })))
     const provider = new FeishuBotProvider(options())
-    const result = await provider.getMessage('om_card')
-    expect(result).toEqual({
+    const { raw, ...fields } = await provider.getMessage('om_card')
+    expect(fields).toEqual({
       messageId: 'om_card',
       msgType: 'interactive',
       content: '✅ Answered\nThe agent has a question[help](https://feishu.cn/help)\n是,关联团队资产',
-      raw: expect.objectContaining({ message_id: 'om_card' }),
     })
+    expect(raw).toEqual(expect.objectContaining({ message_id: 'om_card' }))
   })
 
   it('extracts markdown text from a card schema 2.0 body returned via user_card_content', async () => {
