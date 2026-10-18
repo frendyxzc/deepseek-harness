@@ -30,7 +30,7 @@ function formOf(snapshot: ConfigFormSnapshot<TdaiBotsSection>): ConfigForm<TdaiB
 }
 
 const ready = (bots: unknown, writable = true): ConfigFormSnapshot<TdaiBotsSection> => ({
-  status: 'ready', value: { bots: bots as TdaiBot[] }, base: undefined, user: undefined, revision: 1, writable, mode: 'host',
+  status: 'ready', value: { bots: bots as TdaiBot[] }, base: undefined, user: undefined, revision: 1, writable,
 })
 
 describe('TdaiBotsController', () => {
@@ -41,7 +41,7 @@ describe('TdaiBotsController', () => {
   })
 
   it('waits out a loading snapshot and then resolves', async () => {
-    const scope = formOf({ status: 'loading', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'host' })
+    const scope = formOf({ status: 'loading', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false })
     const controller = new TdaiBotsController(scope)
     const pending = controller.load()
     // Advance the snapshot to ready; the controller resolves on the next publish.
@@ -50,7 +50,7 @@ describe('TdaiBotsController', () => {
   })
 
   it('reports an unavailable namespace without waiting', async () => {
-    const scope = formOf({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'memory' })
+    const scope = formOf({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false })
     const controller = new TdaiBotsController(scope)
     await expect(controller.load()).resolves.toEqual({ available: false, writable: false, bots: [] })
   })

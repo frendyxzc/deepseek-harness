@@ -37,7 +37,7 @@ async function bench() {
   ctx.provide('remote.credentials', { set: setSecret })
   ctx.provide('configForms', {
     get: () => ({
-      getSnapshot: () => ({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false, mode: 'memory' }),
+      getSnapshot: () => ({ status: 'unavailable', value: undefined, base: undefined, user: undefined, revision: undefined, writable: false }),
       subscribe: () => () => {},
       set: async () => true,
       unset: async () => true,
