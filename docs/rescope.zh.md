@@ -28,7 +28,7 @@ Cordis 框架及其基础库以源码形式 vendored 在 [`vendor/`](../vendor/R
 - **`cordis.yml` 配置文件家族**，包括 `*.cordis.yml`、`*.cordis.snapshot.yml`、`cordis.patch.yml`。
 - **名字里带这个词的 harness 包**，例如 `@deepseek-ai/dsh-tool-cordis`。
 - **上游运行时标识符**，例如 Schemastery 的 `Symbol.for('schemastery')` 及其 `vendor:` 元数据字段。
-- **`docs/` 之外的散文。** `vendor/*/README.md`、各包 README 与 Agent Note 保留写作当时的名字；那里的裸 `cordis` 也可能是 Python SDK 的选项名或某个 agent-preset 的 id。`docs/` 之内，散文与所有 Markdown 围栏都跟着改。
+- **`docs/` 之外的散文，以及所有 `cordis` agent-preset id。** `vendor/*/README.md`、各包 README 与 Agent Note 保留写作当时的名字；那里的裸 `cordis` 也可能是 Python SDK 的选项名或某个 agent-preset 的 id。`docs/` 之内，散文与所有 Markdown 围栏都跟着改，除非这个 `cordis` 指的是发行的 Creator preset：该 id 声明在 [`packages/bundle/web-app/presets/cordis.patch.yml`](../packages/bundle/web-app/presets/cordis.patch.yml) 中，而 [`scripts/rescope-vendor.ts`](../scripts/rescope-vendor.ts) 的跳过表列出了每个把带引号的 `cordis` 用作该 id 而非包引用的文件。
 
 ## 你的代码要改什么
 
