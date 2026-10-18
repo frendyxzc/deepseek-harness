@@ -606,8 +606,8 @@ run_upgrade() {
   echo
   echo "Stop the running stack (if any), then restart to pick up the new code:"
   echo "  ./scripts/setup-dsh/stop-all.sh && ./scripts/setup-dsh/start-all.sh"
-  echo "or, for just the Web UI:"
-  echo "  cd $REPO_ROOT && pnpm dsh web --host 0.0.0.0 --port 3080"
+  echo "or, for just the Web UI (start-all.sh resolves this address itself):"
+  echo "  cd $REPO_ROOT && pnpm dsh web --host $(lan_ip || echo 127.0.0.1) --port 3080"
   echo
   exit 0
 }
@@ -968,6 +968,6 @@ echo "  1. MemoryCore     :8420   cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory
 echo "  2. MemoryProxy    :8096   cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryProxy && node --import tsx/esm src/index.ts --config $DSH_HOME/tdai-stack/config/proxy-config.yaml"
 echo "  3. MemoryKnowledge :8421  cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryKnowledge && pnpm dev"
 echo "  4. MemoryPanel    :8123   cd $DSH_HOME/tdai-stack/TencentDB-Agent-Memory/MemoryPanel && pnpm dev"
-echo "  5. dsh Web UI     :3080   cd $WORKSPACE && pnpm dsh web --host 0.0.0.0 --port 3080"
+echo "  5. dsh Web UI     :3080   cd $WORKSPACE && pnpm dsh web --host $(lan_ip || echo 127.0.0.1) --port 3080"
 echo
 echo "Verify memory at http://127.0.0.1:8123 (panel) after a chat."

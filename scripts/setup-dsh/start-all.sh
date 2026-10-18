@@ -5,7 +5,7 @@
 #   2. MemoryProxy    :8096   (dsh's LLM baseURL — needs proxy-config.yaml)
 #   3. MemoryKnowledge :8421  (Wiki / Code-Graph)
 #   4. MemoryPanel    :8123   (stateless control panel, binds all interfaces)
-#   5. dsh Web UI     :3080   (binds all interfaces)
+#   5. dsh Web UI     :3080   (binds one concrete address: the LAN IPv4)
 #
 # Each service is daemonized (logs under $DSH_HOME/run/logs, pidfiles under
 # $DSH_HOME/run/pids), and the script waits on its health endpoint before
@@ -18,6 +18,8 @@
 #
 # Options:
 #   --workspace PATH   repo that serves the dsh Web UI (default: this repo)
+#   --host ADDRESS     bind address for the dsh Web UI (default: the LAN IPv4
+#                      of the default-route interface, else 127.0.0.1)
 #   -h, --help         this help
 set -euo pipefail
 
@@ -35,10 +37,12 @@ if node_dir="$(stack_node_bin)"; then
 fi
 
 WORKSPACE="${DSH_WORKSPACE:-$REPO_ROOT}"
+WEB_HOST="${DSH_WEB_HOST:-}"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --workspace) WORKSPACE="$2"; shift 2 ;;
+    --host) WEB_HOST="$2"; shift 2 ;;
     -h|--help)
       awk 'NR>1 { if (/^set -euo pipefail$/) exit; sub(/^# ?/, ""); print }' "$0"
       exit 0 ;;
@@ -47,6 +51,18 @@ while [[ $# -gt 0 ]]; do
 done
 WORKSPACE="$(cd "$WORKSPACE" 2>/dev/null && pwd || true)"
 [[ -n "$WORKSPACE" && -d "$WORKSPACE" ]] || die "workspace $WORKSPACE is not a directory"
+
+# `dsh web` refuses a wildcard bind, so the Web UI gets one concrete address:
+# the --host / DSH_WEB_HOST value, else the default-route interface's LAN IPv4,
+# else loopback. A single-interface bind answers only that address, so a LAN
+# bind means this machine opens the UI through the LAN address too.
+if [[ -z "$WEB_HOST" ]]; then
+  WEB_HOST="$(lan_ip || true)"
+fi
+if [[ -z "$WEB_HOST" ]]; then
+  warn "no LAN address found — serving the dsh Web UI on loopback only"
+  WEB_HOST=127.0.0.1
+fi
 
 # Pre-flight: the memory stack must already be cloned (hard requirement), and
 # each service's config must exist when that service would have to start here
@@ -73,15 +89,15 @@ require_config panel 8123 "$MEMORY_ROOT/MemoryPanel/.env"
 
 mkdir -p "$PID_DIR" "$LOG_DIR"
 
-# start_service <name> <port> <health-url> <timeout> <shell-command>
+# start_service <name> <port> <health-url> <timeout> <shell-command> [bind-host]
 start_service() {
-  local name="$1" port="$2" url="$3" timeout="$4" cmd="$5"
+  local name="$1" port="$2" url="$3" timeout="$4" cmd="$5" host="${6:-127.0.0.1}"
   # Take over from any legacy launchd instance before touching the port, and
   # wait for its socket to free up so the pidfile-managed process binds cleanly.
   unload_launchd "$name"
   wait_port_free "$port" 10
-  if is_listening "$port"; then
-    warn "$name already listening on :$port — skipping"
+  if is_listening "$port" "$host"; then
+    warn "$name already listening on $host:$port — skipping"
     return 0
   fi
   local pf; pf="$(pidfile "$name")"
@@ -90,10 +106,10 @@ start_service() {
     return 0
   fi
   rm -f "$pf"
-  info "starting $name (:$port) — log: $(logfile "$name")"
+  info "starting $name ($host:$port) — log: $(logfile "$name")"
   bash -c "$cmd" > "$(logfile "$name")" 2>&1 &
   echo $! > "$pf"
-  wait_healthy "$name" "$port" "$url" "$timeout"
+  wait_healthy "$name" "$port" "$url" "$timeout" "$host"
 }
 
 # 1. MemoryCore :8420
@@ -188,12 +204,13 @@ start_service panel 8123 "http://127.0.0.1:8123/health" 30 \
   "cd '$MEMORY_ROOT/MemoryPanel' && pnpm dev"
 
 # 5. dsh Web UI :3080
-# dsh-web has no unauthenticated HTTP health route: `/` (and every API path)
-# is token-gated (401), while `/health` is 404 (the static fallback treats it
-# as a missing asset). Pass an empty health URL so wait_healthy falls back to
-# the TCP-port check instead of misreporting "not ready (http=401)".
+# dsh-web has no unauthenticated HTTP health route: `/` answers 401 until the
+# launch token is exchanged for its cookie, while `/health` is 404 (the static
+# fallback treats it as a missing asset). Pass an empty health URL so
+# wait_healthy falls back to the TCP-port check instead of misreporting
+# "not ready (http=401)".
 start_service dsh-web 3080 "" 120 \
-  "cd '$WORKSPACE' && pnpm dsh web --host 0.0.0.0 --port 3080"
+  "cd '$WORKSPACE' && pnpm dsh web --host $WEB_HOST --port 3080" "$WEB_HOST"
 
 # Extract the authentication token from the dsh-web log. The token is printed
 # once at startup; grab it so the summary can show the authenticated URL.
@@ -214,20 +231,18 @@ echo "  MemoryProxy     http://127.0.0.1:8096/health"
 echo "  MemoryKnowledge http://127.0.0.1:8421/health"
 if LAN_IP="$(lan_ip)"; then
   echo "  MemoryPanel     http://127.0.0.1:8123  (control panel, LAN: http://$LAN_IP:8123)"
-  if [[ -n "$DSH_WEB_TOKEN" ]]; then
-    echo "  dsh Web UI      http://127.0.0.1:3080/?token=$DSH_WEB_TOKEN  (LAN: http://$LAN_IP:3080/?token=$DSH_WEB_TOKEN)"
-  else
-    echo "  dsh Web UI      http://127.0.0.1:3080  (LAN: http://$LAN_IP:3080)"
-    warn "could not extract dsh-web token from log — check $(logfile dsh-web)"
-  fi
 else
-  warn "no LAN IP detected — panel and web UI reachable via loopback only"
+  warn "no LAN IP detected — the memory panel is reachable via loopback only"
   echo "  MemoryPanel     http://127.0.0.1:8123  (control panel)"
-  if [[ -n "$DSH_WEB_TOKEN" ]]; then
-    echo "  dsh Web UI      http://127.0.0.1:3080/?token=$DSH_WEB_TOKEN"
-  else
-    echo "  dsh Web UI      http://127.0.0.1:3080"
-    warn "could not extract dsh-web token from log — check $(logfile dsh-web)"
-  fi
 fi
+# The Web UI answers on the one address it bound, so this machine uses that
+# address too when it is a LAN address.
+if [[ -n "$DSH_WEB_TOKEN" ]]; then
+  echo "  dsh Web UI      http://$WEB_HOST:3080/?token=$DSH_WEB_TOKEN"
+else
+  echo "  dsh Web UI      http://$WEB_HOST:3080"
+  warn "could not extract dsh-web token from log — check $(logfile dsh-web)"
+fi
+[[ "$WEB_HOST" = 127.0.0.1 ]] \
+  || echo "                (bound to $WEB_HOST only — http://127.0.0.1:3080 does not answer)"
 echo "Stop with:       ./scripts/setup-dsh/stop-all.sh"

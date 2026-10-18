@@ -35,15 +35,21 @@ die()   { printf '\033[1;31m[stack]\033[0m %s\n' "$*" >&2; exit 1; }
 pidfile() { printf '%s/%s.pid' "$PID_DIR" "$1"; }
 logfile() { printf '%s/%s.log' "$LOG_DIR" "$1"; }
 
-# is_listening <port> — true when a process is already bound to the TCP port.
+# is_listening <port> [host] — true when a process is already bound to the TCP
+# port. `lsof` and `ss` see any bind address; the nc and /dev/tcp fallbacks
+# connect to one address, so pass the service's bind host when it is not
+# loopback (a service bound to a single interface address never answers on
+# 127.0.0.1).
 is_listening() {
-  local port="$1"
+  local port="$1" host="${2:-127.0.0.1}"
   if command -v lsof >/dev/null 2>&1; then
     lsof -nP -iTCP:"$port" -sTCP:LISTEN >/dev/null 2>&1
+  elif command -v ss >/dev/null 2>&1; then
+    ss -ltnH "sport = :$port" 2>/dev/null | grep -q ":$port"
   elif command -v nc >/dev/null 2>&1; then
-    nc -z 127.0.0.1 "$port" >/dev/null 2>&1
+    nc -z "$host" "$port" >/dev/null 2>&1
   else
-    (exec 3<>"/dev/tcp/127.0.0.1/$port") >/dev/null 2>&1
+    (exec 3<>"/dev/tcp/$host/$port") >/dev/null 2>&1
   fi
 }
 
@@ -85,16 +91,17 @@ stop_tree() {
   done
 }
 
-# wait_healthy <name> <port> <url> <timeout-seconds> — block until the service
-# answers `url` with 2xx (or, when url is empty, until `port` is listening).
+# wait_healthy <name> <port> <url> <timeout-seconds> [host] — block until the
+# service answers `url` with 2xx (or, when url is empty, until `port` is
+# listening on `host`, default loopback).
 wait_healthy() {
-  local name="$1" port="$2" url="$3" max="${4:-60}" i=0 code="" pid=""
+  local name="$1" port="$2" url="$3" max="${4:-60}" host="${5:-127.0.0.1}" i=0 code="" pid=""
   while (( i < max )); do
     if [[ -n "$url" ]]; then
       code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 2 "$url" 2>/dev/null || true)"
       [[ "$code" =~ ^2 ]] && { ok "$name healthy at $url"; return 0; }
-    elif is_listening "$port"; then
-      ok "$name listening on :$port"; return 0
+    elif is_listening "$port" "$host"; then
+      ok "$name listening on $host:$port"; return 0
     fi
     [[ -f "$(pidfile "$name")" ]] && pid="$(cat "$(pidfile "$name")" 2>/dev/null || true)"
     if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then

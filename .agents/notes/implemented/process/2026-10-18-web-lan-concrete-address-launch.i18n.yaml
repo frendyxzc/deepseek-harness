@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for 2026-10-18-web-lan-concrete-address-launch.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/implemented/process/2026-10-18-web-lan-concrete-address-launch.md
+/agent-note-launch-the-lan-web-listener-on-one-concrete-address:
+  en: bfb7f8a4a2592d8d
+  zh: bb34dc3b60038e0b
+/agent-note-launch-the-lan-web-listener-on-one-concrete-address/problem:
+  en: 4a46efb4f9651bb2
+  zh: 1c9f1b2a39c8ac3d
+/agent-note-launch-the-lan-web-listener-on-one-concrete-address/decision:
+  en: b858a6205b140f69
+  zh: bd4747819210e1f6
+/agent-note-launch-the-lan-web-listener-on-one-concrete-address/alternatives-considered:
+  en: 5408d024ab42afef
+  zh: 49050ab363ca0194
+/agent-note-launch-the-lan-web-listener-on-one-concrete-address/consequences:
+  en: f769e2403f66d463
+  zh: 675a83fade79f0e9
+/agent-note-launch-the-lan-web-listener-on-one-concrete-address/testing:
+  en: 19fda193f4b3100f
+  zh: dfb149ff6350d296
