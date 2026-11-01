@@ -36,7 +36,7 @@
 4. **刷新并重建** —— 在 checkout 里运行 `pnpm install` + `pnpm run build`（链接新增的工作区包，并重建 host libs、client bundles 与 Web 前端），随后在 profile 里运行 `pnpm install`。
 5. **刷新 better-harness 技能** —— fetch 并把 `~/.dsh/better-harness` 的 checkout 重置到钉住的分支，重装其根运行时依赖，保持 `/better-harness` 工作流评审技能最新（见 [better-harness skill](#better-harness-skill-optional) 一节）。
 
-之后重启：`./scripts/setup-dsh/start-all.sh` 是幂等的，或仅重启 Web UI 用 `pnpm dsh web --host <本机局域网 IP> --port 3080`（`--host` 需要一个具体地址，`0.0.0.0` 会被拒绝）。
+之后重启：`./scripts/setup-dsh/start-all.sh` 是幂等的，或仅重启 Web UI 用 `pnpm dsh web --host <本机局域网 IP> --port 3080`（`--host` 需要一个具体地址，`0.0.0.0` 会被拒绝）。手工启动只服务该地址；`start-all.sh` 还会加上回环桥接。
 
 > `setup.sh --force` 不是升级路径：它会重写已生成文件，并且过去可能铸造新的 `PROXY_USER_KEY`，悄悄破坏 MemoryCore 的 admin 绑定。`--force` 保留给从模板全新重部署；`--upgrade` 才是就地路径（而且它始终保留现有 `PROXY_USER_KEY`）。
 
@@ -104,9 +104,9 @@ MemoryCore 就绪后，`start-all.sh` 还会用 `PROXY_USER_KEY` 自动引导 ad
 2. MemoryProxy `:8096`（`/health`）
 3. MemoryKnowledge `:8421`（`/health`）
 4. MemoryPanel `:8123`（`/health`，绑定所有接口）
-5. dsh Web UI `:3080`（`/`，绑定一个具体的局域网地址）
+5. dsh Web UI `:3080`（`/`，绑定一个具体的局域网地址，并提供回环桥接）
 
-dsh Web UI 绑定一个具体地址——`start-all.sh` 解析本机局域网 IPv4，或用 `--host` 指定另一个——因为 `dsh web` 拒绝通配地址 `0.0.0.0`：一次绑定所有接口会把 agent 的 shell 交给操作者并未选择的网络。一个监听进程独占端口，绑定局域网地址后 `http://127.0.0.1:3080` 不再应答，启动摘要会打印可用的 URL。MemoryPanel 生成的 `.env` 仍设置 `HOST=0.0.0.0`，因此另一台机器上的浏览器分别经 `http://<本机局域网 IP>:3080` 与 `:8123` 访问两者。Web 的每个 API 调用与数据流都需要 `dsh web` 启动时打印的启动令牌，所以局域网浏览器打开 `http://<局域网 IP>:3080/?token=…`；面板仍无认证。其余 `127.0.0.1` 端点是同机服务链路——dsh → 代理（`:8096`）、代理 → core（`:8420`）——保持回环是正确的。在共享网络上要防火墙封禁 `:3080` 与 `:8123`。
+dsh Web UI 绑定一个具体地址——`start-all.sh` 解析本机局域网 IPv4，或用 `--host` 指定另一个——因为 `dsh web` 拒绝通配地址 `0.0.0.0`：一次绑定所有接口会把 agent 的 shell 交给操作者并未选择的网络。监听进程只持有该地址，因此 `start-all.sh` 还会运行一个回环桥接（`scripts/setup-dsh/loopback-forward.mjs`），把 `127.0.0.1:3080` 转发到它；启动摘要里的两个 URL 都可用，`stop-all.sh` 会先停止桥接再停止 Web UI。MemoryPanel 生成的 `.env` 仍设置 `HOST=0.0.0.0`，因此另一台机器上的浏览器分别经 `http://<本机局域网 IP>:3080` 与 `:8123` 访问两者。Web 的每个 API 调用与数据流都需要 `dsh web` 启动时打印的启动令牌，所以浏览器打开摘要打印的 `/?token=…` URL；面板仍无认证。其余 `127.0.0.1` 端点是同机服务链路——dsh → 代理（`:8096`）、代理 → core（`:8420`）——保持回环是正确的。在共享网络上要防火墙封禁 `:3080` 与 `:8123`。
 
 对于一次性手工启动，唯一没有仓库自带启动辅助脚本的服务是 MemoryCore；启动 gateway 前先 source 它的 `.env.local`：
 

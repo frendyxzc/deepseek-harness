@@ -78,7 +78,8 @@ regenerates a secret, never overwrites a generated file, and never implies
 
 Restart afterwards: `./scripts/setup-dsh/start-all.sh` is idempotent, or
 `pnpm dsh web --host <this machine's LAN IP> --port 3080` for just the Web UI
-(`--host` needs one concrete address; `0.0.0.0` is rejected).
+(`--host` needs one concrete address; `0.0.0.0` is rejected). A manual start
+serves only that address; `start-all.sh` also adds the loopback bridge.
 
 > `setup.sh --force` is not an upgrade path: it rewrites generated files and
 > used to be able to mint a new `PROXY_USER_KEY`, silently breaking the
@@ -184,20 +185,22 @@ Order and endpoints:
 2. MemoryProxy `:8096` (`/health`)
 3. MemoryKnowledge `:8421` (`/health`)
 4. MemoryPanel `:8123` (`/health`, binds all interfaces)
-5. dsh Web UI `:3080` (`/`, binds one concrete LAN address)
+5. dsh Web UI `:3080` (`/`, binds one concrete LAN address, loopback bridged)
 
 The dsh Web UI binds one concrete address — `start-all.sh` resolves the machine's
 LAN IPv4, `--host` pins another — because `dsh web` rejects the wildcard `0.0.0.0`:
 binding every interface at once would hand the agent's shell to networks the
-operator did not choose. One listener owns the port, so `http://127.0.0.1:3080`
-stops answering when a LAN address is bound; the start summary prints the URL that
-works. MemoryPanel's generated `.env` still sets `HOST=0.0.0.0`, so a browser on
-another machine reaches the two surfaces at `http://<this machine's LAN IP>:3080`
-and `:8123`. Every Web API call and stream needs the launch token that `dsh web`
-prints at startup, so the LAN browser opens `http://<LAN IP>:3080/?token=…`; the
-panel stays unauthenticated. The remaining `127.0.0.1` endpoints are same-machine
-server links — dsh → proxy (`:8096`), proxy → core (`:8420`) — and correctly stay
-loopback. Firewall `:3080` and `:8123` on a shared network.
+operator did not choose. The listener owns only that address, so `start-all.sh`
+also runs a loopback bridge (`scripts/setup-dsh/loopback-forward.mjs`) that
+forwards `127.0.0.1:3080` to it; both URLs in the start summary work, and
+`stop-all.sh` stops the bridge before the Web UI. MemoryPanel's generated `.env`
+still sets `HOST=0.0.0.0`, so a browser on another machine reaches the two
+surfaces at `http://<this machine's LAN IP>:3080` and `:8123`. Every Web API call
+and stream needs the launch token that `dsh web` prints at startup, so the
+browser opens the printed `/?token=…` URL; the panel stays unauthenticated. The
+remaining `127.0.0.1` endpoints are same-machine server links — dsh → proxy
+(`:8096`), proxy → core (`:8420`) — and correctly stay loopback. Firewall `:3080`
+and `:8123` on a shared network.
 
 For one-off manual starts, the only service without a repository-owned start
 helper is MemoryCore; source its `.env.local` before launching the gateway:

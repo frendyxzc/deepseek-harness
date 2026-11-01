@@ -53,6 +53,21 @@ is_listening() {
   fi
 }
 
+# is_bound <host> <port> — true only when a listener holds that exact address.
+# is_listening answers whether the port has any listener once lsof or ss is
+# available; the Web UI shares port 3080 between the LAN listener and the
+# loopback bridge, so a check that must tell them apart uses this probe.
+is_bound() {
+  local host="$1" port="$2"
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP@"$host":"$port" -sTCP:LISTEN >/dev/null 2>&1
+  elif command -v nc >/dev/null 2>&1; then
+    nc -z "$host" "$port" >/dev/null 2>&1
+  else
+    (exec 3<>"/dev/tcp/$host/$port") >/dev/null 2>&1
+  fi
+}
+
 # lan_ip — the machine's primary LAN IPv4, or empty when none is found.
 # macOS: the interface carrying the default route. Linux: the first address
 # reported by `hostname -I`.

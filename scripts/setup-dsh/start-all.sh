@@ -5,7 +5,8 @@
 #   2. MemoryProxy    :8096   (dsh's LLM baseURL — needs proxy-config.yaml)
 #   3. MemoryKnowledge :8421  (Wiki / Code-Graph)
 #   4. MemoryPanel    :8123   (stateless control panel, binds all interfaces)
-#   5. dsh Web UI     :3080   (binds one concrete address: the LAN IPv4)
+#   5. dsh Web UI     :3080   (binds one concrete address: the LAN IPv4; a
+#                              loopback bridge keeps http://127.0.0.1:3080 up)
 #
 # Each service is daemonized (logs under $DSH_HOME/run/logs, pidfiles under
 # $DSH_HOME/run/pids), and the script waits on its health endpoint before
@@ -204,6 +205,18 @@ start_service panel 8123 "http://127.0.0.1:8123/health" 30 \
   "cd '$MEMORY_ROOT/MemoryPanel' && pnpm dev"
 
 # 5. dsh Web UI :3080
+# A leftover loopback bridge from a crashed run answers on 127.0.0.1:3080 with
+# no Web UI behind it, and the port-wide listener check cannot tell the two
+# apart; clear it before deciding whether the UI is already running.
+if [[ "$WEB_HOST" != 127.0.0.1 ]] && is_bound 127.0.0.1 3080 && ! is_bound "$WEB_HOST" 3080; then
+  STALE_BRIDGE="$(lsof -nP -tiTCP@127.0.0.1:3080 -sTCP:LISTEN 2>/dev/null | head -1 || true)"
+  if [[ -n "$STALE_BRIDGE" ]]; then
+    warn "stopping stale loopback bridge on 127.0.0.1:3080 (pid $STALE_BRIDGE)"
+    kill "$STALE_BRIDGE" 2>/dev/null || true
+    sleep 1
+  fi
+  rm -f "$(pidfile dsh-web-loopback)"
+fi
 # dsh-web has no unauthenticated HTTP health route: `/` answers 401 until the
 # launch token is exchanged for its cookie, while `/health` is 404 (the static
 # fallback treats it as a missing asset). Pass an empty health URL so
@@ -211,6 +224,29 @@ start_service panel 8123 "http://127.0.0.1:8123/health" 30 \
 # "not ready (http=401)".
 start_service dsh-web 3080 "" 120 \
   "cd '$WORKSPACE' && pnpm dsh web --host $WEB_HOST --port 3080" "$WEB_HOST"
+
+# 5b. Loopback bridge :3080
+# The listener owns one address, so a LAN bind stops answering on loopback. The
+# bridge keeps the local URL working without a second dsh process: it forwards
+# the browser's bytes unchanged, including the `Host: 127.0.0.1:3080` header
+# the listener accepts as a loopback authority.
+if [[ "$WEB_HOST" != 127.0.0.1 ]]; then
+  if is_bound 127.0.0.1 3080; then
+    warn "loopback bridge already listening on 127.0.0.1:3080 — skipping"
+  else
+    rm -f "$(pidfile dsh-web-loopback)"
+    info "bridging 127.0.0.1:3080 -> $WEB_HOST:3080 — log: $(logfile dsh-web-loopback)"
+    node "$SCRIPT_DIR/loopback-forward.mjs" 3080 "$WEB_HOST" \
+      > "$(logfile dsh-web-loopback)" 2>&1 &
+    echo $! > "$(pidfile dsh-web-loopback)"
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      is_bound 127.0.0.1 3080 && break
+      sleep 0.5
+    done
+    is_bound 127.0.0.1 3080 \
+      || warn "loopback bridge did not answer within 5s — see $(logfile dsh-web-loopback)"
+  fi
+fi
 
 # Extract the authentication token from the dsh-web log. The token is printed
 # once at startup; grab it so the summary can show the authenticated URL.
@@ -235,14 +271,13 @@ else
   warn "no LAN IP detected — the memory panel is reachable via loopback only"
   echo "  MemoryPanel     http://127.0.0.1:8123  (control panel)"
 fi
-# The Web UI answers on the one address it bound, so this machine uses that
-# address too when it is a LAN address.
+# The Web UI answers on the LAN address and through the loopback bridge.
 if [[ -n "$DSH_WEB_TOKEN" ]]; then
   echo "  dsh Web UI      http://$WEB_HOST:3080/?token=$DSH_WEB_TOKEN"
+  [[ "$WEB_HOST" = 127.0.0.1 ]] \
+    || echo "                  http://127.0.0.1:3080/?token=$DSH_WEB_TOKEN  (loopback bridge)"
 else
   echo "  dsh Web UI      http://$WEB_HOST:3080"
   warn "could not extract dsh-web token from log — check $(logfile dsh-web)"
 fi
-[[ "$WEB_HOST" = 127.0.0.1 ]] \
-  || echo "                (bound to $WEB_HOST only — http://127.0.0.1:3080 does not answer)"
 echo "Stop with:       ./scripts/setup-dsh/stop-all.sh"

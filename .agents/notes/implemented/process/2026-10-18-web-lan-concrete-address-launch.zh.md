@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-启动器改为点名一个具体地址，而不再要求监听器拥有全部地址。`start-all.sh` 依此顺序解析 Web 绑定主机：`--host` 选项、`DSH_WEB_HOST`、承载默认路由接口的 `lan_ip`，最后在没有局域网地址时回退 `127.0.0.1` 并给出警告。它把该值同时传给 `pnpm dsh web --host` 与 `start_service`，于是“已在监听”的跳过、就绪探测与打印的摘要点名的都是监听器真正持有的地址。`lib.sh` 的 `is_listening` 接收该地址并优先使用 `lsof`，其次 `ss`，再退到只能拨单个地址的 `nc` 与 `/dev/tcp` 探测；`wait_healthy` 把地址转发给它。`setup.sh` 在手工启动提示中打印解析出的地址。记忆面板保留自己的 `HOST=0.0.0.0`：该服务位于独立的 TencentDB 检出中，不受 Web 绑定策略任何部分约束。
+启动器改为点名一个具体地址，而不再要求监听器拥有全部地址。`start-all.sh` 依此顺序解析 Web 绑定主机：`--host` 选项、`DSH_WEB_HOST`、承载默认路由接口的 `lan_ip`，最后在没有局域网地址时回退 `127.0.0.1` 并给出警告。它把该值同时传给 `pnpm dsh web --host` 与 `start_service`，于是“已在监听”的跳过、就绪探测与打印的摘要点名的都是监听器真正持有的地址。监听器仍只持有该地址，因此启动器还会运行一个回环桥接（`scripts/setup-dsh/loopback-forward.mjs`）：把 `127.0.0.1:3080` 的 TCP 转发到该地址，拥有自己的 pidfile 与日志。它不是第二个 dsh 进程——不持有任何 Session、profile 或 token——原样转发浏览器字节，于是监听器收到 `Host: 127.0.0.1:3080`，并通过其 Host 栅栏的回环分支接受它。`lib.sh` 的 `is_listening` 接收该地址并优先使用 `lsof`，其次 `ss`，再退到只能拨单个地址的 `nc` 与 `/dev/tcp` 探测；由于 `lsof` 对整端口作答，Web UI 的检查改用新增的 `is_bound`，只探测一个精确地址，`wait_healthy` 则把地址转发给 `is_listening`。`stop-all.sh` 先停止桥接再停止 Web UI，使按端口的兜底不会停错监听器。`setup.sh` 在手工启动提示中打印解析出的地址。记忆面板保留自己的 `HOST=0.0.0.0`：该服务位于独立的 TencentDB 检出中，不受 Web 绑定策略任何部分约束。
 
 ## 曾考虑的替代方案
 
@@ -22,8 +22,8 @@ Status: implemented
 
 ## 后果
 
-局域网绑定只在该地址应答：局域网地址提供服务时 `http://127.0.0.1:3080` 会拒绝连接，所以 `start-all.sh` 打印已绑定的 URL，`scripts/setup-dsh/README.zh.md` 说明同一条限制。就绪判断、重启检测与等待端口释放仍能工作，因为 `lsof` 和 `ss` 能看到任意绑定地址；两者都没有的主机只能探测自己点名的地址，而启动器现在提供了该地址。本分叉仍然告诉局域网浏览器配置层仅限本机访问（[ui-settings-general](../../../../packages/client/ui-settings-general/src/client/index.ts) 与 Models store 中的 `ctx.remote.$host.isLoopback`），尽管上游现在会用进程启动 token 认证每一个浏览器，并让监听器自身的绑定地址通过 Host 栅栏；撤掉这道客户端闸门是另一个独立决策，需要它自己的暴露面评审。
+局域网绑定在该地址应答，回环桥接也让 `http://127.0.0.1:3080` 应答，因此启动摘要中的两个 URL 都可用。崩溃的启动器留下的桥接会占住回环却没有 Web UI 在后，而按端口的监听探测无法区分两者，所以 `start-all.sh` 在判断 Web UI 是否已在运行之前先清理陈旧的桥接。就绪判断、重启检测与等待端口释放仍能工作，因为 `lsof` 和 `ss` 能看到任意绑定地址；两者都没有的主机只能探测自己点名的地址，而启动器现在提供了该地址。本分叉仍然告诉局域网浏览器配置层仅限本机访问（[ui-settings-general](../../../../packages/client/ui-settings-general/src/client/index.ts) 与 Models store 中的 `ctx.remote.$host.isLoopback`），尽管上游现在会用进程启动 token 认证每一个浏览器，并让监听器自身的绑定地址通过 Host 栅栏；撤掉这道客户端闸门是另一个独立决策，需要它自己的暴露面评审。
 
 ## 测试
 
-对 `lib.sh`、`start-all.sh`、`setup.sh` 执行 `bash -n`。针对合并后的树实测：`pnpm dsh web --host <LAN IPv4> --port 3980 --no-open` 警告纯 HTTP 并打印 `dsh web: http://<LAN IPv4>:3980/?token=…`；同一端口上的 `127.0.0.1` 拒绝连接；带 token 的请求返回 `303` 并设置一个 `HttpOnly`、`SameSite=Strict` 且受众为已绑定权威的 cookie；干净路径带着该 cookie 返回 `200`，不带则返回 `401`；`pnpm dsh web --host 0.0.0.0` 以 1 退出并打印通配消息，没有 URL 行。
+对 `lib.sh`、`start-all.sh`、`stop-all.sh`、`setup.sh` 执行 `bash -n`。针对合并后的树实测：`pnpm dsh web --host <LAN IPv4> --port 3981 --no-open` 警告纯 HTTP 并打印 `dsh web: http://<LAN IPv4>:3981/?token=…`；在桥接存在之前，同一端口上的 `127.0.0.1` 拒绝连接。由 `loopback-forward.mjs` 转发 `127.0.0.1:3981` 后，回环上的 token 请求返回 `303` 并设置一个 `HttpOnly`、`SameSite=Strict` 且受众为回环权威的 cookie；干净路径带着该 cookie 返回 `200`，不带则返回 `401`；局域网 URL 返回同样的 `303`。对哑源服务器测试时，桥接把 `Host: 127.0.0.1:<port>` 原样送达目标。停止两者后端口上没有残留监听器。`pnpm dsh web --host 0.0.0.0` 以 1 退出并打印通配消息，没有 URL 行。

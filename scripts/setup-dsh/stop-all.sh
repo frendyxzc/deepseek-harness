@@ -51,6 +51,25 @@ stop_one() {
   warn "$name: not managed by start-all.sh — skipping"
 }
 
+# The loopback bridge shares :3080 with the Web UI, so it is stopped first by
+# its own pidfile. A bridge left behind by a crashed launcher has no pidfile;
+# two listeners on the port identify it, because a lone loopback listener is
+# the Web UI itself, which stop_one still owns. stop_on_port would otherwise
+# stop an arbitrary one of the two.
+stop_loopback_bridge() {
+  local count pid
+  count="$(lsof -nP -tiTCP:3080 -sTCP:LISTEN 2>/dev/null | wc -l | tr -d ' ')"
+  (( count > 1 )) || return 0
+  pid="$(lsof -nP -tiTCP@127.0.0.1:3080 -sTCP:LISTEN 2>/dev/null | head -1 || true)"
+  [[ -n "$pid" ]] || return 0
+  warn "stopping unmanaged loopback bridge on 127.0.0.1:3080 (pid $pid)"
+  kill "$pid" 2>/dev/null || true
+}
+
+if [[ -f "$(pidfile dsh-web-loopback)" ]]; then
+  stop_one dsh-web-loopback
+fi
+stop_loopback_bridge
 for name in dsh-web panel knowledge proxy core; do
   stop_one "$name"
 done
